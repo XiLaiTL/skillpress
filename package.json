@@ -1,7 +1,7 @@
 {
   "name": "skillpress-tools",
   "private": true,
-  "description": "skillpress 引擎的依赖 —— **只有高亮这一处**（其余 *.mjs 零依赖，随时可直接跑）。放 dependencies 而不是 devDependencies：`npm config get omit=dev` 时 dev 依赖会被静默跳过，引擎缺了高亮就悄悄没了。",
+  "description": "skillpress **本仓开发用**的 npm 依赖 —— 只有高亮这一处，而且只为**冻结的旧实现**（lib/*.mjs，判据要拿它现场产出基准）留着：新引擎的运行时已经随包 vendor（vendor/web-tree-sitter/）⇒ 拿到包的人不需要它。放 dependencies 而不是 devDependencies：`npm config get omit=dev` 时 dev 依赖会被静默跳过，判据会因此拿不到旧基准。",
   "dependencies": {
     "web-tree-sitter": "^0.27.0"
   },

@@ -110,7 +110,14 @@ function prepareRoot(arg, needSkills = true) {
 
 /** 装 tree-sitter + 五份语法（名字取自 `grammars/<名字>.wasm`，与 scm 同名）。 */
 async function boot() {
-  const ts = await import("web-tree-sitter");
+  // 运行时是**随包 vendored** 的那份（与 `launcher/skillpress.mjs` 同一口径，见
+  // `vendor/web-tree-sitter/PROVENANCE.md`）：用**路径**导入而不是裸包名 —— 裸名会去 node_modules
+  // 里找，而我们要保证的正是"**没有** node_modules 也能跑"。
+  // ⚠️ **旧实现**（`lib/*.mjs` 那些冻结的参照物）仍然是裸包名 ⇒ 它们仍要 node_modules。
+  //    那也正是 `package.json` 里那个依赖今天存在的**唯一**理由：判据要跑旧实现现场产出基准。
+  const ts = await import(
+    new URL("../vendor/web-tree-sitter/web-tree-sitter.js", import.meta.url).href
+  );
   await ts.Parser.init();
   const dir = join(ROOT, "grammars");
   const langs = {};

@@ -37,6 +37,9 @@ cmd/skillpress/main.mbt
 cmd/skillpress/moon.pkg
 grammars/moonbit.wasm
 grammars/PROVENANCE.md
+vendor/web-tree-sitter/web-tree-sitter.js
+vendor/web-tree-sitter/web-tree-sitter.wasm
+vendor/web-tree-sitter/PROVENANCE.md
 skills/skillpress-dev/SKILL.md
 skills/skillpress-user/SKILL.md
 engine/gates/:8

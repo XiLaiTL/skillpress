@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# consumer-check.sh —— **消费者视角**：从 `moon package` 打出来的 **zip** 出发，走一遍"拿到包的人"要做的三步
-# （解压成项目里的包 / 装那唯一的 npm 依赖 / 编一次 CLI），然后用**包里的启动器**跑 `check` 与 `gen-file`。
+# consumer-check.sh —— **消费者视角**：从 `moon package` 打出来的 **zip** 出发，走一遍"拿到包的人"要做的两步
+# （解压成项目里的包 / 编一次 CLI），然后用**包里的启动器**跑 `check` 与 `gen-file`。
 #
 #   bash tools/consumer-check.sh          # 不需要 SKILLPRESS_CORPUS：它自带夹具
 #
 # ── 为什么必须有它（R6 的尾巴 + 发布清单第 7 条的预演）────────────────────────────
 # "本地工作区形态能跑"**不构成证据**：工作区里有 `tools/`、有 `node_modules`、有 `_build`，
 # 而包里一样都没有（`.moonignore` 钉着）。这个仓库里"发布包 ≠ 工作区"是有前科的。
-# 所以这里只用 **zip 里的东西 + 使用者自己装的那一个 npm 依赖**，而且：
+# 所以这里只用 **zip 里的东西**，而且**一个 npm 依赖都不装**：
 #
-#   · 先证明 **`check` 在没有那个 npm 依赖时也能跑**（门与高亮没有任何依赖关系）；
-#   · 再装上依赖，证明 `gen-file` 的产物与**本地引擎**在同一份夹具上**逐字节一致**；
+#   · 先证明 `check` 在没有 node_modules 的干净目录里能跑（门与高亮没有任何依赖关系）；
+#   · 再证明 `gen-file` 也能跑 —— **运行时（`vendor/web-tree-sitter`）随包发**，这就是"0 npm"的判据；
+#   · 包里的产物与**本地引擎**在同一份夹具上**逐字节一致**（两边都没有 npm）；
 #   · 两个反证：夹具里放个死路径 ⇒ `check` 必须红；放个认不出的构造 ⇒ `gen-file` 必须退 2 且不吐产物。
 #
 # ⚠️ **前置断言**：`node -e 'import("web-tree-sitter")'` 在消费者目录里必须**解析不到**，
@@ -91,30 +92,29 @@ else
   tail -4 "$BASE/check1.txt" | sed 's/^/      /'
 fi
 
-echo "⑥ 没装 npm 依赖时：\`gen-file\` 必须**说清缺什么**并退 2（不是崩栈、更不是吐半份产物）"
-node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen1.txt" 2> "$BASE/gen1.err"
-r2=$?
-[ "$r2" = 2 ] && grep -q 'npm i web-tree-sitter' "$BASE/gen1.err" && [ ! -s "$BASE/gen1.txt" ] &&
-  ok "缺依赖时：退 2 + 指名要装什么 + stdout 空" ||
-  { bad "缺依赖时表现不对（退出码 $r2）"; head -3 "$BASE/gen1.err" | sed 's/^/      /'; }
-
-echo "⑦ 装上那唯一的依赖（装在**项目根**：Node 从包里往上一层层找得到）"
-( cd "$BASE/proj" && npm i --silent --no-audit --no-fund web-tree-sitter > "$BASE/npm.log" 2>&1 ) &&
-  ok "npm i web-tree-sitter 完成" || { bad "npm i 失败"; tail -3 "$BASE/npm.log" | sed 's/^/      /'; }
-
-echo "⑧ \`gen-file\` 在包里跑出的产物 == 本地引擎的产物（逐字节）"
+echo "⑥ 没装任何 npm 依赖时：\`gen-file\` 也必须**跑通**（运行时随包 vendor，见 vendor/web-tree-sitter）"
+# ⚠️ 这一段 2026-10-06 之前是"必须退 2 并指名 npm i web-tree-sitter" —— 那是**当时的**代价。
+#    运行时（MIT、两个文件）现在随包发 ⇒ 这条路不再需要 npm。**这条断言就是"0 npm"的判据。**
 node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen-pkg.mbt" 2> "$BASE/gen-pkg.err"
-r3=$?
+r6=$?
+if [ "$r6" = 0 ] && [ -s "$BASE/gen-pkg.mbt" ]; then
+  ok "没有 npm 依赖也能出产物（$(wc -l < "$BASE/gen-pkg.mbt" | tr -d ' ') 行）"
+else
+  bad "没有 npm 依赖时 gen-file 跑不通（退出码 $r6）—— 运行时没随包发？"
+  head -3 "$BASE/gen-pkg.err" | sed 's/^/      /'
+fi
+
+echo "⑦ 包里的产物 == 本地引擎的产物（逐字节；两边都**没有** npm）"
 node tools/run-js.mjs gen-file "$FIX" > "$BASE/gen-local.mbt" 2> /dev/null
-r4=$?
-if [ "$r3" = 0 ] && [ "$r4" = 0 ] && cmp -s "$BASE/gen-pkg.mbt" "$BASE/gen-local.mbt"; then
+r7=$?
+if [ "$r6" = 0 ] && [ "$r7" = 0 ] && cmp -s "$BASE/gen-pkg.mbt" "$BASE/gen-local.mbt"; then
   ok "两边的 content.generated.mbt **逐字节一致**（$(wc -l < "$BASE/gen-pkg.mbt" | tr -d ' ') 行）"
 else
   bad "包里的产物与本地不一致（rc $r3 / $r4）"
   diff "$BASE/gen-local.mbt" "$BASE/gen-pkg.mbt" | head -6 | sed 's/^/      /'
 fi
 
-echo "⑨ 反证：坏内容在包里也必须红"
+echo "⑧ 反证：坏内容在包里也必须红"
 printf -- '---\nname: alpha\ndescription: 夹具\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n见 `docs/没有这份文档.md`。\n' > "$FIX/alpha/SKILL.md"
 node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" > "$BASE/check2.txt" 2>&1
 r5=$?

@@ -2,7 +2,8 @@
 
 站点的高亮在**构建期**做（`../highlight.mjs`）：用 tree-sitter 解析代码块，再按语法自带的
 `queries/highlights.scm` 把节点映射到我们自己的调色板。这个目录只放**语法资产**（wasm + 查询），
-运行时（`web-tree-sitter`）是 `../package.json` 里那一个依赖。
+运行时（`web-tree-sitter`）**也 vendor 进来了** —— 在 `../vendor/web-tree-sitter/`（2026-10-06 起；
+在那之前它是 `../package.json` 里那一个 npm 依赖）。
 
 ## 为什么要 vendor 进仓库（而不是装成依赖）
 

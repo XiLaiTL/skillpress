@@ -30,19 +30,29 @@
 # `/_scratch/`    草稿区。
 #
 # ⚠️ **拿到这个包的人怎么用它**（R6 那一问，2026-10-06 有答案了）：包里带一个**启动器**
-# `launcher/skillpress.mjs`（js target 的 CLI 本来就需要一个 Node 启动器：`web-tree-sitter` 的
-# `Parser.init()` 是 Promise，而 `moon build --target js` 出的是 CJS、顶层 await 不成立）。三步：
+# `launcher/skillpress.mjs`（js target 的 CLI 本来就需要一个 Node 启动器：`Parser.init()` 是 Promise，
+# 而 `moon build --target js` 出的是 CJS、顶层 await 不成立）。两步，**一个 npm 依赖都不用装**：
 #
 #   PKG=<你项目>/.mooncakes/XiLaiTL/skillpress
 #   moon -C "$PKG" build cmd/skillpress --target js      # 编一次（产物落在包自己的 _build/）
-#   node "$PKG/launcher/skillpress.mjs" check --skills ./skills
-#   npm i web-tree-sitter                                # ← 只有需要**高亮**时（gen-file / hl / batch）
+#   node "$PKG/launcher/skillpress.mjs" check  --skills ./skills        # 门
+#   node "$PKG/launcher/skillpress.mjs" gen-file ./skills > content.generated.mbt
 #
-# `check`（G1–G4 / G7 / G8）**不需要那个 npm 依赖** —— 启动器在 check 这条路上连 tree-sitter
-# 都不 import（实测：干净目录下没有依赖时 check 照样全过）。这条路的账记在这儿：`grammars/`
-# 随包发（署名见 THIRD-PARTY-NOTICE），`web-tree-sitter` 只能由使用者自己装。
-# 判据 `tools/consumer-check.sh` 把上面这套**从 zip 出发**跑一遍（含"没依赖时 check 必须能跑"
-# 与"包里的产物必须与本地引擎逐字节一致"），判据 `tools/package-check.sh` 钉住下面两张清单。
+# **为什么不需要 npm**：tree-sitter 的**运行时**（`web-tree-sitter`：MIT、一个 ESM 入口 + 一个 wasm）
+# 与**语法资产**（`grammars/*.wasm` + `*.scm`）都**随包 vendor 发**了 ——
+# 见 `vendor/web-tree-sitter/PROVENANCE.md` 与 `grammars/PROVENANCE.md`（含版本、许可、sha256）。
+# 实测：把 `node_modules` 整个移开，`gen-file` 与全语料 `batch` 都照跑。
+#
+# ⚠️ 顺带记一笔"为什么不用 MoonBit 那边的 tree-sitter 包"（2026-10-06 实测）：
+#   · `tonyfettes/tree_sitter` 在 **js 上的实现就是 `await import("web-tree-sitter")`**
+#     （`src/init.js.mbt`）⇒ 用它去不掉 npm，反而多一层依赖；
+#   · 加载语法/query 的 `tonyfettes/tree_sitter_language` 声明 `supported-targets: "+native"`
+#     ⇒ js 目标上编不过（P8.0 的报错就是它）；
+#   · **native** 只对"把引擎自己编成本机二进制"有用（那是唯一能额外给的东西：一支不依赖 Node 的 CLI），
+#     与"站点支持多端"无关 —— 多端是**宿主层**的事（expo / rnw / webview，全是 js 运行时），
+#     而**高亮在构建期就算完**（色号写进生成物）⇒ 运行的应用在任何宿主上都不需要 tree-sitter。
+# 判据 `tools/consumer-check.sh` 把上面这套**从 zip 出发**跑一遍（含"没有 npm 也能出产物"与
+# "包里的产物必须与本地引擎逐字节一致"），判据 `tools/package-check.sh` 钉住下面两张清单。
 # `/tools/`        判据、夹具、基线与探针 —— 开发期的东西（**启动器不在这一层**：它进包）。
 /tools/
 /_build/

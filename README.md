@@ -58,6 +58,8 @@ npm install && npm run press && npm run build && npm run serve   # → http://12
 | `lib/docfacts.mjs` | 同上：**冻结的对照物** —— 事实来源对账（只查算得出来的）。按 D18 已搬去内容仓（`moobile/tools/skillpress-gates.mjs`），程序这边只留旧实现 |
 | `lib/verify-site.mjs` | 同上：站点判据（真 Chrome 无头 + CDP 真鼠标事件） |
 | `grammars/` | vendor 的语法资产（wasm + `highlights.scm`），出处与 sha256 见它的 `PROVENANCE.md` |
+| `vendor/web-tree-sitter/` | vendor 的 tree-sitter **运行时**（MIT：一个 ESM 入口 + 一个 wasm）—— 与 `grammars/` 一起**随包发** ⇒ 拿到包的人**一个 npm 依赖都不用装**（见它的 `PROVENANCE.md`） |
+| `launcher/skillpress.mjs` | 随包发的**启动器**：`Parser.init()` 是 Promise 而 js 产物是 CJS ⇒ 需要一个能 await 的 Node 启动器（`check` 那条路上连 tree-sitter 都不 import） |
 | `SPEC.md` / `SKILLS.md` / `DRIFT.md` | 投影规范 / 集合划分 / 漂移政策（跟着程序走 = 对外契约） |
 | `PLAN.md` | **计划**（会变）：还没做的、已定的决定（D1–D26）、要探的未知 |
 | `claims.txt` / `skills.lock.json` | 禁语表（G7 用，**随包发**）/ 体量指纹锁（每条指纹记着**属于哪个内容根**；锁**不随包发**）。⚠️ 已落地台账 `done-claims.txt` 与 `facts` 那道门按 D18 **搬去内容仓自己**了（`moobile/tools/skillpress-gates.mjs`） |

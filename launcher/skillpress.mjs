@@ -13,17 +13,19 @@
  *
  * ```bash
  * PKG=<你项目>/.mooncakes/XiLaiTL/skillpress      # 包被 moon 装到这里（或任何你解压出来的目录）
- * npm i web-tree-sitter                          # ← 运行时唯一的 npm 依赖（装在**你项目**里即可，
- *                                                #    Node 从包内往上一层层找得到）
  * moon -C "$PKG" build cmd/skillpress --target js # 编一次（产物落在包自己的 _build/ 里）
  *
  * node "$PKG/launcher/skillpress.mjs" check  --skills ./skills        # 门：G1–G4 / G7 / G8
  * node "$PKG/launcher/skillpress.mjs" gen-file ./skills > content.generated.mbt
  * ```
  *
- * ⚠️ **`check` 不需要 tree-sitter**（门不碰高亮）—— 那一条在 `gen-file` 之前就分发掉了，
- *    所以没装 npm 依赖时 `check` 照样能跑（实测）。需要高亮的只有 `gen-file` / `hl` / `batch`
- *    / `dump-blocks`（`dump-blocks` 里也带高亮片段）。
+ * ⚠️ **一个 npm 依赖都不用装**：tree-sitter 的**运行时**与**语法资产**都随包 vendor 发
+ *    （`vendor/web-tree-sitter/` + `grammars/`，见各自的 `PROVENANCE.md`）——
+ *    所以这里用**路径**导入运行时，而不是裸包名（裸名会去 `node_modules` 找）。
+ *    （2026-10-06 之前使用者得自己 `npm i web-tree-sitter`；那条账已经还清了。）
+ *
+ * ⚠️ **`check` 连 tree-sitter 都不 import**（门不碰高亮）—— 那一条在 `gen-file` 之前就分发掉了。
+ *    需要高亮的只有 `gen-file` / `hl` / `batch` / `dump-blocks`（`dump-blocks` 里也带高亮片段）。
  *
  * ⚠️ **如实记下的代价**：`grammars/`（wasm + scm）随包发（署名见 `THIRD-PARTY-NOTICE.md`），
  *    但 `web-tree-sitter` 只能由使用者 `npm i` —— 这是"js target + 树剖析"这条路本身的账。
@@ -125,16 +127,18 @@ function prepareRoot(arg, needSkills = true) {
 
 /** 装 tree-sitter + 五份语法（名字取自 `grammars/<名字>.wasm`，与 scm 同名）。 */
 async function boot() {
-  // ⚠️ 缺依赖时**说人话**：`import` 抛的 ENOENT 栈对"拿到包的人"毫无信息量
-  //    （他会以为包坏了）。所以这里把话讲清：要装什么、在哪装、以及"只想跑门的话不用装"。
+  // ── 运行时是**随包 vendored** 的那份 ⇒ 这条路**不需要 npm**（见 vendor/web-tree-sitter/PROVENANCE.md）──
+  // ⚠️ 用**路径**导入，不写裸包名：裸名会去 node_modules 里找，而"**没有** node_modules"
+  //    恰恰是我们要保证的那个场景（曾经的代价：使用者必须 `npm i web-tree-sitter`）。
   let ts;
   try {
-    ts = await import("web-tree-sitter");
+    ts = await import(new URL("../vendor/web-tree-sitter/web-tree-sitter.js", import.meta.url).href);
   } catch (e) {
+    // 走到这儿 = 包不完整（vendored 运行时不在），不是"你少装了什么" ⇒ 说清是包的问题
     console.error(
-      "✗ 缺 npm 依赖 web-tree-sitter（高亮要用它；**门不需要**）。\n" +
-        "  在你的项目里装一次即可：npm i web-tree-sitter\n" +
-        "  （Node 从这份包往上一层层找 node_modules，所以装在项目根就行）",
+      "✗ 包里的 tree-sitter 运行时不在（vendor/web-tree-sitter/web-tree-sitter.js）——\n" +
+        "  这份包不完整（正常情况下它是随包发的，不需要你装任何 npm 依赖）。\n" +
+        "  若你正从源码跑：`moon package` 出的 zip 里应当有 vendor/ 这一层。",
     );
     process.exit(2);
   }

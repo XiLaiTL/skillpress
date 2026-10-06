@@ -11,7 +11,8 @@
 ## 1. 语法资产（**随包分发**，`grammars/`）
 
 `grammars/` 里的 `.wasm` 是**第三方编译产物**，我们**原样 vendor、未做修改**；`.scm` 是它们自带的查询文件。
-运行期用的解析库是 `web-tree-sitter`（见 §2）。逐文件的出处、版本与 sha256 见 `grammars/PROVENANCE.md`。
+运行期用的解析库是 `web-tree-sitter` —— 它**与语法一起随包 vendor**（`vendor/web-tree-sitter/`）。
+逐文件的出处、版本与 sha256 见 `grammars/PROVENANCE.md` 与 `vendor/web-tree-sitter/PROVENANCE.md`。
 
 | 项目 | 上游 | 许可 |
 |---|---|---|
@@ -31,10 +32,11 @@
 | 项目 | 上游 | 许可 | 说明 |
 |---|---|---|---|
 | **mizchi/markdown** | <https://github.com/mizchi/markdown> | MIT | 内容管线的 markdown 解析（`SPEC` 里"解析边界"那套的底层） |
-| **web-tree-sitter**（npm） | <https://github.com/tree-sitter/tree-sitter> | MIT | **js target 的运行期依赖**：薄垫片透过它跑查询（见 `engine/highlight/ts_shim.mbt`） |
+| **web-tree-sitter**（npm，**已随包 vendor**） | <https://github.com/tree-sitter/tree-sitter> | MIT | js target 的**运行期**：薄垫片透过它跑查询（见 `engine/highlight/ts_shim.mbt`）。**原样 vendor 未修改**（`vendor/web-tree-sitter/`，含它自己的 LICENSE + sha256），所以"0 npm"成立 |
 
-⚠️ 这两条是**依赖**，不是我们分发的代码：前者由 mooncakes 按 `moon.mod` 的声明解析，
-后者由 npm 按 `package.json` 解析。但它们决定了"这个包能不能跑起来"，所以列在明处。
+⚠️ 前一条（`mizchi/markdown`）是**依赖**：由 mooncakes 按 `moon.mod` 的声明解析。
+后一条（`web-tree-sitter`）从 2026-10-06 起**随包分发**了（原样 vendor）⇒ 拿到包的人**一个 npm 依赖都不用装**。
+（`package.json` 里那条依赖今天只为**本仓的旧实现**留着：判据要跑冻结的 `lib/*.mjs` 现场产出基准。）
 
 ## 3. 我们自己的东西
 
