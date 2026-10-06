@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fresh-clone-check.sh —— **干净克隆自查**：把 HEAD 克隆到临时目录（**只有 tracked 文件**），
-# 装依赖，跑四条对账判据 + R9 + 诊断口径账本。
+# 装依赖，跑四条对账 + R9 + 诊断账本 + MoonBit 坑位 + 包内容。
 #
 #   SKILLPRESS_CORPUS=<内容仓>/skills bash tools/fresh-clone-check.sh
 #   SKILLPRESS_CORPUS=<内容仓>/skills bash tools/fresh-clone-check.sh --selftest   # 诱饵
@@ -58,6 +58,9 @@ run highlight-parity bash tools/highlight-parity.sh
 run blocks-fixtures bash tools/blocks-fixtures.sh
 run line-budget bash tools/line-budget.sh
 run diagnostics-ledger bash tools/diagnostics-ledger.sh
+run mbt-traps bash tools/mbt-traps.sh
+# 包内容也在干净克隆里复核：这里**没有未跟踪文件**，所以清单反映的就是版本库的真实内容
+run package-check bash tools/package-check.sh
 echo
 
 # ── 诱饵（--selftest）：把一条检测规矩的**措辞**改掉 ⇒ blocks-fixtures 必须点出这一条 ──────
@@ -86,7 +89,7 @@ if [ "$SELFTEST" = 1 ]; then
 fi
 
 if [ "$fail" -eq 0 ]; then
-  echo "✓ 干净克隆自查通过：四条对账 + R9 在**只有 tracked 文件**、**现编**的克隆里全绿"
+  echo "✓ 干净克隆自查通过：上面那几条（对账 / 夹具 / R9 / 诊断账本 / MoonBit 坑位 / 包内容）在**只有 tracked 文件**、**现编**的克隆里全绿"
 else
   echo "✗ 干净克隆自查：$fail 项失败（$red ）—— 本机绿不算数，先修这里"
   exit 1

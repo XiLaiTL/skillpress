@@ -164,6 +164,17 @@ if [ -f "$INSTANCE/dist/bundle.js" ]; then
     printf '%s\n' "$stale" | sed 's/^/      /'
   elif node bin/skillpress.mjs verify > /tmp/acc-verify.log 2>&1; then
     ok "verify 判据全过（$(grep -oE '全部通过（[0-9]+ 条）' /tmp/acc-verify.log | tail -1)）"
+  elif grep -q '等不到：Chrome 的调试端口' /tmp/acc-verify.log; then
+    # ⚠️ **真浏览器判据天生会抖**（实测：同一份代码，一次"等不到 Chrome 的调试端口"、紧接着单独重跑
+    #    22/22 全过）。这种"基础设施没起来"的红必须处理 —— 但**不许无声重试**（那会把判据变成摆设，
+    #    也会训练人忽略它）。所以三条同时成立才重试：① 只认**这一种**错误（断言失败一律不重试）；
+    #    ② 重试**打出来**给人看；③ **断言一条都不放宽**（重试后仍要 22 条全过）。
+    echo "      ·  Chrome 调试端口第一次没起来（环境抖动，不是断言失败）⇒ 明着重试一次"
+    if node bin/skillpress.mjs verify > /tmp/acc-verify.log 2>&1; then
+      ok "verify 判据全过（重试一次后：$(grep -oE '全部通过（[0-9]+ 条）' /tmp/acc-verify.log | tail -1)）"
+    else
+      bad "verify 重试后仍有红的（两次红 ≈ 真问题）"; tail -3 /tmp/acc-verify.log | sed 's/^/      /'
+    fi
   else
     bad "verify 有红的"; tail -3 /tmp/acc-verify.log | sed 's/^/      /'
   fi
