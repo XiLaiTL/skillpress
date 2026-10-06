@@ -191,6 +191,18 @@ fn find_next(c : Array[Char], from : Int) -> Hit? {
 }
 
 ///|
+/// 删掉字符串里**所有**反引号（链接 label 用；对应 JS 的 `.replace(/`/g, "")`）。
+fn drop_backticks(s : String) -> String {
+  let mut out = ""
+  for ch in s {
+    if ch != '`' {
+      out = out + ch.to_string()
+    }
+  }
+  out
+}
+
+///|
 /// `^[\w./-]+$`（`\w` = 字母 / 数字 / 下划线）—— 链接 label 走 `Code` 还是 `Txt` 看它。
 fn wordy(s : String) -> Bool {
   if s.length() == 0 {
@@ -224,7 +236,9 @@ fn external_link(s : String) -> Bool {
       ch.to_string()
     }
   }).fold(init="", fn(acc, x) { acc + x })
-  low.has_prefix("http:")
+  // ⚠️ `/^https?:/i` 是 "http" + **可有可无的 s** + ":" —— 之前只判 `has_prefix("http:")`，
+  // 于是 `https://…` 被当成站内链接、拆成了两个片段（夹具逮到的）
+  low.has_prefix("http:") || low.has_prefix("https:")
 }
 
 ///|
@@ -256,7 +270,9 @@ pub fn inline(s : String) -> Array[Span] {
     } else if h.kind == 1 {
       emit(Bold(slice(c, h.a, h.b)))
     } else {
-      let label = slice(c, h.a, h.b).replace(old="`", new="")
+      // ⚠️ JS 那边是 `.replace(/`/g, "")` —— **全局删**。MoonBit 的 `String::replace` 只换第一处，
+      // 所以这里手写"滤掉所有反引号"（夹具里 ``[`a` 和 `b`](…)`` 逮到过）
+      let label = drop_backticks(slice(c, h.a, h.b))
       let target = trim(slice(c, h.a2, h.b2))
       if label == target || external_link(target) {
         emit(if wordy(label) { Code(label) } else { Txt(label) })
