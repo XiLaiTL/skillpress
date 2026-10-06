@@ -60,19 +60,24 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | `tools/run-js.mjs` | js 那条图的**引导层**：先 `await` 装好 tree-sitter 与 5 份语法，再进 MoonBit（CJS 不能顶层 await） |
 | `tools/spike/` | P8.0 探针 + 对账的**基准生成器**（不进发布包，`.moonignore` 已排掉） |
 
-## 对账（迁移期最硬的两条判据）
+## 对账与验收（判据都写在明处）
 
 引擎正在从 Node 版搬进 MoonBit（`PLAN.md` 的 P8）。搬的过程**只认一条**：
 新实现的输出要与旧实现的产物**逐字节一致** —— "看着差不多"不算数。
 
 ```bash
-# ① 上色：新实现 vs 旧实现（直接调 lib/highlight.mjs）在**全语料**上的读数必须逐字节一致
-SKILLPRESS_CORPUS=../moobile/skills bash tools/highlight-parity.sh
-# ② 文档块：新实现吐出的 `blocks: […]` vs **旧实现已经产出的** content.generated.mbt
-SKILLPRESS_CORPUS=../moobile/skills bash tools/blocks-parity.sh
+export SKILLPRESS_CORPUS=../moobile/skills     # 下面的命令都按这个内容根跑
+bash tools/highlight-parity.sh    # ① 上色：与旧实现（直接调 lib/highlight.mjs）在全语料上逐字节一致
+bash tools/blocks-parity.sh       # ② 文档块：与**旧实现已产出**的 content.generated.mbt 逐字节一致
+bash tools/blocks-fixtures.sh     # ③ 夹具：现场用旧生成器造基准，专打 7 份真内容覆盖不到的边界
+bash tools/line-budget.sh         # ④ R9：每个源文件 ≤400 行（--selftest 会造 401 行的诱饵证明它会红）
+bash tools/acceptance.sh          # ⑤ 验收：按 PLAN §6 的 A1/A2/A3 逐条查（红在哪 = 还差什么）
 ```
 
-两条脚本都会把两边的原始输出与 diff 落在 `_build/parity/`（产物目录，不进仓）。
+前三条会把两边的原始输出与 diff 落在 `_build/parity/`（产物目录，不进仓）。
+
+⚠️ `acceptance.sh` 的 A1 那几条要**编译本模块**，所以它的读数只在"本模块没人在改"时可信
+（有别的进程/子代理正在改时，你会看到"20 个错误"这种**别人的半成品**读数）。
 
 ## 程序自己的 skill（`skills/`）
 
