@@ -6,49 +6,72 @@
       "lines": 358,
       "bytes": 19809,
       "rows": 52,
-      "codeBlocks": 11
+      "codeBlocks": 11,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
     },
     "moobile-custom-component": {
       "files": 4,
       "lines": 276,
       "bytes": 18142,
       "rows": 44,
-      "codeBlocks": 4
+      "codeBlocks": 4,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
     },
     "moobile-library-development": {
       "files": 6,
       "lines": 288,
       "bytes": 18650,
       "rows": 48,
-      "codeBlocks": 3
+      "codeBlocks": 3,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
     },
     "moobile-migrate-from-rabbita": {
       "files": 6,
       "lines": 362,
       "bytes": 24643,
       "rows": 80,
-      "codeBlocks": 3
+      "codeBlocks": 3,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
     },
     "moobile-pitfalls": {
       "files": 6,
       "lines": 184,
       "bytes": 18965,
       "rows": 75,
-      "codeBlocks": 1
+      "codeBlocks": 1,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
     },
     "moobile-react-library": {
       "files": 5,
       "lines": 296,
       "bytes": 19746,
       "rows": 56,
-      "codeBlocks": 6
+      "codeBlocks": 6,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
     },
     "skillpress": {
       "files": 3,
       "lines": 403,
       "bytes": 28849,
       "rows": 77,
-      "codeBlocks": 6
+      "codeBlocks": 6,
+      "root": "D:\\ai_project\\interest\\moobile\\.agents\\skills"
+    },
+    "skillpress-dev": {
+      "files": 4,
+      "lines": 369,
+      "bytes": 24909,
+      "rows": 71,
+      "codeBlocks": 4,
+      "root": "D:\\ai_project\\interest\\skillpress\\.dsh\\skills"
+    },
+    "skillpress-user": {
+      "files": 3,
+      "lines": 299,
+      "bytes": 17994,
+      "rows": 84,
+      "codeBlocks": 4,
+      "root": "D:\\ai_project\\interest\\skillpress\\.dsh\\skills"
     }
   }
 }
