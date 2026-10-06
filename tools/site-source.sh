@@ -265,8 +265,13 @@ echo "⑨ 从内容仓跑（不带 --program）"
 #    ⇒ 变成 `<内容仓>/tools/run-js.mjs`（不存在）⇒ node 崩掉。
 # ⚠️ 断言也收紧：光"没有那句报错"会被一次崩溃蒙过去（第一版就是这样**假绿**的：末行是
 #    `Node.js v24.14.1` 而判据说 ✓）。所以要求 **rc=0** 且末行是结论行（`全部通过（N 个 skill）`）。
+# ⚠️ **`--repo` / `--skills` 必须显式给**（干净克隆逮到的一课）：这条要证的是"**程序根**默认对不对"，
+#    不是"默认仓库根找不找得到内容仓"。原先只给命令、全走默认 ⇒ 在**干净克隆**里默认仓库根会解析到
+#    临时目录的空壳（克隆旁边没有 `moobile/`）⇒ 门说"还没有 skill" ⇒ 本机绿、克隆红。
+#    只留 `--program` 走默认，前提就不依赖"程序旁边恰好有内容仓"了。
 PROGABS=$(pwd -W)
-out=$(cd "$SKILLPRESS_CORPUS/.." && node "$PROGABS/tools/run-js.mjs" check 2>&1)
+out=$(cd "$SKILLPRESS_CORPUS/.." &&
+  node "$PROGABS/tools/run-js.mjs" check --repo "$SKILLPRESS_CORPUS/.." --skills "$SKILLPRESS_CORPUS" 2>&1)
 rc9=$?
 last9=$(printf '%s' "$out" | tail -1)
 if [ "$rc9" = 0 ] && printf '%s' "$last9" | grep -qE '^(全部通过（[0-9]+ 个 skill）|[0-9]+ 项不合格)$'; then
