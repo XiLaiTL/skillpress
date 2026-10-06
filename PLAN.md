@@ -213,6 +213,31 @@
 
 ### P6 结构：抽 `shell` 包 → 便携 → 集成
 
+**P6 的目标形状（2026-10-06 侦察后就地记下，免得下次再摸一遍）**
+
+实例侧现在是：`moon.pkg` 里 `import { "skillpress-site/content" @content, … }` + `options(link: {js: {exports: ["app"]}})`；
+`app.mbt` **1062 行**，全是界面与状态机。生成物 `content/content.generated.mbt` 里**同时声明类型与值**
+（`Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home` + `home()` / `skills()` / `find_page()`）。
+
+目标：**类型与界面搬进包**（`shell/`），实例只剩几行。按 R9 拆（每文件 ≤400 行）：
+
+| 新文件 | 搬什么（按 `app.mbt` 现在的行段） |
+|---|---|
+| `shell/types.mbt` | 公开契约：上面那 7 个类型（从生成物的声明**原样搬**，注释写清各自的角色） |
+| `shell/theme.mbt` | 13 个颜色常量 + `body_style()` 等样式函数（119–187） |
+| `shell/inline.mbt` | `plain` / `span_view` / `inline_text` / `tok_color`（163–234） |
+| `shell/blocks.mbt` | `code_block` / `table_view` / `heading` / `bullet_view` / `block_view`（235–382） |
+| `shell/state.mbt` | `Sel` / `Model` / `Msg` / `initial` / `update`（27–118） |
+| `shell/docs.mbt` | `Page` / `page_of` + 侧栏树（383–…） |
+| `shell/home.mbt` | 顶栏（分段控件 + 下拉）+ 首栏/分栏渲染 |
+| `shell/site.mbt` | `pub fn site()`：把上面拼成一个 moobile 应用（实例里 `pub fn app` 就调它） |
+
+实例侧随之变成：`app.mbt` 只剩几行（A2 的判据取 **≤20 行**）；`moon.mod` 里**直接依赖** `XiLaiTL/skillpress`。
+⚠️ **生成物的形状会变**（类型不再声明在里面、值要带包前缀）——所以那一步的判据**不再是"逐字节"**，
+而是：`moon check` 干净 + 实例 `npm run build` + `verify` **22/22** + `app.mbt` ≤20 行。
+"逐字节"那条判据管的是**映射逻辑**（P8.1 已经拿到），不是最终的发射格式。
+
+
 > ⚠️ `pack` / `attach` 现在是**核心需求**（D16：产品要做成通用的），不是「以后再说」。
 1. **抽包**：把实例的 `app.mbt`（界面 + 状态机）搬进程序成一个 MoonBit 包，**数据类型的家一起搬**
    （`Home`/`Doc`/`Block`… 变成程序的公开契约，生成器只填值）；实例 `app.mbt` 缩到几行
