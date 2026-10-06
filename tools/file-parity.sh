@@ -11,6 +11,9 @@
 # 以及每个代码块的**高亮片段**（runs）。
 set -u
 cd "$(dirname "$0")/.."
+
+# 前置：确保 CLI 的 js 产物新鲜（干净克隆里 _build 不存在 —— 实测过）
+source tools/_ensure-built.sh
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定内容仓（例：../moobile/skills）}"
 
 INSTANCE="${SKILLPRESS_INSTANCE:-$SKILLPRESS_CORPUS/skillpress/scripts/.skillpress}"

@@ -9,6 +9,9 @@
 # 而"跑起来了"和"跟原来一样好"是两件事。逐块 + 逐语言的读数对齐，才说明没退步。
 set -u
 cd "$(dirname "$0")/.."
+
+# 前置：确保 CLI 的 js 产物新鲜（干净克隆里 _build 不存在 —— 实测过）
+source tools/_ensure-built.sh
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定语料（例：../moobile/skills）}"
 export SKILLPRESS_CORPUS
 
