@@ -169,6 +169,43 @@ fn dump_blocks() -> Unit {
   println(out.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + "\n" + s } }))
 }
 
+
+///|
+/// **`gen-file <内容根>`**：把**整份** `content.generated.mbt` 打到 stdout。
+///
+/// stdout 只有那份文件（判据对它做逐字节 diff）；诊断与问题清单走 **stderr**。
+/// 有问题（认不出的死链、没有 `##`、找不到首页…）时退出码 **2** —— 与旧实现一致。
+fn gen_file() -> Unit {
+  let dirs0 = skill_dirs()
+  let dirs = dirs0.split("\n").filter(fn(l) { l != "" }).map(fn(l) { l.to_owned() }).collect()
+  if dirs.length() == 0 {
+    @content.note("✗ 内容根下没有带 SKILL.md 的目录（引导层按 `gen-file <内容根>` 列举，检查那个参数）")
+    @content.set_exit_code(2)
+    return
+  }
+  let root = dump_root()
+  let (text, problems) = try {
+    @content.gen_content(root, dirs, read_text, @content.md_kids, @content.script_kids, @content.note)
+  } catch {
+    e => {
+      @content.note("✗ 生成失败：\{e}")
+      @content.set_exit_code(2)
+      return
+    }
+  }
+  if problems.length() > 0 {
+    @content.note("gen-content：内容里有解不开的东西（**不静默丢**，逐条点名）：")
+    for p in problems {
+      @content.note("  ✗ " + p)
+    }
+    @content.set_exit_code(2)
+  }
+  // `gen_content` 给回的文本以换行结尾；`println` 自带一个换行 ⇒ 先去掉尾巴再打，
+  // 这样 stdout 恰好等于那份文件（不多不少一个换行）
+  let body = if text.has_suffix("\n") { text[:text.length() - 1].to_owned() } else { text }
+  println(body)
+}
+
 ///|
 fn main {
   if !@hl.ready() {
@@ -182,7 +219,7 @@ fn main {
   let rest : Array[String] = []
   let mut k = 0
   while k < args.length() {
-    if args[k] == "hl" || args[k] == "batch" || args[k] == "dump-blocks" {
+    if args[k] == "hl" || args[k] == "batch" || args[k] == "dump-blocks" || args[k] == "gen-file" {
       break
     }
     k = k + 1
@@ -191,6 +228,7 @@ fn main {
     println("用法：node tools/run-js.mjs hl <markdown 文件> <语言>")
     println("      SKILLPRESS_CORPUS=<根> node tools/run-js.mjs batch")
     println("      node tools/run-js.mjs dump-blocks <内容根>")
+    println("      node tools/run-js.mjs gen-file <内容根>      # 整份 content.generated.mbt → stdout")
     println("垫片装的语法：\{@hl.languages()}")
     return
   }
@@ -220,6 +258,10 @@ fn main {
   }
   if args[k] == "dump-blocks" {
     dump_blocks()
+    return
+  }
+  if args[k] == "gen-file" {
+    gen_file()
     return
   }
   // batch：全语料

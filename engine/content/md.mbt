@@ -23,11 +23,15 @@ pub enum Span {
 }
 
 ///|
-/// 列表项：`indent`（0/1）+ `num`（有序表的 `1. `；无序表是空串）+ 片段。
+/// 列表项：`indent`（0/1）+ `num`（有序表的 `1. `；无序表是空串）+ 片段 + **链接目标**。
+///
+/// ⚠️ `links` 不写进生成物（`Ul(Array[(Int, String, Array[Span])])` 是契约），但首页要它：
+/// 某节下"整项就是一个链接"的列表会变成顶栏那条 tab 的**下拉菜单**（旧实现 `readHome`）。
 pub struct UlItem {
   indent : Int
   num : String
   spans : Array[Span]
+  links : Array[String]
 }
 
 ///|
@@ -244,7 +248,18 @@ fn external_link(s : String) -> Bool {
 ///|
 /// **行内 → Span 序列**（旧实现 `inline()`）：链接按"台词"渲染 —— 文字 + 代码样式的路径；
 /// 文字与目标相同时只留一份。
+///|
+/// 内联 → `Span` 序列（旧实现 `inline`）。链接的处置是**当台词读**：
+/// 文字与目标相同时只留一份；否则渲染成"文字 + 代码样式的路径"两段。
 pub fn inline(s : String) -> Array[Span] {
+  inline_with_links(s).0
+}
+
+///|
+/// 与 `inline` 同一套规则，但**把链接目标也交回来** —— 首页判定"下拉菜单"要用它
+/// （旧实现里 `it.links` 就是 `inline(s, links)` 顺手收的）。
+pub fn inline_with_links(s : String) -> (Array[Span], Array[String]) {
+  let links : Array[String] = []
   let spans : Array[Span] = []
   let emit = fn(sp : Span) {
     let last : Span? = if spans.length() > 0 { Some(spans[spans.length() - 1]) } else { None }
@@ -274,6 +289,7 @@ pub fn inline(s : String) -> Array[Span] {
       // 所以这里手写"滤掉所有反引号"（夹具里 ``[`a` 和 `b`](…)`` 逮到过）
       let label = drop_backticks(slice(c, h.a, h.b))
       let target = trim(slice(c, h.a2, h.b2))
+      links.push(target)
       if label == target || external_link(target) {
         emit(if wordy(label) { Code(label) } else { Txt(label) })
       } else {
@@ -286,5 +302,5 @@ pub fn inline(s : String) -> Array[Span] {
   if last < c.length() {
     text(slice(c, last, c.length()))
   }
-  spans
+  (spans, links)
 }

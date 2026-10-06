@@ -17,7 +17,7 @@
  * ⚠️ 这也是"这个包怎么发出去"的雏形：js target 的 CLI 本来就要有一个 Node 启动器。
  * 那条路要付的代价已经写在 `PLAN.md` 的 P8 里：**运行时仍需要一个 npm 依赖**（`web-tree-sitter`）。
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -51,6 +51,63 @@ function mdFiles() {
   return out.sort();
 }
 
+
+/**
+ * 子页沿用**内容侧 `kids.mjs` 的两条规矩**（遍历顺序与排序也是逐字节判据的一部分，
+ * 所以照抄它，不要在 MoonBit 侧另排一次）：
+ *   · `mdFiles(skillDir)`：任何子目录里的 `.md`（`SKILL.md` 除外）；**点开头与产物目录一律跳过**；
+ *     每层按 `localeCompare` 排。
+ *   · `scriptFiles(skillDir)`：`scripts/` 下**直接放的**非 md 文件，按默认 `sort()` 排。
+ * MoonBit 那边只负责"怎么起名字、谁是 ref 谁是 script、标题与摘要怎么来"。
+ */
+const SKIP_DIRS = new Set(["node_modules", "_build", "dist", "target", ".mooncakes", ".git", ".scratch"]);
+const skipName = (name) => SKIP_DIRS.has(name) || name.startsWith(".");
+
+function mdKids(skillDir) {
+  const out = [];
+  const walk = (dir, prefix) => {
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (skipName(e.name)) continue;
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) walk(abs, rel);
+      else if (e.name.endsWith(".md") && rel !== "SKILL.md") out.push(rel);
+    }
+  };
+  walk(skillDir, "");
+  return out;
+}
+
+function scriptKids(skillDir) {
+  const dir = join(skillDir, "scripts");
+  try {
+    return readdirSync(dir)
+      .filter((f) => !skipName(f) && !f.endsWith(".md") && statSync(join(dir, f)).isFile())
+      .sort()
+      .map((f) => `scripts/${f}`);
+  } catch {
+    return [];
+  }
+}
+
+/** 内容根 + 带 `SKILL.md` 的目录（按名字排序；顺序是判据的一部分，所以只在这儿排一次）。 */
+function prepareRoot(arg, needSkills = true) {
+  if (!arg || !existsSync(arg)) {
+    console.error(`✗ 内容根不存在：${arg ?? "(没给)"}`);
+    process.exit(2);
+  }
+  const abs = resolve(arg);
+  const root = abs.split("\\").join("/");
+  globalThis.__skillpress_ts.dumpRoot = root;
+  if (needSkills) {
+    globalThis.__skillpress_ts.skillDirs = readdirSync(abs, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && existsSync(join(abs, e.name, "SKILL.md")))
+      .map((e) => e.name)
+      .sort();
+  }
+  return root;
+}
+
 /** 装 tree-sitter + 五份语法（名字取自 `grammars/<名字>.wasm`，与 scm 同名）。 */
 async function boot() {
   const ts = await import("web-tree-sitter");
@@ -68,7 +125,15 @@ async function boot() {
     const p = join(dir, `${name}.highlights.scm`);
     if (existsSync(p)) scms[name] = readFileSync(p, "utf8");
   }
-  globalThis.__skillpress_ts = { ts, langs, scms, root: ROOT.split("\\").join("/"), mdFiles: mdFiles() };
+  globalThis.__skillpress_ts = {
+    ts,
+    langs,
+    scms,
+    root: ROOT.split("\\").join("/"),
+    mdFiles: mdFiles(),
+    mdKids,
+    scriptKids,
+  };
   return Object.keys(langs).sort();
 }
 
@@ -80,19 +145,11 @@ const names = await boot();
  * 为什么排序放在引导层：生成物里 doc 的顺序就是**同一个 `sort()`** 的结果 ——
  * 顺序也是逐字节判据的一部分，两处各排一次早晚会漂。
  */
-const dumpIdx = process.argv.indexOf("dump-blocks");
-if (dumpIdx >= 0) {
-  const arg = process.argv[dumpIdx + 1];
-  if (!arg || !existsSync(arg)) {
-    console.error(`✗ 内容根不存在：${arg ?? "(没给)"}（用法：node tools/run-js.mjs dump-blocks <内容根>）`);
-    process.exit(2);
+for (const cmd of ["dump-blocks", "gen-file"]) {
+  const at = process.argv.indexOf(cmd);
+  if (at >= 0) {
+    prepareRoot(process.argv[at + 1]);
   }
-  const abs = resolve(arg);
-  globalThis.__skillpress_ts.dumpRoot = abs.split("\\").join("/");
-  globalThis.__skillpress_ts.skillDirs = readdirSync(abs, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && existsSync(join(abs, e.name, "SKILL.md")))
-    .map((e) => e.name)
-    .sort();
 }
 if (process.env.SKILLPRESS_DEBUG_LANGS === "1") {
   console.error(`引导层装好的语法：${names.join(", ")}`);

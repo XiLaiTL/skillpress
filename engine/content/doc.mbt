@@ -9,7 +9,7 @@
 
 ///|
 /// 代码块贴 runs（认不出语言 / 空块 ⇒ 不贴）。
-fn with_runs(lang : String, text : String) -> Block raise {
+pub fn with_runs(lang : String, text : String) -> Block raise {
   if trim(text) == "" {
     return Code(lang, text, [])
   }

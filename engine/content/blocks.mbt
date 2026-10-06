@@ -57,7 +57,7 @@ fn leading_ws(raw : String) -> Int {
 
 ///|
 /// `/^#{2,4}\s+/` → `(级别, 标题原文)`。
-fn heading(t : String) -> (Int, String)? {
+pub fn heading(t : String) -> (Int, String)? {
   let c = chars(t)
   let mut n = 0
   while n < c.length() && c[n] == '#' {
@@ -317,7 +317,8 @@ pub fn parse_blocks(body : String) -> Array[Block] {
             None => trim(r)
           }
         }
-        items.push({ indent, num, spans: inline(content) })
+        let (item_spans, item_links) = inline_with_links(content)
+        items.push({ indent, num, spans: item_spans, links: item_links })
         i = i + 1
       }
       blocks.push(Ul(items))
@@ -340,7 +341,7 @@ pub fn parse_blocks(body : String) -> Array[Block] {
 
 ///|
 /// `/^\[([^\]]+)\]\(([^)]+)\)$/` —— 整条标题就是一个链接（纯链接节）。
-fn pure_link(head : String) -> (String, String)? {
+pub fn pure_link(head : String) -> (String, String)? {
   let c = chars(head)
   if c.length() < 5 || c[0] != '[' {
     return None

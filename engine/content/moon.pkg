@@ -2,5 +2,11 @@ import {
   "XiLaiTL/skillpress/engine/highlight" @hl,
 }
 
-// 上色链是 js 专用的（薄垫片调 web-tree-sitter），所以这个包也跟着
+// 上色链与 IO 都是 js 专用的（薄垫片调 web-tree-sitter、读文件走宿主），所以这个包也跟着
 supported_targets = "+js"
+
+options(
+  targets: {
+    "io.mbt": [ "js" ],
+  },
+)
