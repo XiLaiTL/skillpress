@@ -318,6 +318,15 @@
 - 移植对象是 `lib/gen-content.mjs` 的 `parseFrontmatter` / `summarize`(46) / `inline` / `parseBlocks` /
   `emitBlock` / `esc` / `spanList` / `runList`；代码块的 runs 用已经对账通过的 `engine/highlight`。
 
+**A1 的本地形态已验（2026-10-06）**：另一个工程能依赖这个模块 —— 实测做法（不需要先发布）：
+
+- 消费者 `moon.mod` 里**声明依赖**：`import { "XiLaiTL/skillpress@0.1.0", }`；
+- 用 `moon.work` 把两个模块连成工作区（`members = [".", "<skillpress 的绝对路径>"]`）——
+  ⚠️ 成员路径要**绝对路径**（相对路径实测报 "系统找不到指定的文件"）；
+- 消费者的包 `import { "XiLaiTL/skillpress/engine/highlight" @hl, }` + `supported_targets = "+js"`（跟着依赖声明）。
+- 结果：`moon check --target js` **干净通过**（零警告）。
+- ⚠️ 但"**moon add 装上**"这条判据**仍然只能靠发布**：`moon add` 只认注册表模块名，没有本地路径形式。
+
 **每一步都要守的一条**：**R6 通用性**（D16）—— 迁完不许变成「只有 moobile 能跑」。
 新建的门/管线一律先问一句：**一个只有 `skills/` 的陌生仓库，它跑得起来吗？**
 
