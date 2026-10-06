@@ -1,5 +1,5 @@
 {
-  "_note": "由 `node examples/apps/skillpress/bin/skillpress.mjs check --update-lock [名字]` 生成。改动 skill 后必须重跑并复核（SPEC §6 G8）。",
+  "_note": "由 `node ../skillpress/bin/skillpress.mjs check --update-lock [名字]` 生成。改动 skill 后必须重跑并复核（SPEC §6 G8）。",
   "skills": {
     "moobile-app-development": {
       "files": 6,
@@ -45,9 +45,9 @@
     },
     "skillpress": {
       "files": 3,
-      "lines": 400,
-      "bytes": 27951,
-      "rows": 75,
+      "lines": 403,
+      "bytes": 28849,
+      "rows": 77,
       "codeBlocks": 6
     }
   }

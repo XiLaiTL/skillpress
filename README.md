@@ -4,35 +4,40 @@
 站点的**首页就是其中一份 skill** —— 它自己也是这个集合里的一员。
 
 这里是**程序本身**（将来发 npm 包 / moonbit 包）：内容管线、构建期上色、三道门、站点判据。
-**内容不在这里**（内容住 `<仓库>/.agents/skills/`，站点实例住那份 skill 的 `scripts/` 里）。
+它是**自己的一个 git 仓库**，与内容仓**平级**（兄弟）：内容仓 = 旁边的 `../moobile/`。
+**内容不在这里**（内容住 `<内容仓>/.agents/skills/`，站点实例住那份 skill 的 `scripts/` 里）。
 
 ## 三个根（先认清再动手）
 
 | 根 | 在哪 | 是什么 |
 |---|---|---|
-| **程序** | `examples/apps/skillpress/`（本目录） | 引擎 + 门 + 语法资产（能拿走、能发布的那份） |
-| **内容** | `<仓库>/.agents/skills/` | 7 份 skill（`SKILL.md` + `references/`）。harness 也扫这个根 |
+| **程序** | 本仓库根（`interest/skillpress`） | 引擎 + 门 + 语法资产（能拿走、能发布的那份） |
+| **内容** | `../moobile/.agents/skills/`（**旁边的兄弟**，不是本仓库） | 7 份 skill（`SKILL.md` + `references/`）。harness 也扫这个根 |
 | **实例** | `<内容>/skillpress/scripts/.skillpress/` | 一个"**用**程序"的 MoonBit 工程（它的 `content/` 是生成物） |
 
 三个根怎么定位（`--repo` / `--skills` / `--app` 与对应环境变量）见
-[`.agents/skills/skillpress/references/layout.md`](../../../.agents/skills/skillpress/references/layout.md)。
+[`../moobile/.agents/skills/skillpress/references/layout.md`](../moobile/.agents/skills/skillpress/references/layout.md)。
 
-## 三条命令（都在**仓库根**跑）
+## 三条命令（在**程序根**跑）
 
 ```bash
-node examples/apps/skillpress/bin/skillpress.mjs check         # 门：skill 自己（G1–G8）
-node examples/apps/skillpress/bin/skillpress.mjs press         # 内容源 → 实例的内容包
-node examples/apps/skillpress/bin/skillpress.mjs verify        # 判据：真 Chrome 无头，自起服务
+node bin/skillpress.mjs check         # 门：skill 自己（G1–G8）
+node bin/skillpress.mjs press         # 内容源 → 实例的内容包
+node bin/skillpress.mjs verify        # 判据：真 Chrome 无头，自起服务
 ```
+
+> 在**内容仓根**（`moobile/`）跑同一份程序就多一层：`node ../skillpress/bin/skillpress.mjs check`。
+> 内容仓不在兄弟位置时用 `--repo <仓库根>` 或 `SKILLPRESS_REPO` 指定 —— **它不猜**
+> （猜错的表现是"站点没更新"，最难查的一类症状）。
 
 其余子命令：`facts`（查事实来源：docs 有没有撒谎）｜`audit`（上色的闸门：召回率 / 漏色比例）
 ｜`check --selftest`（门自己的证伪：造诱饵，必须全被点名）｜`press --check`（生成物与源一致吗）
 ｜`verify --shot f.png`（顺手截首页首屏）。
 
-看一眼站点：
+看一眼站点（站点实例在**内容仓**里）：
 
 ```bash
-cd .agents/skills/skillpress/scripts/.skillpress
+cd ../moobile/.agents/skills/skillpress/scripts/.skillpress
 npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 ```
 
@@ -51,19 +56,19 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | `PLAN.md` | **计划**（会变）：还没做的、已定的决定、要探的未知 |
 | `claims.txt` / `done-claims.txt` / `skills.lock.json` | 禁语表 / 已落地台账 / 体量指纹 |
 
-## 门与判据（现状）
+## 门与判据（现状，2026-10-06 复核；**这些会漂 —— 要准数就跑一遍**）
 
 ```bash
-node examples/apps/skillpress/bin/skillpress.mjs check            # 7 份 skill 全过
-node examples/apps/skillpress/bin/skillpress.mjs check --selftest # 13 个诱饵全被点名
-node examples/apps/skillpress/bin/skillpress.mjs audit            # 召回 97.4%（闸门 ≥90%）
-node examples/apps/skillpress/bin/skillpress.mjs facts            # moobile 侧：硬 0 / 软 2
-node examples/apps/skillpress/bin/skillpress.mjs verify           # 20 条全过
+node bin/skillpress.mjs check            # 7 份 skill 全过
+node bin/skillpress.mjs check --selftest # 13 个诱饵全被点名（+1 个正例不许被误杀）
+node bin/skillpress.mjs audit            # 召回 97.2% / 未上色 13.9%（闸门 ≥90% / ≤40%）
+node bin/skillpress.mjs facts            # 内容仓侧：硬 0 / 软 2
+node bin/skillpress.mjs verify           # 20 条全过（真 Chrome 无头）
 ```
 
 ## 诚实清单
 
-1. **还没发布**：现在靠仓库内路径调用（`node examples/apps/skillpress/bin/…`）。发 npm 包 / moonbit 包
+1. **还没发布**：现在靠**源码路径**调用（`node bin/skillpress.mjs …`）。发 npm 包 / moonbit 包
    是计划里的事，不是现状。
 2. **界面还没抽成包**：站点壳的代码现在**住在实例里**（`app.mbt`），目标是把界面变成程序里的一个
    MoonBit 包（`shell`），实例只剩几行 `@skillpress.site(...)` —— 零复制、升包即升级。

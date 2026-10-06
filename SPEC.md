@@ -2,7 +2,7 @@
 
 > **一句话**：`docs/**` 是事实的家；skill 是**给 AI 用的投影** —— 只收慢变的、不可推导的、会让人踩坑的东西，其余留指针。
 >
-> 状态：**v0**（2026-10-04 起草）。判据见 §6，工具见 `skills/skillpress/scripts/.skillpress/check.mjs`，分工见 [`SKILLS.md`](SKILLS.md)。
+> 状态：**v0**（2026-10-04 起草）。判据见 §6，工具见程序根的 `bin/skillpress.mjs`，分工见 [`SKILLS.md`](SKILLS.md)。
 
 ---
 
@@ -114,13 +114,13 @@ skills/<name>/
 
 ---
 
-## 6. 门（`check.mjs`，住在 `skills/skillpress/scripts/.skillpress/`）
+## 6. 门（`check.mjs`，住在**程序根**的 `lib/` 里 —— 程序是与内容仓平级的另一个仓库）
 
 | # | 判据 | v0 状态 |
 |---|---|---|
 | **G1** | frontmatter 三字段齐全；`name` == 目录名；都是单行标量 | ✅ |
 | **G2** | 体量上限（§3）**＋ 行尾必须 LF**（CRLF 会让 frontmatter 静默失效） | ✅ |
-| **G3** | 正文反引号里的**文件路径**必须存在（按 moobile / 项目根 / **该 skill 自己的目录**查） | ✅ |
+| **G3** | 正文反引号里的**文件路径**必须存在（按内容仓根 / **程序根** / **该 skill 自己的目录**查） | ✅ |
 | **G4** | 正文里的 `tools/*` / `scripts/*` / `moon` / `node` 命令必须解析到真实文件（同样三个根） | ✅ |
 | **G5** | 正文里的 `@html.` / `@style.` / `@cmd.` / `@sub.` API 名必须存在于源码 | ✅ |
 | **G6** | 正文里的 `docs/**.md` 链接与 `§` 锚点必须有效 | 🟡 |
@@ -130,11 +130,17 @@ skills/<name>/
 门存在的理由只有一条：**一个说谎的 skill 比没有 skill 更糟** ——
 它会让 AI 自信地写错代码，而且没人会发现。
 
-> **G3 / G4 为什么查三个根**：多数 skill 讲 moobile，路径相对 moobile 根；
-> 但本仓库**自己也发 skill**（`skills/skillpress/` 讲的是这套工具），它的
-> `scripts/.skillpress/check.mjs` 相对的是**那个 skill 自己的目录**（引擎就住在里面）。
-> 只认一个根会让后者全红，而人红了之后的处置通常是**把真引用删掉** ——
+> **G3 / G4 为什么查三个根**：多数 skill 讲 moobile，路径相对**内容仓根**；
+> 但内容里也有"这套工具自己在哪儿"的指针（`bin/skillpress.mjs`、`lib/check.mjs`、
+> `grammars/PROVENANCE.md`），它们相对**程序根** —— 而程序是**另一个仓库**（内容仓的兄弟）；
+> 还有 `scripts/**` 这种相对**那个 skill 自己的目录**的（站点实例就住在里面）。
+> 只认一个根会让另两边全红，而人红了之后的处置通常是**把真引用删掉** ——
 > 那正是最坏的结果（判据逼人删掉正确的东西）。三个根都认，缺失才红。
+>
+> ⚠️ 2026-10-06 搬家时才发现：**程序根那条原先根本不存在**（`check.mjs` 里第二个根写的是仓库根，
+> 与第一个重复），而 `bin`/`lib`/`grammars` 又不在 G3 的一级目录白名单里 ⇒ 那些指针
+> **一个都没被查过**（是"静默不查"，不是"查了但错了"）。现在两个都补上了，
+> 证据是 `--selftest` 里新加的诱饵 `bad-program-path`（`bin/没有这个门面.mjs` 必须被点名）。
 
 ### 6b. 另一道门：查事实来源（`docfacts.mjs`）
 
@@ -157,9 +163,9 @@ skills/<name>/
 
 站点**不是**第三个事实的家：它和 skill 从**同一份内容源**长出来。
 
-1. **首页 = `skills/skillpress/SKILL.md`**（"自己既是 skill，也是主页"）：H1 + 引言 = 首屏，
+1. **首页 = `.agents/skills/skillpress/SKILL.md`**（"自己既是 skill，也是主页"）：H1 + 引言 = 首屏，
    **每个 `##` = 顶栏的一栏** —— 加一节就多一条，站点代码里不写死任何一节 ⇒ 它的 `##` 要写短名。
-2. **文档区 = `skills/**`**：顶栏那条「文档 / SKILL」切过去；侧栏树 = skill → 它的 `references/`、`scripts/`。
+2. **文档区 = `.agents/skills/**`**：顶栏那条「文档 / SKILL」切过去；侧栏树 = skill → 它的 `references/`、`scripts/`。
    站点上"一个 skill 一页"与 skill 的**结构**同源 ⇒ 结构变了站点跟着变，不用动渲染。
 3. **改了内容源必须重跑生成器**：`gen-content.mjs --check` 是一道门（生成物与源不一致即红）。
 4. **代码块在构建期上色**：tree-sitter 解析 + 语法自带的 `highlights.scm` → 片段带**色号**
@@ -168,8 +174,8 @@ skills/<name>/
    上色坏起来是安静的（页面照样渲染，只是颜色变少），这是唯一看得见的地方。
    这一步是这台引擎里**唯一**用 npm 依赖的地方（`web-tree-sitter`）；语法 wasm 与查询都 vendor 在
    `grammars/`（出处与 sha256 见那份 `PROVENANCE.md`）。
-5. **引擎住在 skill 自己的 `scripts/` 里**（无侵入：项目根上只有人写的东西），
-   **站点应用住在 moobile 的 `examples/` 里**（它本来就是个 moobile 应用）。
-   形状与理由见 `skills/skillpress/references/layout.md`。
+5. **引擎住在**程序根（`interest/skillpress/`，与内容仓平级的另一个仓库），
+   **站点实例住在内容仓里那份 skill 的 `scripts/` 下**（它本来就是个 moobile 应用）。
+   形状与理由见 `.agents/skills/skillpress/references/layout.md`。
 
-细则（数据类型、解析边界、两种模式、判据怎么加）见 `skills/skillpress/references/site-pipeline.md`。
+细则（数据类型、解析边界、两种模式、判据怎么加）见 `.agents/skills/skillpress/references/site-pipeline.md`。

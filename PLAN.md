@@ -10,8 +10,8 @@
 
 | 根 | 在哪 | 是什么 |
 |---|---|---|
-| **程序** | `examples/apps/skillpress/` | 引擎 + 门 + 语法资产（将来发 npm / moonbit 包） |
-| **内容** | `.agents/skills/` | 7 份 skill（harness 的扫描根，rank 200，agent 直接可加载） |
+| **程序** | 程序根 = 本仓库（`interest/skillpress`，**与内容仓平级的另一个 git 仓库**） | 引擎 + 门 + 语法资产（将来发 npm / moonbit 包） |
+| **内容** | `../moobile/.agents/skills/`（旁边的兄弟仓库） | 7 份 skill（harness 的扫描根，rank 200，agent 直接可加载） |
 | **实例** | `.agents/skills/skillpress/scripts/.skillpress/` | 一个"用程序"的 MoonBit 工程（`content/` 是生成物） |
 
 当时全绿：`check` 7/7 ｜ `check --selftest` 13 项 ｜ `press --check` 一致 ｜
@@ -38,6 +38,8 @@
 | D10 | ref 文件名用**主题词**（`structure` / `styles` / `events-and-children`…），**不沿用原节的编号** | **执行期定的**；编号会被下一轮改动打乱，主题名不会 |
 | D11 | 「纯链接节」的判据：**节的标题整条是一个链接**（`## [名字](目标)`；用户给的原话是 `## [这种呀]()`），不是"正文里都是链接" | 用户定（P2 执行期问的）；只有它成立时点那一栏才直接跳页 |
 | D12 | 吸顶：**先探、拿不到证据就不写"已吸顶"** —— 探到底之后发现**是一行 CSS 的事**（根因在宿主 `#root` 是块盒 + 应用根是弹性项），见 P2 那一节 | 用户定（P2 执行期选的兜底档）；"探到底"这一步救了它 |
+| D13 | **程序独立成一个 git 仓库**（`interest/skillpress`），与内容仓 `interest/moobile` **平级**（兄弟） | 用户定（2026-10-06）；理由：程序要能独立发布与协作（那正是"待在内容仓里"给不了的）。代价写在明处：内容里的命令多一层 `../skillpress/`；门那边补上了 G3 的**第二个根 = 程序根**（原先那个根写的是仓库根、与第一个重复 ⇒ 讲程序的指针一个都没查过），并加了诱饵 `bad-program-path` 守着它 |
+| D14 | 站点应用顶栏那条**换模式的标签必须有它自己的名字**（`i == -2` ⇒ 「文档 / SKILL」），不许落到 `i < 0 ⇒ "首页"` 的兜里 | 执行期定的（2026-10-06 逮到）；代价是一次真 bug + 一条假绿判据，见 [`docs/FINDINGS.md`](https://github.com/XiLaiTL/moobile/blob/main/docs/FINDINGS.md) —— 实测：顶栏两条「首页」，`verify` 里 3 条判据被静默跳过（19 条 → 22 条） |
 
 ## 2. 阶段
 

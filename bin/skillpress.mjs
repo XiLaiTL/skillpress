@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // skillpress —— 程序的门面（子命令都只是转发，实现全在 `../lib/`）。
 //
-//   node examples/apps/skillpress/bin/skillpress.mjs <子命令> [参数]
+//   node bin/skillpress.mjs <子命令> [参数]        （在**程序根**跑；程序自己是一个仓库）
+//   node ../skillpress/bin/skillpress.mjs <子命令> （在**内容仓** moobile/ 里跑时）
 //
 //     press    内容源 → 站点实例的内容包（`--check` 是门：生成物与源必须一致）
 //     check    门：skill 自己（G1–G8；`--selftest` 造诱饵证伪门本身）
@@ -12,7 +13,7 @@
 //     attach   挂进一个已有项目（写 skills/ 骨架 + 实例 + npm scripts）—— **还没做**
 //
 // 四个根（都能用参数/环境变量改，见 `lib/gen-content.mjs` 的文件头）：
-//   <程序> = 本仓库的 `examples/apps/skillpress` ｜ <仓库> = moobile 的根
+//   <程序> = 本仓库根（`interest/skillpress`）｜ <仓库> = moobile 的根（程序旁边的兄弟）
 //   <内容> = `<仓库>/.agents/skills`            ｜ <实例> = `<内容>/skillpress/scripts/.skillpress`
 //
 // 为什么要有这层门面：`lib/` 里的文件是给人"读实现"的（名字也按实现起的），
@@ -37,7 +38,12 @@ const CMDS = {
 const USAGE = `skillpress —— 把一堆 skill 印成一个站点
 
 用法：
-  node examples/apps/skillpress/bin/skillpress.mjs <子命令> [参数]
+  node bin/skillpress.mjs <子命令> [参数]           # 在**程序根**（本仓库）跑
+
+  内容仓在别处时，程序与仓库是**兄弟**（interest/moobile 与 interest/skillpress），
+  在内容仓里跑就是   node ../skillpress/bin/skillpress.mjs <子命令>
+  仓库不在兄弟位置时，用 --repo <仓库根> 或 SKILLPRESS_REPO 显式指定（**它不猜**，
+  见 lib/roots.mjs —— 猜错的表现是"站点没更新"，最难查的一类症状）。
 
 子命令：
   press     内容源 → 站点实例的内容包（--check 是门）
@@ -65,7 +71,7 @@ if (!spec) {
 if (spec.todo) {
   // 诚实：没做的**说没做**，别让它看起来像"跑了但没输出"
   console.error(`✗ ${cmd} 还没做：${spec.todo}`);
-  console.error("  计划与前置条件写在 examples/apps/skillpress/SPEC.md 与内容侧的 references/layout.md。");
+  console.error("  计划与前置条件写在程序根的 SPEC.md 与内容侧的 references/layout.md。");
   process.exit(2);
 }
 
