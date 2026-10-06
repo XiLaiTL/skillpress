@@ -42,11 +42,32 @@ pub fn update_lock(
       root: Some(skills_dir),
     }
   }
+  // ── 首页源（R2 / D20 的另一半）：**它也要进指纹** ────────────────────────────────
+  // 只在"锁全部"（没指名具体 skill）时带上它 —— 指名的意思是"我只复核这一份"，别顺手改别的。
+  let home_key = "skillpress/WEBSITE.md"
+  let home_abs = join_path(join_path(skills_dir, "skillpress"), "WEBSITE.md")
+  let also_home = only == "" && host.exists(home_abs)
+  let home_entry_of = fn() -> LockEntry {
+    let fp = fingerprint(host.read(home_abs))
+    {
+      files: 1,
+      lines: fp.lines,
+      bytes: fp.bytes,
+      rows: fp.rows,
+      codeBlocks: fp.codeBlocks,
+      root: Some(skills_dir),
+    }
+  }
   let entries : Array[(String, LockEntry)] = []
   let written : Map[String, Unit] = Map([])
   match load_lock(host, program_dir) {
     Some(l) =>
       for pair in l.skills {
+        if also_home && pair.0 == home_key {
+          entries.push((pair.0, home_entry_of()))
+          written[pair.0] = ()
+          continue
+        }
         let mut hit = false
         for d in targets {
           if pair.0 == d {
@@ -66,6 +87,9 @@ pub fn update_lock(
     if !written.contains(d) {
       entries.push((d, entry_of(d)))
     }
+  }
+  if also_home && !written.contains(home_key) {
+    entries.push((home_key, home_entry_of()))
   }
   host.write(join_path(program_dir, "skills.lock.json"), lock_text(lock_note(), entries))
   (None, entries.length())

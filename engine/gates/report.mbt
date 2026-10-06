@@ -170,9 +170,6 @@ pub fn run(
     // D20 的另一半（进 G8 指纹）**今天不做**，而且要说出来 —— 不是忘了：
     // 指纹锁的**写侧**（`--update-lock`）还在旧 CLI 里，它不认识首页源 ⇒ 新门要是现在
     // 就要求锁里有这一条，就会永远报「新增」，那是**假红**（比不查更糟：它训练人忽略门）。
-    out.push(
-      "    · 首页源还没进 G8 指纹（D20 的另一半）：等指纹锁的写侧搬进新引擎后一起补 —— 现在要求就会永远报「新增」",
-    )
   }
   let (lock_fails, lock_notes) = check_lock(ctx.host, ctx.skills_dir, program_dir, dirs, dirs0)
   for n in lock_notes {

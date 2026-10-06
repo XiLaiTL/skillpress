@@ -212,7 +212,18 @@ pub fn check_lock(
           seen.push(a)
         }
       }
-      for d in kept {
+      // ── 首页源（R2 / D20 的另一半）：它不是 skill，但**它是站点的脸** ⇒ 同样进指纹 ──────
+      // 为什么单列：`skillFiles()` 收不到它（它不在任何 skill 的"固定结构"里）⇒ 它可以无限膨胀
+      // 而没人复核，这正是 D20 实测的两个洞之一。
+      // ⚠️ 回退那一路（首页 = `skillpress/SKILL.md`）**不需要**这条：那份文件本来就在它自己那份
+      //    skill 的指纹里（`skill_files` 含 `SKILL.md`）⇒ 这里只认 `WEBSITE.md`。
+      let home_key = "skillpress/WEBSITE.md"
+      let home_abs = join_path(join_path(skills_dir, "skillpress"), "WEBSITE.md")
+      let has_home = host.exists(home_abs)
+      if has_home {
+        seen.push(home_key) // 它在锁里 ⇒ 不参与"已删除"那一轮
+      }
+    for d in kept {
         let now = fingerprint_skill(host, skills_dir, d)
         let mut was : LockEntry? = None
         for pair in l.skills {
@@ -225,24 +236,7 @@ pub fn check_lock(
             if !belongs_here(entry, skills_dir) {
               continue
             }
-            let detail : Array[String] = []
-            if entry.files != now.files {
-              detail.push("files " + entry.files.to_string() + " → " + now.files.to_string())
-            }
-            if entry.lines != now.lines {
-              detail.push("lines " + entry.lines.to_string() + " → " + now.lines.to_string())
-            }
-            if entry.bytes != now.bytes {
-              detail.push("bytes " + entry.bytes.to_string() + " → " + now.bytes.to_string())
-            }
-            if entry.rows != now.rows {
-              detail.push("rows " + entry.rows.to_string() + " → " + now.rows.to_string())
-            }
-            if entry.codeBlocks != now.codeBlocks {
-              detail.push(
-                "codeBlocks " + entry.codeBlocks.to_string() + " → " + now.codeBlocks.to_string(),
-              )
-            }
+            let detail = entry_field_diff(entry, now)
             if detail.length() > 0 {
               fails.push(
                 "G8 指纹变了：" +
@@ -264,6 +258,48 @@ pub fn check_lock(
               " 表格行）—— 确认后用 --update-lock 落锁",
             )
           }
+        }
+      }
+      // ── 首页源那一条的比对（D20）：与 skill 同一套口径 —— 变了就**硬**红、锁里没有就提示 ──
+      if has_home {
+        let fp = fingerprint(host.read(home_abs))
+        let now : SkillFingerprint = {
+          files: 1,
+          lines: fp.lines,
+          bytes: fp.bytes,
+          rows: fp.rows,
+          codeBlocks: fp.codeBlocks,
+        }
+        let mut was : LockEntry? = None
+        for pair in l.skills {
+          if pair.0 == home_key {
+            was = Some(pair.1)
+          }
+        }
+        match was {
+          Some(entry) =>
+            if belongs_here(entry, skills_dir) {
+              let detail = entry_field_diff(entry, now)
+              if detail.length() > 0 {
+                fails.push(
+                  "G8 首页源指纹变了：" +
+                  home_key +
+                  "（" +
+                  detail.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + "；" + s } }) +
+                  "）—— 复核这次体量变化，然后 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
+                )
+              }
+            }
+          None =>
+            notes.push(
+              "G8 新增 首页源：" +
+              home_key +
+              "（" +
+              now.lines.to_string() +
+              " 行 / " +
+              now.rows.to_string() +
+              " 表格行）—— 确认后用 --update-lock 落锁",
+            )
         }
       }
       for pair in l.skills {
@@ -336,3 +372,28 @@ fn json_escape(s : String) -> String {
   out
 }
 
+
+///|
+/// 两枚指纹之间**变了哪几项**（旧实现那句 `Object.keys(now).filter(k => now[k] !== was[k])` 的搬运）。
+///
+/// 抽出来是因为现在有**两处**要用它：每个 skill 的指纹、以及**首页源**（D20）。
+/// 分开写两遍的话，就会有两种"变了"的措辞 —— 而判据是逐字节比输出的。
+fn entry_field_diff(was : LockEntry, now : SkillFingerprint) -> Array[String] {
+  let detail : Array[String] = []
+  if was.files != now.files {
+    detail.push("files " + was.files.to_string() + " → " + now.files.to_string())
+  }
+  if was.lines != now.lines {
+    detail.push("lines " + was.lines.to_string() + " → " + now.lines.to_string())
+  }
+  if was.bytes != now.bytes {
+    detail.push("bytes " + was.bytes.to_string() + " → " + now.bytes.to_string())
+  }
+  if was.rows != now.rows {
+    detail.push("rows " + was.rows.to_string() + " → " + now.rows.to_string())
+  }
+  if was.codeBlocks != now.codeBlocks {
+    detail.push("codeBlocks " + was.codeBlocks.to_string() + " → " + now.codeBlocks.to_string())
+  }
+  detail
+}

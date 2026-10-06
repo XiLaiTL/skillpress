@@ -190,18 +190,38 @@ g10=$?
   grep -q 'G3 路径不存在：docs/没有这份文档.md' "$C9/bad.txt" &&
   ok "⑤ 坏首页源（死路径）被点名，且指名到首页源那一行" ||
   bad "⑤ 坏首页源没被抓住（rc=$g10）—— 首页就又成了没人复核的那块"
-grep -q '首页源还没进 G8 指纹' "$C9/good.txt" &&
-  ok "⑤ D20 的另一半（进指纹）**明着记着**没做，不是悄悄跳过" ||
-  bad "⑤ 少了那条「指纹那一半还没做」的声明（不许有静默的缺口）"
 
-# ── ⑥ 门与**旧门**在同一份副本上逐字节一致 ──────────────────────────────────────
+# ── ⑥ 首页源**也进 G8 指纹**（D20 的另一半）──────────────────────────────────────
+# D20 的第二个洞：首页源原先**既不过门、也不进指纹** ⇒ 它可以无限膨胀而没人复核。
+# ⑤ 管的是"过门"，这里管"进指纹"：落锁要写出它那一条、改一个字节要**当场红**。
+echo "⑥ 首页源进 G8 指纹（D20）"
+P6=$(mktemp -d)
+node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$SKILLPRESS_CORPUS" \
+  --program "$P6" --update-lock > "$W/lockh.txt" 2>&1
+grep -q '"skillpress/WEBSITE.md"' "$P6/skills.lock.json" &&
+  ok "⑥ 落锁把首页源写进了锁（key = skillpress/WEBSITE.md）" || bad "⑥ 首页源没进锁"
+out=$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$SKILLPRESS_CORPUS" \
+  --program "$P6" 2>&1)
+printf '%s' "$out" | grep -q '首页源还没进 G8 指纹' &&
+  bad "⑥ 门还在说「首页源还没进指纹」—— 那句话已经过期（自销账没同步）" ||
+  ok "⑥ 门上那句「还没进指纹」的声明已撤（它真进指纹了）"
+# 改**真首页源**一个字节（改完立刻撤回；这条判据必须证明它会红）
+cp "$SKILLPRESS_CORPUS/skillpress/WEBSITE.md" "$W/home.bak"
+printf '\n<!-- 判据探针 -->\n' >> "$SKILLPRESS_CORPUS/skillpress/WEBSITE.md"
+printf '%s' "$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$SKILLPRESS_CORPUS" --program "$P6" 2>&1)" |
+  grep -q 'G8 首页源指纹变了：skillpress/WEBSITE.md' &&
+  ok "⑥ 首页源改一个字节 ⇒ 「首页源指纹变了」当场红（指纹不是摆设）" || bad "⑥ 首页源变了没被抓住"
+cp "$W/home.bak" "$SKILLPRESS_CORPUS/skillpress/WEBSITE.md"   # 撤回探针
+rm -rf "$P6"
+
+# ── ⑦ 门与**旧门**在同一份副本上逐字节一致 ──────────────────────────────────────
 # 为什么必须挪到副本上：R4 之后旧实现不认识忽略清单 ⇒ 在真语料上两边**必然**差出"被跳过的那一份"
 # （那不是 bug，是设计）。副本上没有清单、没有 WEBSITE.md ⇒ 读的内容相同 ⇒ 可以整份报告逐字节比。
 # ⚠️ 跑法要用**真仓库根**（旧门的 G5/G6 要靠那边的 `.mbt` 索引）+ **显式空清单**（不然默认路径会把
 #    真清单漏进来）。G5/G6 按 D18 不搬 —— 用真索引时它们在旧门那一侧**通过**，所以两边输出仍然相等。
-echo "⑥ 门在副本上与旧门逐字节一致"
+echo "⑦ 门在副本上与旧门逐字节一致"
 C10=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh 2>/dev/null) ||
-  bad "⑥ 造不出副本（前提不成立）"
+  bad "⑦ 造不出副本（前提不成立）"
 if [ -n "${C10:-}" ]; then
   : > "$W/empty-ignore.md"
   node lib/check.mjs --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" > "$W/gate-old.txt" 2>&1
@@ -211,30 +231,30 @@ if [ -n "${C10:-}" ]; then
     > "$W/gate-new.txt" 2>&1
   rn=$?
   if [ "$ro" = "$rn" ] && diff -q "$W/gate-old.txt" "$W/gate-new.txt" > /dev/null; then
-    ok "⑥ 旧门与新 CLI 在副本上**逐字节一致**（rc 都是 $ro，$(grep -c . "$W/gate-new.txt") 行）"
+    ok "⑦ 旧门与新 CLI 在副本上**逐字节一致**（rc 都是 $ro，$(grep -c . "$W/gate-new.txt") 行）"
   else
-    bad "⑥ 门对账不一致（旧 rc=$ro 新 rc=$rn）"
+    bad "⑦ 门对账不一致（旧 rc=$ro 新 rc=$rn）"
     diff "$W/gate-old.txt" "$W/gate-new.txt" | head -8 | sed 's/^/      /'
   fi
 fi
 
-# ── ⑦ 落锁（写侧）走一遍完整循环（**在临时程序根里做，真锁一个字都不碰**）──────────
+# ── ⑧ 落锁（写侧）走一遍完整循环（**在临时程序根里做，真锁一个字都不碰**）──────────
 # 为什么单列：写侧是"让门变绿"的唯一入口，它坏掉的样子最危险 —— 要么悄悄不写、要么把别人的指纹
 # 一起锁掉。所以：落锁 ⇒ 不再报「新增」；改一个字节 ⇒ **必须**报「指纹变了」。
-echo "⑦ 落锁写侧（临时程序根）"
+echo "⑧ 落锁写侧（临时程序根）"
 P7=$(mktemp -d)
 node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" \
   --update-lock > "$W/lock1.txt" 2>&1
 grep -q '已落锁：7 个 skill' "$W/lock1.txt" &&
-  ok "⑦ 落锁：打印与旧实现同形（$(head -1 "$W/lock1.txt")）" || bad "⑦ 落锁没打那句（$(head -2 "$W/lock1.txt" | tr '\n' ' ')）"
-[ -f "$P7/skills.lock.json" ] && ok "⑦ 锁写到了指定的程序根（不是别处）" || bad "⑦ 锁没写出来"
+  ok "⑧ 落锁：打印与旧实现同形（$(head -1 "$W/lock1.txt")）" || bad "⑧ 落锁没打那句（$(head -2 "$W/lock1.txt" | tr '\n' ' ')）"
+[ -f "$P7/skills.lock.json" ] && ok "⑧ 锁写到了指定的程序根（不是别处）" || bad "⑧ 锁没写出来"
 out=$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" 2>&1)
 printf '%s' "$out" | grep -q 'G8 新增 skill' &&
-  bad "⑦ 刚落完锁还报「新增」⇒ 写侧与读侧对不上" || ok "⑦ 落锁后不再报「新增」（读写同一套口径）"
+  bad "⑧ 刚落完锁还报「新增」⇒ 写侧与读侧对不上" || ok "⑧ 落锁后不再报「新增」（读写同一套口径）"
 printf '\n<!-- 判据探针 -->\n' >> "$C10/moobile-pitfalls/SKILL.md"
 printf '%s' "$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" 2>&1)" |
   grep -q 'G8 指纹变了：moobile-pitfalls' &&
-  ok "⑦ 改一个字节 ⇒ 「指纹变了」当场红（门的意义就在这一条）" || bad "⑦ 指纹变了没被抓住"
+  ok "⑧ 改一个字节 ⇒ 「指纹变了」当场红（门的意义就在这一条）" || bad "⑧ 指纹变了没被抓住"
 rm -rf "$P7"
 
 
