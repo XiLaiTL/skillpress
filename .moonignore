@@ -8,9 +8,10 @@
 #   cmd/**           新 CLI（MoonBit）
 #   grammars/**      语法资产（*wasm + *scil + PROVENANCE）—— 随包分发，署名见 THIRD-PARTY-NOTICE
 #   skills/**        程序自己的两份 skill（给别人看的用法/做法）
-#   claims.txt / done-claims.txt
-#                    ⚠️ **门要读的数据**（G7 禁语表 / 已落地台账）—— 别当草稿删掉，
-#                    删了 `forbidden` / `facts` 那两道门就变成"没有数据的门"
+#   claims.txt       G7 的**禁语表** —— **通用**（"不许把未做写成已支持"对谁都成立）⇒ 随包发；
+#                    ⚠️ 它是**门要读的数据**，别当草稿删掉：删了 G7 就变成"没有数据的门"。
+#                    （~~done-claims.txt~~：那是**已落地台账**，条目里全是 moobile 的路径 ⇒
+#                     按 D18 跟 `facts` 一起**搬进内容仓根**了，不再是这份包的东西。）
 #   moon.mod ｜ README.md ｜ SPEC.md ｜ SKILLS.md ｜ DRIFT.md ｜ PLAN.md
 #   LICENSE ｜ THIRD-PARTY-NOTICE.md
 #
@@ -28,11 +29,21 @@
 #                 G8 指纹锁：里面是**本机绝对路径 + 体量指纹**，不随包走（每个用户自己落锁）。
 # `/_scratch/`    草稿区。
 #
-# ⚠️ **已知的边界（写在明处，别当成已解决）**：这份包是**库**（供站点实例依赖：`XiLaiTL/skillpress/shell`
-# + 引擎与门的包），**不是一个能直接跑起来的分发** —— 新 CLI 的 js 产物要靠 Node 引导层
-# （`tools/run-js.mjs`，在这里被排除）把 web-tree-sitter 与语法装好。也就是说：
-# 「用户拿到包之后怎么在本机跑 press/check」这件事**今天还没有答案**，它是 R6（通用产品）的下一步，
-# 不是这份 .moonignore 能决定的。判据 `tools/package-check.sh` 钉住的是**上面那两张清单**。
+# ⚠️ **拿到这个包的人怎么用它**（R6 那一问，2026-10-06 有答案了）：包里带一个**启动器**
+# `launcher/skillpress.mjs`（js target 的 CLI 本来就需要一个 Node 启动器：`web-tree-sitter` 的
+# `Parser.init()` 是 Promise，而 `moon build --target js` 出的是 CJS、顶层 await 不成立）。三步：
+#
+#   PKG=<你项目>/.mooncakes/XiLaiTL/skillpress
+#   moon -C "$PKG" build cmd/skillpress --target js      # 编一次（产物落在包自己的 _build/）
+#   node "$PKG/launcher/skillpress.mjs" check --skills ./skills
+#   npm i web-tree-sitter                                # ← 只有需要**高亮**时（gen-file / hl / batch）
+#
+# `check`（G1–G4 / G7 / G8）**不需要那个 npm 依赖** —— 启动器在 check 这条路上连 tree-sitter
+# 都不 import（实测：干净目录下没有依赖时 check 照样全过）。这条路的账记在这儿：`grammars/`
+# 随包发（署名见 THIRD-PARTY-NOTICE），`web-tree-sitter` 只能由使用者自己装。
+# 判据 `tools/consumer-check.sh` 把上面这套**从 zip 出发**跑一遍（含"没依赖时 check 必须能跑"
+# 与"包里的产物必须与本地引擎逐字节一致"），判据 `tools/package-check.sh` 钉住下面两张清单。
+# `/tools/`        判据、夹具、基线与探针 —— 开发期的东西（**启动器不在这一层**：它进包）。
 /tools/
 /_build/
 /.mooncakes/

@@ -21,6 +21,7 @@ cd "$(dirname "$0")/.."
 REQUIRED="
 moon.mod
 LICENSE
+launcher/skillpress.mjs
 README.md
 SPEC.md
 SKILLS.md
@@ -28,7 +29,6 @@ DRIFT.md
 PLAN.md
 THIRD-PARTY-NOTICE.md
 claims.txt
-done-claims.txt
 engine/content/moon.pkg
 engine/highlight/moon.pkg
 engine/gates/moon.pkg

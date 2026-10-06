@@ -113,6 +113,15 @@ else
   bad "消费者编不过"; tail -5 "$W/log" | sed 's/^/      /'
 fi
 rm -rf "$W"
+# A1c：**从 zip 出发**的消费者视角（R6 / D33）——"工作区能跑"**不构成证据**：
+# 工作区里有 tools/、node_modules、_build，而包里一样都没有。这一段跑 `tools/consumer-check.sh`：
+# 解压成项目里的包 ⇒ 编一次 ⇒ 没 npm 依赖时 check 必须能跑 ⇒ 装上依赖后产物与本地引擎逐字节一致
+# ⇒ 两个反证。慢（npm i + 编一次），但它是 A1 里最硬的一条。
+if bash tools/consumer-check.sh > /tmp/acc-consumer.log 2>&1; then
+  ok "消费者视角全过（从 zip 出发：包自己编得过、check 不依赖 npm、产物与本地逐字节一致）"
+else
+  bad "消费者视角有红"; grep '^  ✗' /tmp/acc-consumer.log | head -3 | sed 's/^/      /'
+fi
 echo "  ·  ⚠️ 注册表那条（\`moon add\` 装已发布的版本）**必须真发布**才能证 —— 发布要凭据"
 
 # ── A2：站点直接依赖包，而不是抄界面 ─────────────────────────────────────────

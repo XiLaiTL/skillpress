@@ -14,7 +14,6 @@
     "check": "node bin/skillpress.mjs check",
     "check:selftest": "node bin/skillpress.mjs check --selftest",
     "verify": "node bin/skillpress.mjs verify",
-    "facts": "node bin/skillpress.mjs facts",
     "audit": "node bin/skillpress.mjs audit",
     "package-check": "bash tools/package-check.sh"
   }

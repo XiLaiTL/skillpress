@@ -27,14 +27,16 @@ npm run check          # 门：skill 自己（G1–G8）—— **今天仍由冻
 npm run verify         # 站点判据：真 Chrome 无头，自起服务（**同上**）
 ```
 
-> ⚠️ `check` / `verify` / `facts` / `audit` 这四道**今天**还是旧实现（`lib/*.mjs`）——
+> ⚠️ `check` / `verify` / `audit` 这三道**今天**还是旧实现（`lib/*.mjs`）——
 > 新引擎的通用门正在 `engine/gates/` 里长（P8.2），搬完才会换过来。`press` 那条**已经换了**。
 > 在**内容仓根**（`moobile/`）跑同一份程序就多一层：`node ../skillpress/bin/skillpress.mjs check`。
 > 内容仓不在兄弟位置时用 `--repo <仓库根>` 或 `SKILLPRESS_REPO` 指定 —— **它不猜**
 > （猜错的表现是"站点没更新"，最难查的一类症状）。
 
-其余子命令：`facts`（查事实来源：docs 有没有撒谎）｜`audit`（上色的闸门：召回率 / 漏色比例）
+其余子命令：`audit`（上色的闸门：召回率 / 漏色比例）
 ｜`check:selftest`（门自己的证伪：造诱饵，必须全被点名）。`pack` / `attach` **还没做**（用法里就这么写）。
+⚠️ `facts`（查 docs 有没有撒谎）按 **D18 已搬去内容仓自己**：`moobile/tools/skillpress-gates.mjs --gate facts`
+（连同 G5 / G6 两道"只对 moobile 有意义"的门与台账 `done-claims.txt`）。
 `npm run package-check` = 发布包内容复核（见下节 ⑧）。
 
 看一眼站点（站点实例在**内容仓**里）：
@@ -48,17 +50,17 @@ npm install && npm run press && npm run build && npm run serve   # → http://12
 
 | 路径 | 是什么 |
 |---|---|
-| `bin/skillpress.mjs` | **旧**门面：`check` / `facts` / `audit` / `verify` 今天仍由它提供（换实现不改文档） |
+| `bin/skillpress.mjs` | **旧**门面：`check` / `audit` / `verify` 今天仍由它提供（换实现不改文档；`facts` 已按 D18 搬去内容仓） |
 | `skills/` | **程序自己的 skill**（见下节）—— `skills` 是"给别人看的内容"，不是这里 |
 | `lib/gen-content.mjs` | **冻结的旧实现**（真相参照物）：内容管线 —— 判据拿它现场印基准 |
 | `lib/highlight.mjs` | 同上：构建期上色（tree-sitter → 色号；`--audit` 是它的闸门） |
 | `lib/check.mjs` | 同上：门 G1–G8（含 `--selftest` 证伪、`--update-lock` 落锁） |
-| `lib/docfacts.mjs` | 同上：门：事实来源对账（只查算得出来的；按 D18 要搬去内容仓） |
+| `lib/docfacts.mjs` | 同上：**冻结的对照物** —— 事实来源对账（只查算得出来的）。按 D18 已搬去内容仓（`moobile/tools/skillpress-gates.mjs`），程序这边只留旧实现 |
 | `lib/verify-site.mjs` | 同上：站点判据（真 Chrome 无头 + CDP 真鼠标事件） |
 | `grammars/` | vendor 的语法资产（wasm + `highlights.scm`），出处与 sha256 见它的 `PROVENANCE.md` |
 | `SPEC.md` / `SKILLS.md` / `DRIFT.md` | 投影规范 / 集合划分 / 漂移政策（跟着程序走 = 对外契约） |
 | `PLAN.md` | **计划**（会变）：还没做的、已定的决定（D1–D26）、要探的未知 |
-| `claims.txt` / `done-claims.txt` / `skills.lock.json` | 禁语表 / 已落地台账 / 体量指纹（每条指纹记着**属于哪个内容根**）。⚠️ 前两份是**门要读的数据**（随包发）；`skills.lock.json` 里是本机绝对路径，**不随包发** |
+| `claims.txt` / `skills.lock.json` | 禁语表（G7 用，**随包发**）/ 体量指纹锁（每条指纹记着**属于哪个内容根**；锁**不随包发**）。⚠️ 已落地台账 `done-claims.txt` 与 `facts` 那道门按 D18 **搬去内容仓自己**了（`moobile/tools/skillpress-gates.mjs`） |
 | `tools/*.sh` | **判据**（见下节）：对账 / 夹具 / R9 / 诊断账本 / 干净克隆 / 包内容 |
 | `engine/highlight/` | **MoonBit 版引擎的第一块**（P8.1）：调色板 / 包装候选 / 薄垫片 —— 见下节「对账」 |
 | `engine/content/` + `cmd/skillpress/` | 内容管线与 CLI 的 MoonBit 版（P6/P8）：生成物由 `cmd/skillpress` 的 `gen-file` 吐到 stdout |
