@@ -50,6 +50,9 @@
 | D22 | **诊断措辞允许一种偏差：「旧句子在新设计下成了假话」，但必须记账、并把新句子冻在判据里**。第一条实例是**空内容根**：旧实现 push `skills/ 下没有 SKILL.md`（**还会多报一条**「找不到首页」），新实现打「内容根下没有带 SKILL.md 的目录（引导层按 `gen-file <内容根>` 列举，检查那个参数）」。**行为**（退 2、不吐产物）两边必须一致；**措辞**这处偏差由 `tools/blocks-fixtures.sh` **夹具四**冻住：整句逐字节断言 + 一条诱饵（**有内容的内容根不许出现这句**）+ 断言本条决定在 PLAN 里记着 | 实测（2026-10-06，干净克隆自查 + 静态审计）。理由：旧句把根名**写死**成 `skills/`，而内容根现在可配置（`--skills <目录>` / `SKILLPRESS_CORPUS`）—— 照抄旧句在新设计下就是**假话**；新句还交代了"目录是谁列举的"，更指得动路。⚠️ 这段还牵出下面那笔老账 |
 | D23 | **判据的读数只在「干净克隆 + 现编」下算数**：新增 `tools/fresh-clone-check.sh`（把 HEAD 克隆到临时目录、**只带 tracked 文件**、现装依赖现编，再跑四条对账 + R9；带 `--selftest` 诱饵）。**本机绿不算数** | 实测两笔老账（2026-10-06）：① 四条对账判据要"编出来的 js"，而 `_build/` 不进版本库 ⇒ **干净克隆里全红**、本机一直绿（只因本机早编过）；② 更狠的一条：**已提交的引擎里根本没有**「图片 / 原始 HTML / 表格缺分隔行 / 围栏没闭合」这四条点名规矩 —— `parse_blocks(body)` 的签名里**没有 problems 参数**，移植时按我自己写的注释（"`dump-blocks` 的判据是逐字节一致 ⇒ 这条命令不用 problems"）把报错清单从 API 上摘了，而 `gen-file` 正需要它。**参数一摘，规矩就没了出口**：坏夹具上 `gen-file` 退出码 0、stdout 吐 4407 字节坏产物、stderr 全空 —— 正是旧实现刻意不做的「静默丢」。⚠️ 连带承认：`blocks-fixtures` **从出生那一刻（25046f6）起就是红的**，我上一轮报的"四条判据全绿"里那一条是**假绿** |
 | D24 | **发布包的边界**：发 **新引擎（`engine/**`）+ 站点界面（`shell/**`）+ 新 CLI（`cmd/**`）+ 门要读的数据（`claims.txt` / `done-claims.txt`）+ 语法资产（`grammars/**`）+ 规范与账本 + 程序自己的 skill（`skills/**`）+ 许可/署名**；**不发开发期的东西**：旧 Node 引擎（`lib/`）、旧 CLI（`bin/`）、npm 清单（`package.json`/`package-lock.json`）、判据与夹具/引导层（`tools/`）、构建产物、**指纹锁**（`skills.lock.json`：里面是本机绝对路径）、草稿（`_scratch/`）。由 `.moonignore` 钉住；判据 = `tools/package-check.sh`（该含的缺一个也红、不该含的多一个也红） | 实测（2026-10-06）：`moon package --list` 里原本赫然有 `lib\*.mjs`（冻结的旧引擎 7 个文件）、`bin\skillpress.mjs`（旧 CLI）、`package.json`/`package-lock.json` —— 发出去等于让用户拿到**两个引擎，其中一个是旧版**。⚠️ **已知边界写在明处（别当成已解决）**：这份包是**库**（供站点实例 `XiLaiTL/skillpress/shell` 依赖），**不是能直接跑起来的分发** —— 新 CLI 的 js 产物要靠 Node 引导层（`tools/run-js.mjs`，被排除）装 web-tree-sitter 与语法。所以「用户拿到包之后怎么在本机跑 press/check」**今天还没有答案**，属 R6（通用产品）的下一步。⚠️ 诱饵刻意**不依赖本模块能编**（拿自造清单喂检查器）：把"判据自己会不会红"绑在"此刻编不编得过"上，就等于**别人一改代码诱饵先失效** |
+| D25 | **数据的家搬进包**：`Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home` 从**生成物**搬进 `shell/types.mbt`（唯一声明处），生成物**只填值**：签名与值都带 `@shell.` 前缀、结构体字面量保持**匿名**（靠字段类型推）。⚠️ 三个类型必须 `pub(all)` 而不是 `pub`（后者对别的包**只读**）。代价：`shell` 要用 moobile（`@html`/`@style`/`@cmd`/`@moobile`）⇒ `XiLaiTL/moobile` 成了**模块级**依赖，随包发布给所有用引擎的人（要拆开只能拆成两个模块） | 用户定（P6，2026-10-06）。兑现的是同一条价值观：**契约只有一处**（原来类型声明在生成物里 = 每个实例各有一份，改契约要改所有生成物）。三个"没想到"（`using` 只引类型名、限定结构体字面量不是合法语法、`pub` 只读）都是**实测**出来的，记在 P6 那节的补记里 —— 语言事实别猜 |
+| D26 | **"逐字节一致"这条判据的载体换一次，但口径更严而不是更松**：旧形状的产物冻成基线（`tools/baseline/`，**只能**用旧引擎刷、sha256 钉住），新产物与它**先归一化再逐字节比**（`tools/normalize-gen.mjs` 三条规则 = 去头注释 / 去类型声明块 / 去 `@shell.` 前缀）；另加"旧引擎现场重印基线"（`acceptance.sh` A3）与两条形状守卫（基线必须旧形状、新产物必须新形状）。**判据自己必须会红**：`tools/file-parity.sh --selftest` 五条，其中"只在归一化看不见的地方改基线 ⇒ 必须红"证明 sha 钉子是**承重**的 | P6 实测（2026-10-06）。由来：生成物的形状换了（D25），原来那条"与实例里的旧产物逐字节比"**比不出东西了**（两边的形状差是**设计**，不是 bug）。两条替代路都更差：删掉判据（丢了对映射的逐字节防线）／改成"看一眼差不多"（把旧实现白干）。所以选"归一化只抹形状差 + 多层钉子"。⚠️ **边界写在明处**：归一化抹掉的正是"前缀与类型声明块"这两样 ⇒ 它们**只**由形状守卫与编译器（`@shell.` 写错就编不过）保证，不由那条 diff 保证 |
+| D27 | **MoonBit 里不许用 `Array::sort()` 排字符串**（它**不是字典序**）；要排就自己写比较器 —— `engine/gates/` 里现成的 `utf16_compare`（JS `.sort()` 的 UTF-16 码元序）+ **稳定**排序 | 实测（2026-10-06，P8.2 对账逮到）：`["styles.md","structure.md","events-and-subs.md","FAQ.md"]` 被排成 `["FAQ.md","styles.md","structure.md","events-and-subs.md"]`（看着像先比长度）⇒ 真语料 `references/` 顺序**整片错位**。危险在于它**不会自己红**：编译器不管、不写测试就不炸，只会在某天"顺序又不对了"时以最难查的形式冒出来。判据 = `tools/mbt-traps.sh`（代码行里的 `.sort()` 即红；**注释里的不算** —— 否则解释这条规矩的注释会把门弄红，人就只好去删注释）；另有 `gates_wbtest.mbt` 一条测试**显式断言 `.sort()` 的结果与字典序不一致**，作为"这条规矩为真"的现场证据。⚠️ 例外只有两处且都写了理由：`report_wbtest.mbt`（就是那条测试）与 `ts_shim.mbt`（JS 源码字符串）—— 例外还被**断言仍在位**（豁免不许烂在判据里） |
 
 ## 2. 阶段
 
@@ -239,6 +242,37 @@
 ⚠️ **生成物的形状会变**（类型不再声明在里面、值要带包前缀）——所以那一步的判据**不再是"逐字节"**，
 而是：`moon check` 干净 + 实例 `npm run build` + `verify` **22/22** + `app.mbt` ≤20 行。
 "逐字节"那条判据管的是**映射逻辑**（P8.1 已经拿到），不是最终的发射格式。
+
+**P6 做完了（2026-10-06）—— 实际读数与三个"没想到"**
+
+做到了：`shell/` 10 个文件（`types` / `state` / `theme` / `inline` / `blocks` / `docs` / `topbar` / `home` / `site`）、
+实例 `app.mbt` **1062 → 17 行**、实例 `moon.mod` 直接依赖 `XiLaiTL/skillpress@0.1.0`、实例 `moon.work`
+（成员 `["." , "../../../../../skillpress"]`，**相对**路径 —— 与 `verify.mjs` / `package.json` 的跨仓约定同源）。
+读数：`moon check`（实例两个包）0 错 0 警 ｜ 实例 `build` 出 `dist/bundle.js` ｜ 真浏览器 `verify` **22/22** ｜
+`tools/acceptance.sh` 的 **A2 三条全绿**（17 ≤ 20 行 / 依赖在 / 没有界面副本）。
+
+⚠️ **对账口径没有"放弃逐字节"，而是收紧了一层**：基线（旧引擎的产物）冻在 `tools/baseline/`，
+两边先过 `tools/normalize-gen.mjs`（三条规则：去头注释 / 去类型声明块 / 去 `@shell.` 前缀）再逐字节比；
+基线自己被三样钉住（是旧形状 · sha256 与 `EXPECTED.sha256` 一致 · `acceptance.sh` 里用**旧引擎现场重印**复核）。
+`tools/file-parity.sh --selftest` 五条自证里，最要紧的一条是"**只在归一化看不见的地方改基线 ⇒ 必须红**"
+（去掉那枚 sha 钉子，这条会绿 ⇒ 判据废掉）。见 D25 / D26。
+
+三个"没想到"（都是实测，不是推理）：
+
+1. **`using` 救不了构造器**：`using @shell {type Span, type Block}` 只把**类型名**引进作用域，
+   `Txt(...)` / `Hr` 仍然 unbound ⇒ 生成物里的值必须写 `@shell.Txt(...)`。
+   而 `@shell.NavItem { … }` 这种"限定结构体字面量"**不是合法语法** —— 好在生成物里的结构体字面量
+   本来就是**匿名**的（`{ title: … }`，靠字段类型推），所以不受影响。
+2. **`pub` 是只读的**：类型搬进包之后，`pub enum` / `pub struct` 对**别的包**只读 ——
+   消费者写 `@shell.Txt("x")` 会得到 `Cannot create values of the read-only type`，
+   写 `@shell.NavItem { … }` 会得到 `Value NavItem not found in package shell`。
+   跨包填值必须 `pub(all)`（探针：`_scratch` 包，用完即删）。
+3. **搬界面的等价性得自己造仪器**：`app.mbt` 被机械切进 `shell/` 之后"两边都编得过"**不构成证据**
+   （少画一个块、顺序换一条都不会报错）。所以加了 `tools/dom-dump.mjs`：真 Chrome 抓渲染后的 DOM，
+   并且**先自证**（同一份 bundle 连抓两次逐字节相同），再比"搬之前 / 搬之后"——
+   实测**21142 字符逐字节相同**（期间 bundle 的 sha256 换了三次，DOM 一次没动）。
+   ⚠️ 它踩过一个坑：同进程里的静态服务 + `spawnSync` 会**死锁**（同步子进程堵住事件循环 ⇒ 服务答不上请求），
+   必须异步 `spawn`。
 
 
 > ⚠️ `pack` / `attach` 现在是**核心需求**（D16：产品要做成通用的），不是「以后再说」。
@@ -452,7 +486,7 @@
 | 1 | **`moon.mod` 的元数据齐全** | 实测：`readme` 与 `repository` **原先没设**，`moon package` 每次警告两行（2026-10-06 已补）。发布前再跑一次 `moon package --list`，警告应为 0 |
 | 2 | **包内容复核** | `bash tools/package-check.sh`（**判据，不是"人读一遍"**）：该含的缺一个也红、不该含的多一个也红，带三向诱饵；两张清单与理由写在 `.moonignore` 的文件头（D24） |
 | 3 | **许可与署名** | `LICENSE`（Apache-2.0）+ `THIRD-PARTY-NOTICE.md`（随包分发的语法资产是 MIT / Apache-2.0 —— 这条是**发出去才有的义务**） |
-| 4 | **判据全绿** | `tools/acceptance.sh`（A1/A2/A3）+ 四条对账判据 + `line-budget.sh` |
+| 4 | **判据全绿** | 九条，一条都不能少：`acceptance.sh`（A1/A2/A3）｜`file-parity`（含 `--selftest` 五条）｜`blocks-parity`｜`highlight-parity`｜`blocks-fixtures`（含夹具四）｜`line-budget`（R9）｜`diagnostics-ledger`（诊断口径账本）｜`mbt-traps`（MoonBit 坑位）｜`package-check`（第 2 条）—— 再加 `fresh-clone-check.sh`：**干净克隆 + 现编下也是这些读数** |
 | 5 | **凭据** | `moon login`（**需要用户**）—— 到这一步先问 |
 | 6 | 发布 | `moon publish` |
 | 7 | **发布后：外部视角** | 另一个工程 `moon add XiLaiTL/skillpress@<ver>` → `moon check` 编过（**这才是 A1 的注册表那条判据** —— 本地工作区那套不算数）；再跑一次 `tools/acceptance.sh` |
@@ -477,15 +511,15 @@
 | **DG-check** | `--check` 全套 6 条（产物不存在 / 一致 / 不一致 / 第一处差异在第 N 行 …） | 判据侧有 `file-parity` 同语义替代，但**直接调引擎的人拿不到** | P8.2 |
 | **DG-高亮指路** | 语法缺失时丢了「见程序根 `grammars/PROVENANCE.md` 的取法」，还多出 `ERR:` 前缀 | 撞上缺语法的人找不到取法 | P8.2 |
 | **DG-audit** | 高亮的 audit 闸门整条未移植（**空集合必须红** / 召回率 ≥ 90% / 未上色 ≤ 40%） | `highlight-parity` 更强，但**旧 npm 侧一撤这道保护同时消失**；空集合上还能"两侧都空"地**假绿** | P8.2 |
-| **DG-门整条** | `check.mjs` 的 27 条（G1–G4 / G7 / G8）未移植 | 门整体不存在：今天由旧 CLI 提供，**迁移完成那刻保险一起失效** | P8.2（`engine/gates/` 在做） |
+| **DG-门整条** | ~~`check.mjs` 的 G1–G4 / G7 / G8 未移植~~ | ✅ **已落地**（2026-10-06，P8.2）：`engine/gates/` 19 文件 / 2817 行，真语料报告与旧实现**逐字节一致（76 行 / diff 0）**、28 文件夹具树 14 个诱饵全点红、G8 锁序列化回环逐字节、22 条 wbtest。**G5 / G6 按 D18 不搬**（它们读的是 moobile 的源码与 docs），所以夹具树里 `bad-api` / `bad-section` 两个诱饵在新实现里是绿的 —— 这是**刻意**的偏差，不是漏 | 已落地 |
 | **DG-facts** | `docfacts.mjs` 8 条 | 按 D18 搬去内容仓，不在核心里 | 内容仓 |
 | **DG-verify** | `verify-site.mjs` 7 条 + 22 条判据 label | 站点判据未移植 | P8.3 |
 | **DG-首页标签** | 首页问题的标签口径：旧是 `relative(REPO, …)`（**随机器变**，实测能退化成带反斜杠的绝对路径），新固定 `skillpress/SKILL.md`；"找不到首页"那条还**删掉了**「便携目录由 pack 生成它；项目里也可以自己写一份」 | 标签固定是**被迫且应接受**的（跨机器稳定）；但被删掉的那句是**可行动信息**，属于新实现漏的 | P8.1 收尾 |
-| **DG-提示走 stderr** | 纯链接节提示「（…还带着 N 块正文…）」文本逐字节一致，但**流向 stdout → stderr** | 方向是被迫的（`gen-file` 的 stdout 必须是产物），但**用户可见行为变了**，得登记 | 已登记，待补断言 |
+| **DG-提示走 stderr** | 纯链接节提示「（…还带着 N 块正文…）」文本逐字节一致，但**流向 stdout → stderr** | 方向是被迫的（`gen-file` 的 stdout 必须是产物），但**用户可见行为变了**，得登记 | 已登记，`file-parity` 会把 stderr 逐条打出来给人看 |
 
-**另外两笔不是欠账、是账本外的漏洞（`tools/diagnostics-ledger.sh` 管不到，另记在这里）：**
+**另外两笔不是欠账、是账本外的漏洞（`tools/diagnostics-ledger.sh` 管不到，另记在这里）—— 两笔都已修：**
 
-1. 🔴 **`acceptance.sh` 的 A3 跑的是旧 CLI**（`bin/skillpress.mjs press --check`）⇒ 迁移一完成，A3 对新引擎**什么都证明不了**（假绿）。
-   修法：A3 直接吃 `node tools/run-js.mjs gen-file <内容根>` 与 `tools/baseline/` 的对账（即把 `file-parity` 拉进验收）。
-2. 🟠 **`file-parity.sh` 的 `EXPECTED.sha256` 缺失时会被静默跳过**（那段是 `if [ -f "$EXPECTED_SHA_FILE" ]`）⇒
-   删掉那个文件就等于关掉"防基线被静默刷新"这道锁。修法：文件缺失直接判红（**不许有静默后门**）。
+1. ~~🔴 **`acceptance.sh` 的 A3 跑的是旧 CLI** ⇒ 迁移一完成 A3 对新引擎什么都证明不了（假绿）~~ ⇒ ✅ **已修**（P6）：A3 现在两头都钉 ——
+   ① 旧引擎**现场重印**基线（证明基线不是手抄的、也没被新引擎覆盖过）；② `file-parity` 把新引擎产物与基线**归一化后逐字节**比。
+2. ~~🟠 **`file-parity.sh` 的 `EXPECTED.sha256` 缺失时被静默跳过** ⇒ 删掉那个文件就等于关锁~~ ⇒ ✅ **已修**（2026-10-06）：
+   改成"钉子文件不存在直接判红"，并实测过（移走文件 ⇒ 红并点名；放回 ⇒ 绿）。**不许有静默后门。**

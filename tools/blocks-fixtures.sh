@@ -122,16 +122,35 @@ MD
 node lib/gen-content.mjs --skills "$W/root" --app "$W/app" > "$W/gen.log" 2>&1 || {
   echo "✗ 旧生成器跑失败（$W/gen.log）："; tail -5 "$W/gen.log"; exit 1;
 }
-node tools/spike/old-doc-blocks.mjs "$W/app/content/content.generated.mbt" > "$W/base.txt" || {
+node tools/spike/old-doc-blocks.mjs "$W/app/content/content.generated.mbt" > "$W/base.raw.txt" || {
   echo "✗ 基准切不出来"; exit 1;
 }
-node tools/run-js.mjs dump-blocks "$W/root" > "$W/new.txt" 2>&1 || {
-  echo "✗ 新实现跑失败："; tail -5 "$W/new.txt"; exit 1;
+node tools/run-js.mjs dump-blocks "$W/root" > "$W/new.raw.txt" 2>&1 || {
+  echo "✗ 新实现跑失败："; tail -5 "$W/new.raw.txt"; exit 1;
 }
 
+# ── 归一化（P6 的口径）：两边都过 `tools/normalize-gen.mjs` ───────────────────
+# P6 把类型搬进包 `shell` ⇒ 新实现的每个构造器带 `@shell.` 前缀，而基准那侧（旧生成器的产物，现场产出）
+# 是裸构造器。**形状差不是内容差**，所以先归一化再逐字节比 —— 规则与理由见
+# `tools/normalize-gen.mjs` 的文件头（那边还带 `--selftest`，证明"值改一个字符必须红"）。
+# ⚠️ 两条形状守卫不是装饰：没有它们，"旧生成器哪天也被改成吐前缀"会让这条 diff 变成**恒真**。
+if grep -q '@shell\.' "$W/base.raw.txt"; then
+  echo "✗ 夹具一：基准里出现了 \`@shell.\` —— 旧生成器不该吐新形状（基准侧被换掉了？）"; exit 1
+fi
+if ! grep -q '@shell\.' "$W/new.raw.txt"; then
+  echo "✗ 夹具一：新实现里没有 \`@shell.\` —— 类型没搬进包（新形状没生效？）"; exit 1
+fi
+node tools/normalize-gen.mjs "$W/base.raw.txt" > "$W/base.txt"
+node tools/normalize-gen.mjs "$W/new.raw.txt" > "$W/new.txt"
+
 if diff -u "$W/base.txt" "$W/new.txt" > "$W/diff.txt"; then
+  # 诱饵：把新产物改**一个字符**，这条 diff 必须红 —— 证明归一化没把判据吃空
+  sed '0,/Txt("/s//Txt("诱/' "$W/new.txt" > "$W/new-decoy.txt"
+  if diff -q "$W/base.txt" "$W/new-decoy.txt" > /dev/null; then
+    echo "✗ 夹具一（诱饵）：值改一个字符居然还判「一致」—— 归一化把这条判据吃空了"; exit 1
+  fi
   docs=$(grep -c '^### ' "$W/new.txt")
-  echo "✓ 夹具对账通过：$docs 段（含结尾标记）与**旧生成器现场产出**的基准逐字节一致"
+  echo "✓ 夹具对账通过：$docs 段（含结尾标记）与**旧生成器现场产出**的基准逐字节一致（归一化后；诱饵已证会红）"
 else
   echo "✗ 夹具对账不一致（完整 diff 在 $W/diff.txt）："
   head -30 "$W/diff.txt" | sed 's/^/    /'

@@ -84,7 +84,7 @@ fn home_lit_lines(h : HomeLit, pad : String) -> Array[String] {
   out.push(pad + "  sections: [")
   for s in h.sections {
     let nav = if s.nav.length() == 0 {
-      "([] : Array[NavItem])"
+      "([] : Array[" + REC + "NavItem])"
     } else {
       let parts : Array[String] = []
       for item in s.nav {
@@ -107,74 +107,21 @@ fn home_lit_lines(h : HomeLit, pad : String) -> Array[String] {
 }
 
 ///|
-/// 类型声明与文件头（旧实现 `generate` 里那段 `out.push(...)` 的照抄）。
+/// 文件头注释（旧实现 `generate` 里那段 `out.push(...)` 的照抄）。
+///
+/// ⚠️ **P6 起这里不再有类型声明**：`Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home`
+/// 全搬进了包 `shell`（`shell/types.mbt` 是唯一声明处），生成物只填值。
+/// 这条"搬家"就是 `tools/file-parity.sh` 里那份**归一化**存在的理由（旧形状 = 有类型声明 + 裸构造器）。
 fn header_lines() -> Array[String] {
   [
-    "// 由 `tools/gen-content.mjs` 生成 —— **别手改**（跑 `--check` 会红）。",
+    "// 由 `skillpress` 生成（P6 起是 MoonBit 引擎：`cmd/skillpress gen-file`）—— **别手改**。",
+    "//",
+    "// 类型**不在这里**：它们在包 `XiLaiTL/skillpress/shell`（`Span` / `Block` / `Kid` / `Doc` /",
+    "// `NavItem` / `Section` / `Home`）。这份文件只**填值**，所以每个构造器都带 `@shell.` 前缀 ——",
+    "// 为什么必须带，见 `engine/content/emit.mbt` 里 `REC` 的注释。",
     "//",
     "// 内容源：`skills/skillpress/SKILL.md`（首页）+ `skills/<name>/{SKILL.md,references/*.md,scripts/*}`。",
-    "// 为什么在构建期解析 markdown：见 `tools/gen-content.mjs` 的文件头。",
-    "",
-    "///| 一段行内内容。",
-    "pub enum Span {",
-    "  Txt(String)",
-    "  Code(String)",
-    "  Bold(String)",
-    "}",
-    "",
-    "///| 正文里的一个块。",
-    "pub enum Block {",
-    "  Hr",
-    "  H2(Array[Span])",
-    "  H3(Array[Span])",
-    "  H4(Array[Span])",
-    "  P(Array[Span])",
-    "  Quote(Array[Span])",
-    "  Code(String, String, Array[(String, Int)]) // 语言, 正文, 高亮片段（文本, 色号）",
-    "  Ul(Array[(Int, String, Array[Span])]) // 缩进, 序号前缀(有序列表用), 内容",
-    "  Table(Array[Array[Span]], Array[Array[Array[Span]]]) // 表头, 行",
-    "}",
-    "",
-    "///| 一个子页：skill 的 references/（深水区）或 scripts/（随 skill 发的脚本）。",
-    "pub struct Kid {",
-    "  kind : String // \"ref\" | \"script\"",
-    "  name : String",
-    "  title : String",
-    "  desc : String",
-    "  blocks : Array[Block]",
-    "}",
-    "",
-    "///| 一页 = 一个 skill。",
-    "pub struct Doc {",
-    "  slug : String        // 目录名（= skill 名）",
-    "  desc : String        // 侧栏用的一行摘要",
-    "  full_desc : String   // frontmatter 的完整 description",
-    "  when : String        // frontmatter 的 whenToUse",
-    "  blocks : Array[Block]",
-    "  kids : Array[Kid]",
-    "}",
-    "",
-    "///| 分栏下拉菜单里的一条（来自那一节的第一个链接列表）。",
-    "pub struct NavItem {",
-    "  label : String  // 显示的名字",
-    "  key : String    // 页面键（给 `find_page` 换成第几页）",
-    "}",
-    "",
-    "///| 官网首页的一个**分栏** = 首页那份 skill 里的一个 `##`（顶部栏的一条）。",
-    "pub struct Section {",
-    "  title : Array[Span]  // 分栏名（就是那个 `##` 的标题文本）",
-    "  blocks : Array[Block]",
-    "  link : String        // 纯链接节：这一节指向的**页面键**（空 = 普通分栏，点了只换正文）",
-    "  nav : Array[NavItem] // 这一节的下拉菜单（空 = 没有）；有它时点一下先展开",
-    "}",
-    "",
-    "",
-    "///| 首页（来自 `skills/skillpress/SKILL.md`：H1 + 首个 `##` 之前 = 首屏）。",
-    "pub struct Home {",
-    "  title : String       // H1 —— 页眉的站名",
-    "  lede : Array[Block]  // 首屏正文",
-    "  sections : Array[Section]",
-    "}",
+    "// 为什么在构建期解析 markdown：见 `tools/gen-content.mjs` 的文件头（映射的**参照实现**还在那边）。",
     "",
   ]
 }

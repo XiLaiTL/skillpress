@@ -72,16 +72,29 @@ pub struct Kid {
 }
 
 ///|
+/// `D:/a/skills/foo` → `foo`（点名时要用 `skills/<slug>/<相对路径>` 这个口径）。
+///
+/// ⚠️ 按 **`/`** 切，别用 `split_rel` —— 那个是"引导层给的按**换行**拼的清单"用的
+/// （P8.1 实测踩过：拿它切路径会原样退回来，标签里于是塞进一整条绝对路径）。
+fn slug_of(skill_dir : String) -> String {
+  let parts = skill_dir.split("/").filter(fn(l) { l != "" }).map(fn(l) { l.to_owned() }).collect()
+  if parts.length() == 0 { skill_dir } else { parts[parts.length() - 1] }
+}
+
+///|
 /// 读一个 skill 的子页（refs 在前、scripts 在后 —— 旧实现就是这个顺序）。
 ///
 /// `read` 是"读文件"，由调用方给（IO 归宿主/引导层，这一层只做规矩）。
+/// `report` 收子页正文里认不出的构造（图片之类的）—— 与主文档那边同一套点名规矩。
 pub fn read_kids(
   skill_dir : String,
   read : (String) -> String,
   md_kids : (String) -> Array[String],
   script_kids : (String) -> Array[String],
+  report : (String) -> Unit,
 ) -> Array[Kid] {
   let kids : Array[Kid] = []
+  let slug = slug_of(skill_dir)
   for (name, rel) in name_kids(md_kids(skill_dir)) {
     let text = read(skill_dir + "/" + rel)
     let data = frontmatter_data(text)
@@ -95,7 +108,13 @@ pub fn read_kids(
       Some(d) => summarize(d, 46)
       None => summarize(first_nonempty_line(trim(body)), 46)
     }
-    kids.push({ kind: "ref", name, title, desc, blocks: parse_blocks(body) })
+    kids.push({
+      kind: "ref",
+      name,
+      title,
+      desc,
+      blocks: parse_blocks(body, "skills/" + slug + "/" + rel, report),
+    })
   }
   for rel in script_kids(skill_dir) {
     let base = rel[8:].to_owned() // 去掉 "scripts/"

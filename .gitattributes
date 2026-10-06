@@ -35,3 +35,12 @@ moon.mod text eol=lf
 
 # 语法资产：二进制，别做任何转换
 *.wasm binary
+
+# ⚠️ **字节本身就是证据**的文件：一律不转换（`-text`）。加新文件时记得回来钉 ——
+# 漏一条的代价是"判据红在没人改过的文件上"（实测差点发生）：
+#   · `*.sha256`：`tools/baseline/EXPECTED.sha256` 是防基线被静默刷新的**钉子**，
+#     多一个 `\r` 会让比对失败 —— 而基线其实没动。
+#   · `*.html`：`tools/baseline/dom-before-p6.html` 是"搬界面之前"的 DOM 取证，
+#     P6 的 DOM 对账是**逐字节**比它 ⇒ CRLF 转换会把这份证据直接毁掉。
+*.sha256 -text
+*.html   -text

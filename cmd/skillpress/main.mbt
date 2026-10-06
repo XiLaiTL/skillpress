@@ -174,7 +174,9 @@ fn dump_blocks() -> Unit {
 /// **`gen-file <内容根>`**：把**整份** `content.generated.mbt` 打到 stdout。
 ///
 /// stdout 只有那份文件（判据对它做逐字节 diff）；诊断与问题清单走 **stderr**。
-/// 有问题（认不出的死链、没有 `##`、找不到首页…）时退出码 **2** —— 与旧实现一致。
+/// 有问题（认不出的死链、没有 `##`、找不到首页、图片/原始 HTML 这类认不出的构造…）时
+/// **退出码 2 且 stdout 是空的** —— 旧实现就是"有问题就不写产物"（那个 `else` 分支才 `writeFileSync`）。
+/// 照抄这条不只是为了对齐：`gen-file > 产物文件` 是常见用法，有问题还照吐就等于**把一份坏产物落盘**。
 fn gen_file() -> Unit {
   let dirs0 = skill_dirs()
   let dirs = dirs0.split("\n").filter(fn(l) { l != "" }).map(fn(l) { l.to_owned() }).collect()
@@ -199,6 +201,7 @@ fn gen_file() -> Unit {
       @content.note("  ✗ " + p)
     }
     @content.set_exit_code(2)
+    return
   }
   // `gen_content` 给回的文本以换行结尾；`println` 自带一个换行 ⇒ 先去掉尾巴再打，
   // 这样 stdout 恰好等于那份文件（不多不少一个换行）
@@ -208,8 +211,12 @@ fn gen_file() -> Unit {
 
 ///|
 fn main {
+  // 引导层没装好 ⇒ **退 2 且 stdout 什么都不打**。原先这里既能过、又往 stdout 打了句"✗"：
+  // `gen-file > 产物` 那种用法会因此得到一份写着报错的"产物"、退出码还是 0 ——
+  // 正是旧实现注释里骂过的"一个退出码不对的门比没有门更糟"（P8.1 自查发现，已改）。
   if !@hl.ready() {
-    println("✗ tree-sitter 没装好 —— 请用 `node tools/run-js.mjs` 拉起（它会先 await 装好再进 MoonBit）")
+    @content.note("✗ tree-sitter 没装好 —— 请用 `node tools/run-js.mjs` 拉起（它会先 await 装好再进 MoonBit）")
+    @content.set_exit_code(2)
     return
   }
   let args = @env.args()

@@ -176,7 +176,11 @@ pub fn read_home(
     return (None, problems)
   }
   let body = frontmatter_body(text)
-  let blocks = parse_blocks(body)
+  // 首页正文里认不出的构造（图片 / 原始 HTML / 围栏没闭合 / 表格缺分隔行）同样**点名**。
+  // ⚠️ 旧实现这里给的标签是"相对**程序仓**的路径"（`relative(REPO, readme)`）—— 跑在不同机器上
+  // 长得都不一样（P8.1 实测：探针语料下打出 `..\..\..\tmp\...`）。这里统一成内容根口径
+  // `skillpress/SKILL.md`，与本文件其它几条首页问题的写法一致。
+  let blocks = parse_blocks(body, "skillpress/SKILL.md", fn(p) { problems.push(p) })
   let links = heading_links(body)
   let lede : Array[Block] = []
   let sections : Array[SectionLit] = []

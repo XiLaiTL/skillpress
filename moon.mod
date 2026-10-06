@@ -22,6 +22,11 @@ repository = "https://github.com/XiLaiTL/skillpress"
 
 preferred_target = "js"
 
+// ⚠️ `XiLaiTL/moobile` 是 **shell 包**带来的依赖：站点界面本身就是个 moobile 应用
+//    （`@html` / `@style` / `@cmd` / `@moobile`）。模块级依赖**随包发布** ⇒ 用引擎的人也会下载 moobile
+//    （见 moobile 自己的 AGENTS.md 那条）。这是 P6「一个月亮包装下引擎 + 界面」的必然代价；
+//    要拆开只能把 skillpress 拆成两个模块（引擎一个、界面一个）。
 import {
   "mizchi/markdown@0.8.3",
+  "XiLaiTL/moobile@0.5.0",
 }

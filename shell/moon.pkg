@@ -1,0 +1,8 @@
+import {
+  "XiLaiTL/moobile" @moobile,
+  "XiLaiTL/moobile/style" @style,
+  "XiLaiTL/moobile/vendor/rabbita/html" @html,
+  "XiLaiTL/moobile/vendor/rabbita/cmd" @cmd,
+}
+
+supported_targets = "+js"

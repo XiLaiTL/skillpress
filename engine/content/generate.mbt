@@ -44,8 +44,8 @@ pub fn gen_content(
       desc: summarize(field(data, "description"), 60),
       full_desc: field(data, "description"),
       when: field(data, "whenToUse"),
-      blocks: parse_blocks(body),
-      kids: read_kids(root + "/" + d, read, md_kids, script_kids),
+      blocks: parse_blocks(body, "skills/" + d + "/SKILL.md", fn(p) { problems.push(p) }),
+      kids: read_kids(root + "/" + d, read, md_kids, script_kids, fn(p) { problems.push(p) }),
     })
   }
   // ③ 首页
@@ -88,7 +88,7 @@ pub fn gen_content(
   // ⑤ 发射（顺序与空行都照抄旧实现）
   let out = header_lines()
   out.push("///| 首页（来自 `skills/skillpress/SKILL.md`）。")
-  out.push("pub fn home() -> Home {")
+  out.push("pub fn home() -> " + REC + "Home {")
   match home {
     Some(h) => for line in home_lit_lines(h, "  ") {
       out.push(line)
@@ -98,7 +98,7 @@ pub fn gen_content(
   out.push("}")
   out.push("")
   out.push("///| 全部 skill（按 slug 排序，保证生成物稳定）。")
-  out.push("pub fn skills() -> Array[Doc] {")
+  out.push("pub fn skills() -> Array[" + REC + "Doc] {")
   out.push("  [")
   for d in filled {
     for line in doc_lit_lines(d, "    ", true) {

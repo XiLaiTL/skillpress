@@ -45,175 +45,30 @@ pub fn frontmatter_body(text : String) -> String {
 }
 
 ///|
-/// 行首空白字符个数（旧实现 `raw.match(/^\s*/)[0].length`）。
-fn leading_ws(raw : String) -> Int {
-  let c = chars(raw)
-  let mut n = 0
-  while n < c.length() && c[n].is_whitespace() {
-    n = n + 1
-  }
-  n
-}
+/// 块循环要用的一行一判，全在 `lines.mbt`（R9：一个文件一件事）。
+
 
 ///|
-/// `/^#{2,4}\s+/` → `(级别, 标题原文)`。
-pub fn heading(t : String) -> (Int, String)? {
-  let c = chars(t)
-  let mut n = 0
-  while n < c.length() && c[n] == '#' {
-    n = n + 1
-  }
-  if n < 2 || n > 4 {
-    return None
-  }
-  if n >= c.length() || !c[n].is_whitespace() {
-    return None
-  }
-  let mut k = n
-  while k < c.length() && c[k].is_whitespace() {
-    k = k + 1
-  }
-  Some((n, trim(slice(c, k, c.length()))))
+/// **认不出的构造要点名**（旧实现 `parseBlocks(body, where)` 里那四处 `problems.push`；
+/// `where` 在 MoonBit 里是关键字，这里叫 `label`，口径照旧）。
+///
+/// 为什么非报不可：块**照收**（图/原始 HTML 直接跳过、表格照渲染、围栏没闭合就当读到文件尾），
+/// 但"收下了"不等于"这份内容是对的" —— 闷声跳过会让人以为站点里那行渲染出来了。
+/// 旧实现的口径正是"不静默丢"：**有问题就点名，且退出码 2、不写产物**。
+///
+/// `label` 用 `skills/<slug>/<文件>` 这种口径（旧实现对 skill 主文档与子页就是拼这个）。
+fn report_at(label : String, line : Int, kind : String, detail : String, report : (String) -> Unit) -> Unit {
+  let tail = if detail == "" { "" } else { "：" + detail }
+  report(label + ":" + line.to_string() + " " + kind + tail)
 }
 
-///|
-/// `/^#\s+/`（H1：只吃掉标题，不进 `blocks`）。
-fn is_h1(t : String) -> Bool {
-  let c = chars(t)
-  c.length() >= 2 && c[0] == '#' && c[1].is_whitespace()
-}
 
 ///|
-/// `/^-{3,}$/`（**先 trim 再判**）。
-fn is_hr(t : String) -> Bool {
-  let c = chars(t)
-  if c.length() < 3 {
-    return false
-  }
-  for ch in c {
-    if ch != '-' {
-      return false
-    }
-  }
-  true
-}
-
-///|
-/// `/^\s*[-*]\s+/` → 命中的前缀长度（在**原始行**上判）。
-fn bullet_prefix(raw : String) -> Int? {
-  let c = chars(raw)
-  let mut k = 0
-  while k < c.length() && c[k].is_whitespace() {
-    k = k + 1
-  }
-  if k >= c.length() || (c[k] != '-' && c[k] != '*') {
-    return None
-  }
-  let mut m = k + 1
-  if m >= c.length() || !c[m].is_whitespace() {
-    return None
-  }
-  while m < c.length() && c[m].is_whitespace() {
-    m = m + 1
-  }
-  Some(m)
-}
-
-///|
-/// `/^\s*\d+[.)]\s+/` → `(前缀长度, 数字串)`（在**原始行**上判）。
-fn ordered_prefix(raw : String) -> (Int, String)? {
-  let c = chars(raw)
-  let mut k = 0
-  while k < c.length() && c[k].is_whitespace() {
-    k = k + 1
-  }
-  let mut d = k
-  while d < c.length() && c[d] >= '0' && c[d] <= '9' {
-    d = d + 1
-  }
-  if d == k || d >= c.length() || (c[d] != '.' && c[d] != ')') {
-    return None
-  }
-  let mut m = d + 1
-  if m >= c.length() || !c[m].is_whitespace() {
-    return None
-  }
-  while m < c.length() && c[m].is_whitespace() {
-    m = m + 1
-  }
-  Some((m, slice(c, k, d)))
-}
-
-///|
-/// 段落续行的终止判据（旧实现 `BREAK(nt, raw)`）：**前四条打在剔除后的行上，后两条打在原始行上**。
-fn breaks(nt : String, raw : String) -> Bool {
-  if nt == "" {
-    return true
-  }
-  if nt.has_prefix("```") || nt.has_prefix("|") || nt.has_prefix(">") {
-    return true
-  }
-  match heading(nt) {
-    Some(_) => return true
-    None => ()
-  }
-  if is_h1(nt) {
-    return true
-  }
-  if bullet_prefix(raw) is Some(_) {
-    return true
-  }
-  if ordered_prefix(raw) is Some(_) {
-    return true
-  }
-  is_hr(nt)
-}
-
-///|
-/// 引用行剥掉 `>` 与**一个**可选空白（旧实现 `replace(/^>\s?/, "")`，打在 trim 过的行上）。
-fn strip_quote(t : String) -> String {
-  let c = chars(t)
-  if c.length() == 0 || c[0] != '>' {
-    return t
-  }
-  let mut k = 1
-  if k < c.length() && c[k].is_whitespace() {
-    k = k + 1
-  }
-  slice(c, k, c.length())
-}
-
-///|
-/// 表格行 → 单元格：**只去掉一个**首 `|` 与一个尾 `|`，再按 `|` 切、各自 trim。
-fn cells(row : String) -> Array[String] {
-  let c = chars(row)
-  let mut a = 0
-  let mut b = c.length()
-  if a < b && c[a] == '|' {
-    a = a + 1
-  }
-  if b > a && c[b - 1] == '|' {
-    b = b - 1
-  }
-  let mid = slice(c, a, b)
-  let out : Array[String] = []
-  let mut cur : Array[Char] = []
-  for ch in mid {
-    if ch == '|' {
-      out.push(trim(cur.fold(init="", fn(acc, x) { acc + x.to_string() })))
-      cur = []
-    } else {
-      cur.push(ch)
-    }
-  }
-  out.push(trim(cur.fold(init="", fn(acc, x) { acc + x.to_string() })))
-  out
-}
-
-///|
-/// 正文 → 块序列。`problems`（旧实现的报错清单）**这条命令不用**：块照收，问题照报的那种口径
-/// 是写给人的，`dump-blocks` 的判据是"生成物逐字节一致"。
-pub fn parse_blocks(body : String) -> Array[Block] {
+/// 正文 → 块序列。
+///
+/// `label` + `report` 是"点名用的"：`dump-blocks` 这条命令不关心（判据是"生成物逐字节一致"），
+/// 传个空标签与不吭声的回调就行；`gen-file` 那一路把它们汇进问题清单（有问题 ⇒ 退 2、不吐产物）。
+pub fn parse_blocks(body : String, label : String, report : (String) -> Unit) -> Array[Block] {
   let lines = split_lines(body)
   let blocks : Array[Block] = []
   let mut i = 0
@@ -231,6 +86,10 @@ pub fn parse_blocks(body : String) -> Array[Block] {
       while i < lines.length() && !trim(lines[i]).has_prefix("```") {
         buf.push(lines[i])
         i = i + 1
+      }
+      // 围栏没闭合：旧实现报的行号是**扫描停下时的下标**（吃到文件尾 ⇒ 就等于行数），照抄
+      if i >= lines.length() {
+        report_at(label, i, "代码块没闭合", "", report)
       }
       i = i + 1
       blocks.push(Code(lang, buf.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + "\n" + s } }), []))
@@ -268,6 +127,10 @@ pub fn parse_blocks(body : String) -> Array[Block] {
       while i < lines.length() && trim(lines[i]).has_prefix("|") {
         rows.push(trim(lines[i]))
         i = i + 1
+      }
+      // 行号照抄旧实现：`i - rows.length() + 1` = **表格第一行**那个 1-based 行号
+      if rows.length() < 2 || !is_sep_row(rows[1]) {
+        report_at(label, i - rows.length() + 1, "表格缺分隔行", "", report)
       }
       let header = cells(rows[0]).map(inline)
       let body_rows : Array[Array[Array[Span]]] = []
@@ -324,7 +187,14 @@ pub fn parse_blocks(body : String) -> Array[Block] {
       blocks.push(Ul(items))
       continue
     }
-    if t.has_prefix("![") || t.has_prefix("<") {
+    // 认不出的构造：跳过（不渲染）但**点名** —— 旧实现的两条 `problems.push`
+    if t.has_prefix("![") {
+      report_at(label, i + 1, "不支持的构造（图片）", slice(chars(t), 0, 40), report)
+      i = i + 1
+      continue
+    }
+    if t.has_prefix("<") {
+      report_at(label, i + 1, "不支持的构造（原始 HTML）", slice(chars(t), 0, 40), report)
       i = i + 1
       continue
     }

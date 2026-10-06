@@ -26,7 +26,9 @@ pub fn with_runs(lang : String, text : String) -> Block raise {
 ///|
 /// 一份 markdown → 它的 `blocks` 行（每行含 `pad` 缩进与行尾逗号）。
 pub fn doc_block_lines(md : String, pad : String) -> Array[String] raise {
-  let blocks = parse_blocks(frontmatter_body(md))
+  // `dump-blocks` 只对"这段 blocks 的原文行"负责：问题清单（认不出的构造）由 `gen-file` 那一路管，
+  // 这里给个不吭声的回调 —— 但**不能**因此改变解析结果（块照收，与旧实现一致）
+  let blocks = parse_blocks(frontmatter_body(md), "", fn(_) { () })
   let out : Array[String] = []
   for b in blocks {
     match b {
