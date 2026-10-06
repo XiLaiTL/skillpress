@@ -23,16 +23,6 @@ extern "js" fn read_text_js(path : String) -> String =
   #|(path) => { try { return require("node:fs").readFileSync(path, "utf8"); } catch (e) { return ""; } }
 
 ///|
-/// 语料根（调试用）。
-fn corpus_root() -> String {
-  corpus_root_js()
-}
-
-///|
-extern "js" fn corpus_root_js() -> String =
-  #|() => process.env.SKILLPRESS_CORPUS || "（没设）"
-
-///|
 /// 语料文件清单（引导层按 `SKILLPRESS_CORPUS` 列好，换行分隔）。
 fn md_files() -> String {
   md_files_js()
@@ -41,6 +31,26 @@ fn md_files() -> String {
 ///|
 extern "js" fn md_files_js() -> String =
   #|() => ((globalThis.__skillpress_ts && globalThis.__skillpress_ts.mdFiles) || []).join("\n")
+
+///|
+/// `dump-blocks` 的内容根（引导层按参数解析好，绝对路径、正斜杠）。
+fn dump_root() -> String {
+  dump_root_js()
+}
+
+///|
+extern "js" fn dump_root_js() -> String =
+  #|() => (globalThis.__skillpress_ts && globalThis.__skillpress_ts.dumpRoot) || ""
+
+///|
+/// 内容根下**带 `SKILL.md` 的目录名**（引导层已按名字排好序 —— 顺序也是判据的一部分，别再排一次）。
+fn skill_dirs() -> String {
+  skill_dirs_js()
+}
+
+///|
+extern "js" fn skill_dirs_js() -> String =
+  #|() => ((globalThis.__skillpress_ts && globalThis.__skillpress_ts.skillDirs) || []).join("\n")
 
 ///|
 /// 一个围栏块：语言标记 + 正文。
@@ -119,6 +129,47 @@ fn add(t : Map[String, Tally], label : String, dark : Int, total : Int) -> Unit 
 }
 
 ///|
+///|
+/// **`dump-blocks <内容根>`**：把内容根下每份 skill 的 `blocks` 段按旧实现的排版吐出来。
+///
+/// 输出格式是**判据的接口**（与 `tools/spike/old-doc-blocks.mjs` 逐字节可比）：
+/// `### <slug>` + 那段原文（含 8 格缩进）+ 一个空行，最后一行 `### end`。
+fn dump_blocks() -> Unit {
+  let dirs0 = skill_dirs()
+  let dirs = dirs0.split("\n").filter(fn(l) { l != "" }).map(fn(l) { l.to_owned() }).collect()
+  if dirs.length() == 0 {
+    println("✗ 内容根下没有带 SKILL.md 的目录（引导层按 `dump-blocks <内容根>` 列举，检查那个参数）")
+    return
+  }
+  let root = dump_root()
+  let out : Array[String] = []
+  for dir in dirs {
+    let md = read_text(root + "/" + dir + "/SKILL.md")
+    if md == "" {
+      println("✗ 读不到 \{root}/\{dir}/SKILL.md")
+      return
+    }
+    let lines = try {
+      @content.doc_block_lines(md, "        ")
+    } catch {
+      e => {
+        println("✗ \{dir} 出块失败：\{e}")
+        return
+      }
+    }
+    out.push("### " + dir)
+    for line in lines {
+      out.push(line)
+    }
+    out.push("")
+  }
+  out.push("### end")
+  // 逐字节可比：`join("\n")` + `println` 自带的那一个换行 = 旧实现的 `join("\n") + "\n"`
+  // （core 里没有不带换行的 `print`，所以这里刻意把换行交给 `println`）
+  println(out.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + "\n" + s } }))
+}
+
+///|
 fn main {
   if !@hl.ready() {
     println("✗ tree-sitter 没装好 —— 请用 `node tools/run-js.mjs` 拉起（它会先 await 装好再进 MoonBit）")
@@ -131,13 +182,15 @@ fn main {
   let rest : Array[String] = []
   let mut k = 0
   while k < args.length() {
-    if args[k] == "hl" || args[k] == "batch" {
+    if args[k] == "hl" || args[k] == "batch" || args[k] == "dump-blocks" {
       break
     }
     k = k + 1
   }
   if k >= args.length() {
-    println("用法：node tools/run-js.mjs hl <markdown 文件> <语言>   ｜   SKILLPRESS_CORPUS=<根> node tools/run-js.mjs batch")
+    println("用法：node tools/run-js.mjs hl <markdown 文件> <语言>")
+    println("      SKILLPRESS_CORPUS=<根> node tools/run-js.mjs batch")
+    println("      node tools/run-js.mjs dump-blocks <内容根>")
     println("垫片装的语法：\{@hl.languages()}")
     return
   }
@@ -163,6 +216,10 @@ fn main {
     println("输入 = \{rest[0]}（```\{rest[1]} 共 \{all.length()} 块）")
     let (dark, total, _) = show(all[0], "块 1")
     println("未上色 = \{dark}/\{total}")
+    return
+  }
+  if args[k] == "dump-blocks" {
+    dump_blocks()
     return
   }
   // batch：全语料

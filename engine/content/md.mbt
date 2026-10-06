@@ -123,13 +123,16 @@ fn squeeze_ws(s : String) -> String {
 /// 返回 `(i, 类型, 内容a, 内容b)`；类型：0 = 反引号代码、1 = 加粗、2 = 链接。
 /// 链接返回两段（label 与 target），用 `(i, 2, labelA, labelB, targetA, targetB)` 表达不便，
 /// 所以这里分开返回两个区间。
-struct Hit {
+priv struct Hit {
   at : Int
   kind : Int
   a : Int
   b : Int
   a2 : Int
   b2 : Int
+  /// 整条匹配的**结束下标**（不含）。⚠️ 加粗是 `**…**`，比内容尾巴多**两个**字符 ——
+  /// 曾经按"内容尾 +1"算 `last`，于是闭包第二个 `*` 被当成正文，每个加粗后面都多一个 `*`。
+  end : Int
 }
 
 ///|
@@ -142,7 +145,7 @@ fn match_at(c : Array[Char], i : Int) -> Hit? {
       j = j + 1
     }
     if j < c.length() && j > i + 1 {
-      return Some({ at: i, kind: 0, a: i + 1, b: j, a2: 0, b2: 0 })
+      return Some({ at: i, kind: 0, a: i + 1, b: j, a2: 0, b2: 0, end: j + 1 })
     }
   }
   // ② 加粗：**…**，内容非空且**不含 `*`**
@@ -152,7 +155,7 @@ fn match_at(c : Array[Char], i : Int) -> Hit? {
       j = j + 1
     }
     if j + 1 < c.length() && j > i + 2 && c[j] == '*' && c[j + 1] == '*' {
-      return Some({ at: i, kind: 1, a: i + 2, b: j, a2: 0, b2: 0 })
+      return Some({ at: i, kind: 1, a: i + 2, b: j, a2: 0, b2: 0, end: j + 2 })
     }
   }
   // ③ 链接：[label](target)，label 非空且不含 `]`，target 非空且不含 `)`
@@ -167,7 +170,7 @@ fn match_at(c : Array[Char], i : Int) -> Hit? {
         k = k + 1
       }
       if k < c.length() && k > j + 2 {
-        return Some({ at: i, kind: 2, a: i + 1, b: j, a2: j + 2, b2: k })
+        return Some({ at: i, kind: 2, a: i + 1, b: j, a2: j + 2, b2: k, end: k + 1 })
       }
     }
   }
@@ -230,7 +233,7 @@ fn external_link(s : String) -> Bool {
 pub fn inline(s : String) -> Array[Span] {
   let spans : Array[Span] = []
   let emit = fn(sp : Span) {
-    let last = if spans.length() > 0 { spans[spans.length() - 1] } else { None }
+    let last : Span? = if spans.length() > 0 { Some(spans[spans.length() - 1]) } else { None }
     match (sp, last) {
       (Txt(v), Some(Txt(prev))) => spans[spans.length() - 1] = Txt(prev + v)
       _ => spans.push(sp)
@@ -253,7 +256,7 @@ pub fn inline(s : String) -> Array[Span] {
     } else if h.kind == 1 {
       emit(Bold(slice(c, h.a, h.b)))
     } else {
-      let label = slice(c, h.a, h.b).replace("`", "")
+      let label = slice(c, h.a, h.b).replace(old="`", new="")
       let target = trim(slice(c, h.a2, h.b2))
       if label == target || external_link(target) {
         emit(if wordy(label) { Code(label) } else { Txt(label) })
@@ -262,7 +265,7 @@ pub fn inline(s : String) -> Array[Span] {
         emit(Code(target))
       }
     }
-    last = if h.kind == 2 { h.b2 + 1 } else { h.b + 1 }
+    last = h.end
   }
   if last < c.length() {
     text(slice(c, last, c.length()))

@@ -73,6 +73,27 @@ async function boot() {
 }
 
 const names = await boot();
+
+/**
+ * `dump-blocks <内容根>`：内容根下**带 `SKILL.md` 的目录**（按名字排序）。
+ *
+ * 为什么排序放在引导层：生成物里 doc 的顺序就是**同一个 `sort()`** 的结果 ——
+ * 顺序也是逐字节判据的一部分，两处各排一次早晚会漂。
+ */
+const dumpIdx = process.argv.indexOf("dump-blocks");
+if (dumpIdx >= 0) {
+  const arg = process.argv[dumpIdx + 1];
+  if (!arg || !existsSync(arg)) {
+    console.error(`✗ 内容根不存在：${arg ?? "(没给)"}（用法：node tools/run-js.mjs dump-blocks <内容根>）`);
+    process.exit(2);
+  }
+  const abs = resolve(arg);
+  globalThis.__skillpress_ts.dumpRoot = abs.split("\\").join("/");
+  globalThis.__skillpress_ts.skillDirs = readdirSync(abs, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && existsSync(join(abs, e.name, "SKILL.md")))
+    .map((e) => e.name)
+    .sort();
+}
 if (process.env.SKILLPRESS_DEBUG_LANGS === "1") {
   console.error(`引导层装好的语法：${names.join(", ")}`);
   console.error(`语料根=${process.env.SKILLPRESS_CORPUS ?? "(没设)"} ｜ 列出的 .md = ${globalThis.__skillpress_ts.mdFiles.length}`);
