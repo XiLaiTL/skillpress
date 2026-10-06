@@ -1,0 +1,23 @@
+# .editorconfig —— 让编辑器在**你敲下回车的那一刻**就用对行尾
+#
+# 这份仓库特别需要它：本机 `core.autocrlf=true`，而 CRLF 在这套东西里是**静默出错**
+# （frontmatter 三字段全空 / 禁语表词条比对不上），要等到跑门才发现。
+# `.gitattributes` 管检出，这个文件管**写**。
+#
+# 参考：ratatui / Dioxus / Tauri 这类项目都在根上放这个文件。
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+# markdown 行尾两空格是硬换行，别让编辑器删掉
+trim_trailing_whitespace = false

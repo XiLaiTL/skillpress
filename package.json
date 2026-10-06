@@ -1,0 +1,19 @@
+{
+  "name": "skillpress-tools",
+  "private": true,
+  "description": "skillpress 引擎的依赖 —— **只有高亮这一处**（其余 *.mjs 零依赖，随时可直接跑）。放 dependencies 而不是 devDependencies：`npm config get omit=dev` 时 dev 依赖会被静默跳过，引擎缺了高亮就悄悄没了。",
+  "dependencies": {
+    "web-tree-sitter": "^0.27.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "press": "node gen-content.mjs",
+    "check": "node check.mjs",
+    "selftest": "node check.mjs --selftest",
+    "audit": "node highlight.mjs --audit",
+    "verify": "node verify-site.mjs",
+    "facts": "node docfacts.mjs"
+  }
+}

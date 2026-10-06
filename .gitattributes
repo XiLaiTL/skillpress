@@ -1,0 +1,27 @@
+# .gitattributes —— 行尾策略
+#
+# 为什么必须显式管：本机 `core.autocrlf=true`，默认会把**检出内容**转成 CRLF。
+# 而这份程序里有两处「CRLF 会静默出错」：
+#   · `claims.txt` / `done-claims.txt` / `skills.lock.json` 按行解析 —— 多出来的 `\r`
+#     会跟着词条一起进比对，表现成"禁语表没生效"这种不报错的错；
+#   · skill 的 frontmatter 靠 `(.*)$` 匹配行尾 —— CRLF 会让三个字段**静默全空**
+#     （这就是 skillpress 的 G2 门在拦的那条）。
+#
+# 所以：**凡是「内容必须逐字节稳定」的文件，一律钉成 LF。**
+
+# 无扩展名的那几份：字节必须稳定，别做任何转换
+.gitignore     -text
+.gitattributes -text
+.editorconfig  -text
+LICENSE        -text
+
+# 程序与数据：UTF-8 + LF
+*.mjs  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf
+*.md   text eol=lf
+*.scm  text eol=lf
+
+# 语法资产：二进制，别做任何转换
+*.wasm binary

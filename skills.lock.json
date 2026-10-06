@@ -1,0 +1,54 @@
+{
+  "_note": "由 `node examples/apps/skillpress/bin/skillpress.mjs check --update-lock [名字]` 生成。改动 skill 后必须重跑并复核（SPEC §6 G8）。",
+  "skills": {
+    "moobile-app-development": {
+      "files": 6,
+      "lines": 358,
+      "bytes": 19809,
+      "rows": 52,
+      "codeBlocks": 11
+    },
+    "moobile-custom-component": {
+      "files": 4,
+      "lines": 276,
+      "bytes": 18142,
+      "rows": 44,
+      "codeBlocks": 4
+    },
+    "moobile-library-development": {
+      "files": 6,
+      "lines": 288,
+      "bytes": 18650,
+      "rows": 48,
+      "codeBlocks": 3
+    },
+    "moobile-migrate-from-rabbita": {
+      "files": 6,
+      "lines": 362,
+      "bytes": 24643,
+      "rows": 80,
+      "codeBlocks": 3
+    },
+    "moobile-pitfalls": {
+      "files": 6,
+      "lines": 184,
+      "bytes": 18965,
+      "rows": 75,
+      "codeBlocks": 1
+    },
+    "moobile-react-library": {
+      "files": 5,
+      "lines": 296,
+      "bytes": 19746,
+      "rows": 56,
+      "codeBlocks": 6
+    },
+    "skillpress": {
+      "files": 3,
+      "lines": 400,
+      "bytes": 27951,
+      "rows": 75,
+      "codeBlocks": 6
+    }
+  }
+}
