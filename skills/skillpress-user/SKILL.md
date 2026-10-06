@@ -33,7 +33,7 @@ node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无�
 | `moon.mod` / `moon.pkg` | 独立 MoonBit 模块（依赖 `XiLaiTL/moobile`） | 换依赖时动 |
 | `package.json` | `file:` 依赖宿主 + `SKILLPRESS_ENGINE` 指向程序 | 换机器/换路径时动 |
 
-现成的一份在：`<内容仓>/.agents/skills/skillpress/scripts/.skillpress/`。
+现成的一份在：`<内容仓>/skills/skillpress/scripts/.skillpress/`。
 一个 skill / 多个 skill 各自要动什么、哪些名字写死 —— 见 `references/make-a-site.md`。
 
 ## 二、内容怎么组织（站点结构 = 目录结构）
@@ -104,6 +104,6 @@ node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无�
 | 投影规范：收录判据 / 结构 / 预算 / 站点边界 | 程序 `SPEC.md`（§2 / §3 / §8） |
 | 集合划分、产出顺序 | 程序 `SKILLS.md` |
 | 计划与未做 | 程序 `PLAN.md` |
-| 目录形状（程序 / 内容 / 实例三个根） | `.agents/skills/skillpress/references/layout.md` |
-| 站点管线内部（数据形状、两种模式、上色细则） | `.agents/skills/skillpress/references/site-pipeline.md` |
+| 目录形状（程序 / 内容 / 实例三个根） | `skills/skillpress/references/layout.md` |
+| 站点管线内部（数据形状、两种模式、上色细则） | `skills/skillpress/references/site-pipeline.md` |
 | 改**程序本身**（引擎 / 门 / 判据） | 另一份 skill：`skillpress-dev` |

@@ -6,13 +6,13 @@
 
 ## 0. 起点（2026-10-06 快照）
 
-三个根已就位（细则见内容侧 `.agents/skills/skillpress/references/layout.md`）：
+三个根已就位（细则见内容侧 `skills/skillpress/references/layout.md`）：
 
 | 根 | 在哪 | 是什么 |
 |---|---|---|
 | **程序** | 程序根 = 本仓库（`interest/skillpress`，**与内容仓平级的另一个 git 仓库**） | 引擎 + 门 + 语法资产（将来发 npm / moonbit 包） |
-| **内容** | `../moobile/.agents/skills/`（旁边的兄弟仓库） | 7 份 skill（harness 的扫描根，rank 200，agent 直接可加载） |
-| **实例** | `.agents/skills/skillpress/scripts/.skillpress/` | 一个"用程序"的 MoonBit 工程（`content/` 是生成物） |
+| **内容** | `../moobile/skills/`（旁边的兄弟仓库） | 7 份 skill（harness 的扫描根，rank 200，agent 直接可加载） |
+| **实例** | `skills/skillpress/scripts/.skillpress/` | 一个"用程序"的 MoonBit 工程（`content/` 是生成物） |
 
 当时全绿：`check` 7/7 ｜ `check --selftest` 13 项 ｜ `press --check` 一致 ｜
 `audit` 召回 97.4% ｜ `verify` 20/20 ｜ moobile 的 `verify_all.sh` 34/34。
@@ -26,7 +26,7 @@
 
 | # | 决定 | 出处 / 理由 |
 |---|---|---|
-| D1 | 首页 = `.agents/skills/skillpress/SKILL.md`（它自己既是 skill 也是主页） | 用户定；首页内容与别的 skill 同一套规矩（体量、门） |
+| D1 | 首页 = `skills/skillpress/SKILL.md`（它自己既是 skill 也是主页） | 用户定；首页内容与别的 skill 同一套规矩（体量、门） |
 | D2 | 顶栏形态 **B**：分栏做成现代分段控件；**「文档」就是最右那一栏，不给独立样式** | 用户定（A 的"极简顶栏 + 全靠右栏目录"被否） |
 | D3 | 首页的二级标题 = 顶栏的一栏；**某节只有链接时，点它直接跳**（链到文件就渲染那个文件） | 用户定；让首页能当"入口页"用 |
 | D4 | 目录（TOC）：**空间够挂右栏；不够收进左侧对应条目下**（可选展开子树） | 用户定；左侧形态选 A（挂在条目下） |
@@ -66,7 +66,7 @@
 **教训（执行期踩到的，值得留给下一份计划）**：
 
 - **G3 不查兄弟 skill 的目录**：跨 skill 引用写 `references/platform.md` 会红，必须写全路径
-  （`.agents/skills/moobile-pitfalls/references/platform.md`）。
+  （`skills/moobile-pitfalls/references/platform.md`）。
 - **`press` 生成物必须重跑**：改了内容不重跑，`press --check` 会红（这正是它的用处）。
 - **G8 会按 skill 红**；落锁用 `--update-lock <名字>` **逐个锁**，别整文件重写（会连别人正在改的一起锁掉）。
 - **G6 会抓"节号写了但不存在"**：我写 `LAYERS.md` **§三端产物**，实际那张图在 **§4** —— 引节号前先看标题。
@@ -209,7 +209,7 @@
    （`Home`/`Doc`/`Block`… 变成程序的公开契约，生成器只填值）；实例 `app.mbt` 缩到几行
    `@skillpress.site(...)`。顺带定"实例进不进 `moon.work`"。
 2. **`pack`**：一组 skill → 便携目录（程序副本 + 生成的首页 skill）。
-3. **`attach`**：挂进一个已有的 moobile 项目（写 `.agents/skills/` 骨架 + 实例 + npm scripts）。
+3. **`attach`**：挂进一个已有的 moobile 项目（写 `skills/` 骨架 + 实例 + npm scripts）。
 4. **moobile 的 `--with <包或路径>` 钩子**：通用扩展点，skillpress 做第一个插件。
    ⚠️ 那条 CLI 面在 moobile 是**冻结**的（`bin/cli.js` 明说改前先看 `docs/design/SCAFFOLD.md` §3.8），
    所以要先写那边设计文档、再补它的门。

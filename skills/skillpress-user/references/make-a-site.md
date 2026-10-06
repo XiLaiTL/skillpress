@@ -13,11 +13,11 @@ description: 站点怎么从内容源长出来：一个 skill 的最小站点、
 | 根 | 在哪 | 谁提供 |
 |---|---|---|
 | **程序** | 旁边的 `skillpress/`（`bin/skillpress.mjs`） | 这套工具本身 |
-| **内容** | `<内容仓>/.agents/skills/`（可以换成任何目录：`--skills`） | **你写的 skill** |
-| **实例** | 一个 MoonBit 工程（现成的在 `.agents/skills/skillpress/scripts/.skillpress/`） | 界面 + 宿主 + 生成物 |
+| **内容** | `<内容仓>/skills/`（可以换成任何目录：`--skills`） | **你写的 skill** |
+| **实例** | 一个 MoonBit 工程（现成的在 `skills/skillpress/scripts/.skillpress/`） | 界面 + 宿主 + 生成物 |
 
 `press` 把**内容**读出来、写进**实例**的 `content/content.generated.mbt`；界面住在实例的 `app.mbt` 里。
-三个根怎么定位（`--repo` / `--skills` / `--app` 与环境变量）见 `.agents/skills/skillpress/references/layout.md`。
+三个根怎么定位（`--repo` / `--skills` / `--app` 与环境变量）见 `skills/skillpress/references/layout.md`。
 
 ## 二、一份 skill 的最小站点
 

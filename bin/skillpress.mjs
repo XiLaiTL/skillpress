@@ -14,7 +14,7 @@
 //
 // 四个根（都能用参数/环境变量改，见 `lib/gen-content.mjs` 的文件头）：
 //   <程序> = 本仓库根（`interest/skillpress`）｜ <仓库> = moobile 的根（程序旁边的兄弟）
-//   <内容> = `<仓库>/.agents/skills`            ｜ <实例> = `<内容>/skillpress/scripts/.skillpress`
+//   <内容> = `<仓库>/skills`            ｜ <实例> = `<内容>/skillpress/scripts/.skillpress`
 //
 // 为什么要有这层门面：`lib/` 里的文件是给人"读实现"的（名字也按实现起的），
 // 而文档里该出现的是**稳定、可复制**的命令 —— 换实现不该改文档。

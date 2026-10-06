@@ -14,7 +14,7 @@ description: 程序/仓库/内容/实例四个根的定位算法（lib/roots.mjs
 |---|---|---|---|
 | **程序** | （由文件位置决定） | — | `lib/` 的上一层 = 本仓库根 |
 | **仓库**（内容仓） | `--repo <目录>` | `SKILLPRESS_REPO` | **旁边的 `moobile/`**；找不到才退回"程序往上 3 层" |
-| **内容** | `--skills <目录>` | `SKILLPRESS_SKILLS` | `<内容仓>/.agents/skills` |
+| **内容** | `--skills <目录>` | `SKILLPRESS_SKILLS` | `<内容仓>/skills` |
 | **实例** | `--app <目录>` | `SKILLPRESS_APP_DIR` | `<内容>/skillpress/scripts/.skillpress` |
 
 ⚠️ **这四条只有一处实现**。它们原先在 5 个文件里各写一遍（内容管线 / 门 / 事实门 / 上色 /
@@ -29,15 +29,24 @@ description: 程序/仓库/内容/实例四个根的定位算法（lib/roots.mjs
 ```
 布局 A（现在）：兄弟                      布局 B（搬家前）：嵌套
 interest/                                <内容仓>/  moobile/
-├── skillpress/   ★ 程序                  ├── .agents/skills/      ★ 内容
+├── skillpress/   ★ 程序                  ├── skills/      ★ 内容
 │   ├── bin/ lib/ grammars/               └── examples/apps/skillpress/  ★ 程序
 └── moobile/      ★ 内容仓
-    └── .agents/skills/   ★ 内容
+    └── skills/   ★ 内容
 ```
 
-判定就一行意思：**先看"程序旁边有没有 moobile"（要求它下面真有 `.agents/skills`），
+判定就一行意思：**先看"程序旁边有没有 moobile"（要求它下面真有 `skills`），
 没有才退回"往上三层"**。所以把程序挪来挪去**不用改任何路径**。
 裸克隆到临时目录时两者都不成立（那时必须显式给 `--repo` 或 `SKILLPRESS_REPO`）。
+
+⚠️ **内容根自己也搬过一次**（2026-10-06）：从 `.agents` 下的 `skills` 搬到仓库根的 `skills/`。
+
+- **为什么**：普通目录**看得见**（翻仓库的人一眼看到），而且**会跟着发布包走** ——
+  实测 `moon package --list`：普通目录默认进包，点目录（`.agents` / `.dsh` / `.skillpress`）默认不进。
+- **默认值因此是**：`<仓库>/skills` 优先，老仓库退回 `.agents` 下的 `skills`（见 `lib/roots.mjs` 的 `defaultSkills`）。
+- **代价**：`skills/` 不在 harness 的扫描根里（扫描根只有 `.dsh` 下的 `skills` 与 `.agents` 下的 `skills` 这两个），
+  所以搬过去之后 agent **不会自动加载**它们。要两者都要，只有配 DSH 的 `customSkillDirs`；
+  **别两边各放一份** —— 两份内容就是两份会漂的真相。
 
 ## 三、这条路走过两遍，第二次的理由不一样
 

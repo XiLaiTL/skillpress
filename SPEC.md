@@ -125,7 +125,7 @@ skills/<name>/
 | **G5** | 正文里的 `@html.` / `@style.` / `@cmd.` / `@sub.` API 名必须存在于源码 | ✅ |
 | **G6** | 正文里的 `docs/**.md` 链接与 `§` 锚点必须有效 | 🟡 |
 | **G7** | **不许把"未做"写成"已支持"**：`claims.txt` 里的禁语出现即红 | 🟡 |
-| **G8** | **体量/条目数变化必须人复核**：指纹（行数/字节/表格行/代码块）对不上就红，复核后 `--update-lock`。锁**一份**（跟着程序走），但每条指纹记着**它属于哪个内容根** —— 程序可以面对多个内容根（内容仓的 `.agents/skills` 与程序自己的 `skills/`） | ✅ |
+| **G8** | **体量/条目数变化必须人复核**：指纹（行数/字节/表格行/代码块）对不上就红，复核后 `--update-lock`。锁**一份**（跟着程序走），但每条指纹记着**它属于哪个内容根** —— 程序可以面对多个内容根（内容仓的 `skills/` 与程序自己的 `skills/` —— **同名、不同仓库**） | ✅ |
 
 门存在的理由只有一条：**一个说谎的 skill 比没有 skill 更糟** ——
 它会让 AI 自信地写错代码，而且没人会发现。
@@ -163,9 +163,9 @@ skills/<name>/
 
 站点**不是**第三个事实的家：它和 skill 从**同一份内容源**长出来。
 
-1. **首页 = `.agents/skills/skillpress/SKILL.md`**（"自己既是 skill，也是主页"）：H1 + 引言 = 首屏，
+1. **首页 = `<内容仓>/skills/skillpress/SKILL.md`**（"自己既是 skill，也是主页"）：H1 + 引言 = 首屏，
    **每个 `##` = 顶栏的一栏** —— 加一节就多一条，站点代码里不写死任何一节 ⇒ 它的 `##` 要写短名。
-2. **文档区 = `.agents/skills/**`**：顶栏那条「文档 / SKILL」切过去；侧栏树 = skill → 它的 `references/`、`scripts/`。
+2. **文档区 = `<内容仓>/skills/**`**：顶栏那条「文档 / SKILL」切过去；侧栏树 = skill → 它的 `references/`、`scripts/`。
    站点上"一个 skill 一页"与 skill 的**结构**同源 ⇒ 结构变了站点跟着变，不用动渲染。
 3. **改了内容源必须重跑生成器**：`gen-content.mjs --check` 是一道门（生成物与源不一致即红）。
 4. **代码块在构建期上色**：tree-sitter 解析 + 语法自带的 `highlights.scm` → 片段带**色号**
@@ -176,6 +176,6 @@ skills/<name>/
    `grammars/`（出处与 sha256 见那份 `PROVENANCE.md`）。
 5. **引擎住在**程序根（`interest/skillpress/`，与内容仓平级的另一个仓库），
    **站点实例住在内容仓里那份 skill 的 `scripts/` 下**（它本来就是个 moobile 应用）。
-   形状与理由见 `.agents/skills/skillpress/references/layout.md`。
+   形状与理由见 `<内容仓>/skills/skillpress/references/layout.md`。
 
-细则（数据类型、解析边界、两种模式、判据怎么加）见 `.agents/skills/skillpress/references/site-pipeline.md`。
+细则（数据类型、解析边界、两种模式、判据怎么加）见 `<内容仓>/skills/skillpress/references/site-pipeline.md`。

@@ -1,7 +1,7 @@
 # 依赖（引擎只有高亮这一处依赖，见 package.json 的说明）
 node_modules/
 
-# 站点实例的构建产物（实例在 moobile/.agents/skills/skillpress/scripts/.skillpress/，
+# 站点实例的构建产物（实例在 moobile/skills/skillpress/scripts/.skillpress/，
 # 产物不进这边；这里列出来是为了"在哪儿都不小心生成"时不进仓）
 _build/
 dist/

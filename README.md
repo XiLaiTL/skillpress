@@ -5,18 +5,18 @@
 
 这里是**程序本身**（将来发 npm 包 / moonbit 包）：内容管线、构建期上色、三道门、站点判据。
 它是**自己的一个 git 仓库**，与内容仓**平级**（兄弟）：内容仓 = 旁边的 `../moobile/`。
-**内容不在这里**（内容住 `<内容仓>/.agents/skills/`，站点实例住那份 skill 的 `scripts/` 里）。
+**内容不在这里**（内容住 `<内容仓>/skills/`，站点实例住那份 skill 的 `scripts/` 里）。
 
 ## 三个根（先认清再动手）
 
 | 根 | 在哪 | 是什么 |
 |---|---|---|
 | **程序** | 本仓库根（`interest/skillpress`） | 引擎 + 门 + 语法资产（能拿走、能发布的那份） |
-| **内容** | `../moobile/.agents/skills/`（**旁边的兄弟**，不是本仓库） | 7 份 skill（`SKILL.md` + `references/`）。harness 也扫这个根 |
+| **内容** | `../moobile/skills/`（**旁边的兄弟**，不是本仓库） | 7 份 skill（`SKILL.md` + `references/`）。harness 也扫这个根 |
 | **实例** | `<内容>/skillpress/scripts/.skillpress/` | 一个"**用**程序"的 MoonBit 工程（它的 `content/` 是生成物） |
 
 三个根怎么定位（`--repo` / `--skills` / `--app` 与对应环境变量）见
-[`../moobile/.agents/skills/skillpress/references/layout.md`](../moobile/.agents/skills/skillpress/references/layout.md)。
+[`../moobile/skills/skillpress/references/layout.md`](../moobile/skills/skillpress/references/layout.md)。
 
 ## 三条命令（在**程序根**跑）
 
@@ -37,7 +37,7 @@ node bin/skillpress.mjs verify        # 判据：真 Chrome 无头，自起服�
 看一眼站点（站点实例在**内容仓**里）：
 
 ```bash
-cd ../moobile/.agents/skills/skillpress/scripts/.skillpress
+cd ../moobile/skills/skillpress/scripts/.skillpress
 npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 ```
 
@@ -46,7 +46,7 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | 路径 | 是什么 |
 |---|---|
 | `bin/skillpress.mjs` | 门面：子命令转发的唯一入口（**换实现不改文档**） |
-| `skills/` | **程序自己的 skill**（见下节）—— `.agents/skills` 是"给别人看的内容"，不是这里 |
+| `skills/` | **程序自己的 skill**（见下节）—— `skills` 是"给别人看的内容"，不是这里 |
 | `lib/gen-content.mjs` | 内容管线：markdown → 类型化数据（解析边界见它文件头） |
 | `lib/highlight.mjs` | 构建期上色：tree-sitter → 色号；`--audit` 是它的闸门 |
 | `lib/check.mjs` | 门：G1–G8（含 `--selftest` 证伪、`--update-lock` 落锁） |
@@ -66,7 +66,7 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | `skillpress-user` | 用它做站点的人 | 一份 / 多份 skill → 站点、主页怎么写、配色与字号改哪儿、加一块新构造、验收 |
 | `skillpress-dev` | 改这套程序的人 | 四个根、改什么跑哪条门、怎么加判据与诱饵、落锁、会安静咬人的坑 |
 
-为什么是 `skills/` 而不是 `.agents/skills/`：后者是**内容** —— 会被印成站点、给别人看的那份
+为什么是 `skills/` 而不是 `skills/`：后者是**内容** —— 会被印成站点、给别人看的那份
 （由内容仓持有）；而这个 `skills/` 是**给用这个仓库的人**看的那份（用它的、改它的）。
 
 ⚠️ 顺带一件好事：`skills/` 的形状和内容根**一模一样**（`skills/<名字>/SKILL.md`）——

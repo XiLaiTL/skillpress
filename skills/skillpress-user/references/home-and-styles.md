@@ -64,7 +64,7 @@ description: 首页（那份叫 skillpress 的 skill）的写作规矩、markdow
 ⚠️ 样式层的坑（改样式前值得知道）：这套界面是 moobile 的样式系统，
 RN 上有几条"写了不报错但没效果"的陷阱（按下一类、`transform` 每项只读第一个键、
 `position: sticky` 连构造器都没有、`View` 不滚动）。这些的家是内容仓的那份
-`.agents/skills/moobile-pitfalls/`，别在这儿重抄。
+`skills/moobile-pitfalls/`，别在这儿重抄。
 
 ## 四、加一块新构造 = 两边一起改
 

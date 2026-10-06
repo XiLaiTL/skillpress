@@ -15,7 +15,7 @@ whenToUse: 你要动 `lib/*.mjs`（内容管线 / 高亮 / check / docfacts / ve
 |---|---|---|
 | **程序** | 本仓库根（`interest/skillpress`） | `lib/roots.mjs` —— **唯一算法** |
 | **仓库**（内容仓） | **旁边的** `../moobile/`；找不到才退回"程序往上 3 层" | 同上：`--repo` / `SKILLPRESS_REPO` |
-| **内容** | `<内容仓>/.agents/skills` | 同上：`--skills` / `SKILLPRESS_SKILLS` |
+| **内容** | `<内容仓>/skills` | 同上：`--skills` / `SKILLPRESS_SKILLS` |
 | **实例** | `<内容>/skillpress/scripts/.skillpress` | 同上：`--app` / `SKILLPRESS_APP_DIR` |
 
 ⚠️ **不猜是刻意的**：猜错的表现是"站点没更新"—— 页面照常渲染，只是旧内容，最难查的一类症状。
@@ -68,11 +68,18 @@ node bin/skillpress.mjs verify            # 站点判据：真 Chrome 无头 + C
 
 ## 五、程序自己的 skill 住哪儿（这份就在这儿）
 
-程序自己的 skill 住在 **`skills/`** —— 给**用这个仓库的人**看的那份（用它的人 + 改它的人）。
-它和内容根**不是一回事**：`.agents/skills/**` 是**内容**，也就是会被印成站点、给别人看的那份
-（由内容仓持有）；`skills/**` 是本仓库自己的那一批。
+程序自己的 skill 住在 **本仓库的 `skills/`** —— 给**用这个仓库的人**看的那份（用它的人 + 改它的人）。
 
-⚠️ 这不是风格问题：`skills/` 的形状**和内容根一模一样**（`skills/<名字>/SKILL.md`），
+⚠️ **两个 `skills/`，别混**：内容仓（`../moobile/`）里那个也在同一个位置、同一个名字，
+但它是**内容**（会被印成站点、给别人看的那份）。分得清它们的只有**仓库**，不是目录名 ——
+所以指向内容的地方一律写全 `<内容仓>/skills/…`，别只写 `skills/…`。
+
+⚠️ 与老约定的一处差别：内容根原先是 **`.agents` 下的 `skills`**（**harness 的项目扫描根**，rank 200），
+搬到 `skills/` 之后 harness **不再自动加载**它们（`skills/` 不在 DSH 的扫描根里）。
+要恢复"agent 一进仓库就带 7 份 skill"，得配 DSH 的 `customSkillDirs`（本机全局设置）——
+**别两边各放一份**：两份内容就是两份会漂的真相。
+
+⚠️ 这不是风格问题：`skills/` 的形状和内容根**一模一样**（`skills/<名字>/SKILL.md`），
 所以将来把程序自己的 skill 印成站点（自举）时，它天然就是那个内容根。
 
 跑门时**显式指这个根**（默认那个根是内容仓的）：
