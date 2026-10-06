@@ -26,6 +26,8 @@ pub fn gen_content(
   note : (String) -> Unit,
 ) -> (String, Array[String]) raise {
   let problems : Array[String] = []
+  // ⓪ 首页源**先**选好（R2/D20）：索引与 kids 都要用它把首页源排除出去（首页不算子页）
+  let pick = pick_home(root, home_file, read, note)
   // ① 页面键索引：文件路径（相对内容根）→ 页面键
   // ⚠️ 这两个回调拿到的是 **slug**，要自己拼成绝对路径再交给引导层（P8.1 实测：给 slug
   // 会让 `readdir` 去程序仓根找 `<slug>`，报 ENOENT）
@@ -33,6 +35,7 @@ pub fn gen_content(
     dirs,
     fn(d) { name_kids(md_kids(root + "/" + d)) },
     fn(d) { script_kids(root + "/" + d) },
+    pick.label,
   )
   // ② 每份 skill（SKILL.md + 它的子页）
   let docs : Array[DocLit] = []
@@ -46,11 +49,18 @@ pub fn gen_content(
       full_desc: field(data, "description"),
       when: field(data, "whenToUse"),
       blocks: parse_blocks(body, "skills/" + d + "/SKILL.md", fn(p) { problems.push(p) }),
-      kids: read_kids(root + "/" + d, read, md_kids, script_kids, fn(p) { problems.push(p) }),
+      kids: read_kids(
+        root + "/" + d,
+        read,
+        md_kids,
+        script_kids,
+        fn(p) { problems.push(p) },
+        pick.label,
+      ),
     })
   }
-  // ③ 首页（源：`WEBSITE.md` 优先、回退 `SKILL.md`、`--home` 可覆盖 —— 见 home.mbt）
-  let hr = read_home(root, index, home_file, read, note)
+  // ③ 首页（源已经选好；这里只解析）
+  let hr = read_home(pick, index)
   for p in hr.problems {
     problems.push(p)
   }

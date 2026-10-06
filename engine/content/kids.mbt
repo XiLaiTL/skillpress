@@ -86,16 +86,24 @@ fn slug_of(skill_dir : String) -> String {
 ///
 /// `read` 是"读文件"，由调用方给（IO 归宿主/引导层，这一层只做规矩）。
 /// `report` 收子页正文里认不出的构造（图片之类的）—— 与主文档那边同一套点名规矩。
+///
+/// `home_rel` = 首页源的内容根相对路径（如 `skillpress/WEBSITE.md`）—— **它不算子页**（D20）：
+/// 同一个文件既当首页、又当书架里的一页，两套渲染规矩会打架。回退那一路（首页是 `SKILL.md`）
+/// 本来就进不了 kids ⇒ 这一步在旧形状语料上是**空转**，对账不受影响。
 pub fn read_kids(
   skill_dir : String,
   read : (String) -> String,
   md_kids : (String) -> Array[String],
   script_kids : (String) -> Array[String],
   report : (String) -> Unit,
+  home_rel : String,
 ) -> Array[Kid] {
   let kids : Array[Kid] = []
   let slug = slug_of(skill_dir)
   for (name, rel) in name_kids(md_kids(skill_dir)) {
+    if slug + "/" + rel == home_rel {
+      continue
+    }
     let text = read(skill_dir + "/" + rel)
     let data = frontmatter_data(text)
     let body = frontmatter_body(text)

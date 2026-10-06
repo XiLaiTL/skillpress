@@ -110,15 +110,24 @@ pub struct HomeLit {
 ///
 /// 为什么不能拿路径直接比页面键：页面键用的是**站点上的显示名**（md 去掉 `.md`；脚本保留扩展名），
 /// 而纯链接节写的是**文件路径**（`references/layout.md`）—— 差一层映射，靠字符串猜一定会错。
+///
+/// `home_rel` = 首页源的内容根相对路径（如 `skillpress/WEBSITE.md`）—— **它不进索引**（D20）：
+/// 否则同一个文件**既当首页、又当书架里的一页**，两套渲染规矩打架，纯链接节还能指向首页自己。
+/// ⚠️ 回退那一路（首页是 `skillpress/SKILL.md`）本来就进不了索引 ⇒ 这一步在旧形状语料上是**空转**，
+/// `file-parity` 的对账因此不受影响。
 pub fn build_index(
   dirs : Array[String],
   refs_of : (String) -> Array[(String, String)],
   scripts_of : (String) -> Array[String],
+  home_rel : String,
 ) -> Map[String, String] {
   let index : Map[String, String] = Map([])
   for d in dirs {
     index.set(d + "/SKILL.md", d)
     for (name, rel) in refs_of(d) {
+      if d + "/" + rel == home_rel {
+        continue
+      }
       index.set(d + "/" + rel, d + "/ref/" + name)
     }
     for rel in scripts_of(d) {
@@ -173,13 +182,16 @@ pub struct HomeResult {
 /// （顶栏栏名要短 vs skill 门禁要自足）；拆开之后 `skillpress/SKILL.md` 只讲 skillpress 本身。
 ///
 /// ⚠️ `--home <路径>` 覆盖：那个路径**直接**当源（绝对路径或相对内容根的路径都行），标签就用给的这条。
-priv struct HomePick {
+///
+/// ⚠️ 这个选择**必须在建索引之前算出来**（`gen_content` 就是这么做的）：索引与 kids 都要用它
+/// 把首页源**排除出去**（D20：首页不算子页）。
+pub struct HomePick {
   label : String
   text : String
 }
 
 ///|
-fn pick_home(
+pub fn pick_home(
   root : String,
   home_file : String,
   read : (String) -> String,
@@ -205,14 +217,12 @@ fn pick_home(
 /// 首页那一份**源文件**的解析（H1 标题 + 首屏 + 分栏）。
 ///
 /// 返回 `HomeResult`：问题清单**不静默丢**（旧实现逐条点名，并让退出码非零）。
+/// ⚠️ 源**由调用方先选好**（`pick_home`）再传进来：选源要早于建索引（索引/kids 都要排除首页源），
+/// 而"选源时打印一句用了哪个"只该打印一次。
 pub fn read_home(
-  root : String,
+  pick : HomePick,
   index : Map[String, String],
-  home_file : String,
-  read : (String) -> String,
-  note : (String) -> Unit,
 ) -> HomeResult {
-  let pick = pick_home(root, home_file, read, note)
   let problems : Array[String] = []
   if pick.text == "" {
     problems.push(

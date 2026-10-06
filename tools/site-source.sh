@@ -84,6 +84,15 @@ C=$(mk_corpus website); run "$C"
 grep -q 'title: "站名来自 WEBSITE"' "$C/out.txt" && ok "① WEBSITE.md 赢（H1 来自它）" || bad "① 首页没取 WEBSITE.md"
 grep -q '站名来自 SKILL' "$C/out.txt" && bad "① 生成物里混进了 SKILL.md 的首页内容" || ok "① SKILL.md 的首页内容没混进来"
 grep -qF '· 首页源：`skillpress/WEBSITE.md`' "$C/err.txt" && ok "① 打印了用了哪个源" || bad "① 没打印首页源（R2 要求打印）"
+# D20 的第二个洞：同一个文件**既当首页、又当书架里的一页** ⇒ 两套渲染规矩打架。
+# 所以 `WEBSITE.md` **不算子页**（索引与 kids 都排除它）。
+# ⚠️ 断言要收窄：生成物头部的注释里**本来就该**出现 `WEBSITE.md` 的名字（那句在说"首页来自它"），
+#    首页正文里也有站名。要查的是"**子页条目**里没有它" ⇒ 只看 kids 那两行的形状（`kind:` + `name:`）。
+if grep -A 1 'kind: "ref"' "$C/out.txt" | grep -q 'name: "WEBSITE"'; then
+  bad "① 首页源 WEBSITE.md 被当成子页收进生成物了（D20：它不算子页）"
+else
+  ok "① 首页源不算子页（D20）"
+fi
 
 # 回退：把 WEBSITE.md 抽走（也顺带覆盖"文件在但是空的"这条边界）
 C2=$(mk_corpus fallback); : > "$C2/root/skillpress/WEBSITE.md"; run "$C2"
@@ -165,6 +174,25 @@ node "$DEV" --repo "$C8" --skills "$C8/root" --program . > "$C8/gate2.txt" 2>&1
 g9=$?
 [ "$g9" = 1 ] && grep -q '一份 skill 都不剩' "$C8/gate2.txt" &&
   ok "④ 全被忽略 ⇒ 判红（不许在空集合上通过）" || bad "④ 全被忽略时退码是 $g9（应当是 1 并点名）"
+
+# ── ⑤ 首页源**也过门**（R2 / D20：它不是 skill，但它是站点的脸）──────────────────
+# D20 的第一半：`skillFiles()` 收不到首页源 ⇒ 它原先既不过门也不进指纹（能无限膨胀而没人复核）。
+echo "⑤ 首页源也过门（D20）"
+C9=$(mk_corpus gate-home)
+node "$DEV" --repo "$C9" --skills "$C9/root" --program . > "$C9/good.txt" 2>&1
+grep -q '✓ skillpress/WEBSITE.md（首页源）' "$C9/good.txt" &&
+  ok "⑤ 好首页源被门认下（报告里有它那一行）" || bad "⑤ 门没有把首页源算进去"
+# 坏首页源：里面摆一条不存在的仓库内路径 ⇒ G3 必须点名它（而且**指名到 WEBSITE.md**）
+printf '# 站名\n\n引言。\n\n## 一栏\n\n见 `docs/没有这份文档.md`。\n' > "$C9/root/skillpress/WEBSITE.md"
+node "$DEV" --repo "$C9" --skills "$C9/root" --program . > "$C9/bad.txt" 2>&1
+g10=$?
+[ "$g10" = 1 ] && grep -q '✗ skillpress/WEBSITE.md（首页源）' "$C9/bad.txt" &&
+  grep -q 'G3 路径不存在：docs/没有这份文档.md' "$C9/bad.txt" &&
+  ok "⑤ 坏首页源（死路径）被点名，且指名到首页源那一行" ||
+  bad "⑤ 坏首页源没被抓住（rc=$g10）—— 首页就又成了没人复核的那块"
+grep -q '首页源还没进 G8 指纹' "$C9/good.txt" &&
+  ok "⑤ D20 的另一半（进指纹）**明着记着**没做，不是悄悄跳过" ||
+  bad "⑤ 少了那条"指纹那一半还没做"的声明（不许有静默的缺口）"
 
 
 # ── 诱饵（--selftest）：把上面那些"必须红"的用例反过来验一遍 ─────────────────────

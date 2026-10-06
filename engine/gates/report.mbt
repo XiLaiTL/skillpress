@@ -143,6 +143,30 @@ pub fn run(ctx : Ctx, repo : String, program_dir : String, repo_label : String) 
       bad = bad + 1
     }
   }
+  // ── 首页源（R2 / D20）：**它不是 skill，但它是站点的脸** ⇒ 同样过门 ──────────────
+  // 为什么必须补：`skillFiles()` 只收 `SKILL.md` + `references/**` + `FAQ.md` ⇒ 首页**既不过门、
+  // 也不进指纹**（D20 实测的两个洞）。旧的首页是 `SKILL.md`（那份本来就在门里），所以只有
+  // `WEBSITE.md` 这一路需要补 —— 这也让"没有 WEBSITE.md 的老形状语料"输出**一字不变**（对账不受影响）。
+  let home = join_path(join_path(ctx.skills_dir, "skillpress"), "WEBSITE.md")
+  if ctx.host.exists(home) {
+    let r = judge(ctx, ctx.host.read(home), "skillpress", "home")
+    out.push((if r.fails.length() > 0 { "✗" } else { "✓" }) + " skillpress/WEBSITE.md（首页源）")
+    for n in r.notes {
+      out.push("    · " + n)
+    }
+    for f in r.fails {
+      out.push("    ✗ " + f)
+    }
+    if r.fails.length() > 0 {
+      bad = bad + 1
+    }
+    // D20 的另一半（进 G8 指纹）**今天不做**，而且要说出来 —— 不是忘了：
+    // 指纹锁的**写侧**（`--update-lock`）还在旧 CLI 里，它不认识首页源 ⇒ 新门要是现在
+    // 就要求锁里有这一条，就会永远报「新增」，那是**假红**（比不查更糟：它训练人忽略门）。
+    out.push(
+      "    · 首页源还没进 G8 指纹（D20 的另一半）：等指纹锁的写侧搬进新引擎后一起补 —— 现在要求就会永远报「新增」",
+    )
+  }
   let (lock_fails, lock_notes) = check_lock(ctx.host, ctx.skills_dir, program_dir, dirs)
   for n in lock_notes {
     out.push("    · " + n)
