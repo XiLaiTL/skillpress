@@ -60,6 +60,7 @@ run line-budget bash tools/line-budget.sh
 run diagnostics-ledger bash tools/diagnostics-ledger.sh
 run mbt-traps bash tools/mbt-traps.sh
 run site-source bash tools/site-source.sh
+run shell-traps node tools/shell-traps.mjs
 # 包内容也在干净克隆里复核：这里**没有未跟踪文件**，所以清单反映的就是版本库的真实内容
 run package-check bash tools/package-check.sh
 echo

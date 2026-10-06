@@ -61,8 +61,28 @@ mkdir -p "$FIX/alpha" "$FIX/skillpress"
 printf -- '---\nname: alpha\ndescription: 夹具里的 alpha\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n正文，带一个代码块：\n\n```bash\nls -la\n```\n' > "$FIX/alpha/SKILL.md"
 printf -- '---\nname: skillpress\ndescription: 首页那份\nwhenToUse: 测试\n---\n\n# 站名\n\n引言。\n\n## 一栏\n\n正文。\n' > "$FIX/skillpress/SKILL.md"
 
-echo "④ 没装 npm 依赖时：\`check\` 必须能跑（门不碰高亮）"
-node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" > "$BASE/check1.txt" 2>&1
+echo "④ 拿到包的人**第一次**跑门：如实告诉他「还没有你的锁」（而不是偷偷用开发者本机的锁）"
+# ⚠️ 这一条是修完"程序根默认"之后才看得见的真实体验：消费者刚拿到包时**没有**属于自己的
+#    `skills.lock.json`（锁里记的是**内容根**的指纹，因人而异）⇒ 门应当退 1 并说清怎么落锁。
+#    （第一版判据在这里"过"了，是因为它偷偷用了**开发者本机那份程序根**的锁 —— 测试自己被环境
+#     喂饱了。修完默认值它就红给你看，这才是对的读数。）
+node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" --program "$BASE/proj" \
+  > "$BASE/check0.txt" 2>&1
+r0=$?
+if [ "$r0" = 1 ] && grep -q 'G8 没有 skills.lock.json' "$BASE/check0.txt"; then
+  ok "没锁时退 1 并指名怎么落锁（消费者第一次跑的真实读数）"
+else
+  bad "没锁时的表现不对（退出码 $r0）—— 它要么静默放过，要么说得不清"
+  tail -4 "$BASE/check0.txt" | sed 's/^/      /'
+fi
+
+echo "⑤ 落锁（锁落在**消费者自己的目录**里）⇒ 再跑：没装 npm 依赖也必须全过"
+node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" --program "$BASE/proj" \
+  --update-lock > "$BASE/lock.txt" 2>&1
+[ -f "$BASE/proj/skills.lock.json" ] &&
+  ok "锁落在消费者的程序根里（$(head -1 "$BASE/lock.txt")）" || bad "锁没落在消费者目录里"
+node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" --program "$BASE/proj" \
+  > "$BASE/check1.txt" 2>&1
 r1=$?
 if [ "$r1" = 0 ] && grep -q '全部通过（2 个 skill）' "$BASE/check1.txt"; then
   ok "check 在没有 web-tree-sitter 时照样全过（退出码 0）"
@@ -71,18 +91,18 @@ else
   tail -4 "$BASE/check1.txt" | sed 's/^/      /'
 fi
 
-echo "⑤ 没装 npm 依赖时：\`gen-file\` 必须**说清缺什么**并退 2（不是崩栈、更不是吐半份产物）"
+echo "⑥ 没装 npm 依赖时：\`gen-file\` 必须**说清缺什么**并退 2（不是崩栈、更不是吐半份产物）"
 node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen1.txt" 2> "$BASE/gen1.err"
 r2=$?
 [ "$r2" = 2 ] && grep -q 'npm i web-tree-sitter' "$BASE/gen1.err" && [ ! -s "$BASE/gen1.txt" ] &&
   ok "缺依赖时：退 2 + 指名要装什么 + stdout 空" ||
   { bad "缺依赖时表现不对（退出码 $r2）"; head -3 "$BASE/gen1.err" | sed 's/^/      /'; }
 
-echo "⑥ 装上那唯一的依赖（装在**项目根**：Node 从包里往上一层层找得到）"
+echo "⑦ 装上那唯一的依赖（装在**项目根**：Node 从包里往上一层层找得到）"
 ( cd "$BASE/proj" && npm i --silent --no-audit --no-fund web-tree-sitter > "$BASE/npm.log" 2>&1 ) &&
   ok "npm i web-tree-sitter 完成" || { bad "npm i 失败"; tail -3 "$BASE/npm.log" | sed 's/^/      /'; }
 
-echo "⑦ \`gen-file\` 在包里跑出的产物 == 本地引擎的产物（逐字节）"
+echo "⑧ \`gen-file\` 在包里跑出的产物 == 本地引擎的产物（逐字节）"
 node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen-pkg.mbt" 2> "$BASE/gen-pkg.err"
 r3=$?
 node tools/run-js.mjs gen-file "$FIX" > "$BASE/gen-local.mbt" 2> /dev/null
@@ -94,7 +114,7 @@ else
   diff "$BASE/gen-local.mbt" "$BASE/gen-pkg.mbt" | head -6 | sed 's/^/      /'
 fi
 
-echo "⑧ 反证：坏内容在包里也必须红"
+echo "⑨ 反证：坏内容在包里也必须红"
 printf -- '---\nname: alpha\ndescription: 夹具\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n见 `docs/没有这份文档.md`。\n' > "$FIX/alpha/SKILL.md"
 node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" > "$BASE/check2.txt" 2>&1
 r5=$?

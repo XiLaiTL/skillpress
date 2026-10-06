@@ -92,6 +92,8 @@ bash tools/fresh-clone-check.sh   # ⑦ 干净克隆自查：把 HEAD 克隆到�
 bash tools/package-check.sh       # ⑧ 发布包内容复核：该含的缺一个也红、不该含的多一个也红（--selftest 三向诱饵）
 bash tools/mbt-traps.sh           # ⑨ MoonBit 坑位（第一条：`Array::sort()` 排字符串**不是字典序**；--selftest 两向诱饵）
 bash tools/site-source.sh         # ⑩ 首页源（R2：WEBSITE.md 优先 / 回退 SKILL.md / --home）+ 忽略清单（R4：站点与门都跳过）
+bash tools/shell-traps.mjs        # ⑪ shell 坑位（双引号里的反引号 = **会真的执行**；--selftest 四向诱饵）
+bash tools/published-check.sh     # ⑫ 发布后（§7 第 7 条）：从 registry 装下来、在别的工程里编过（没发布时会明说）
 bash tools/acceptance.sh          # ⑪ 验收：按 PLAN §6 的 A1/A2/A3 逐条查（红在哪 = 还差什么）
 ```
 
