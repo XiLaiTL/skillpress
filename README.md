@@ -56,6 +56,23 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | `SPEC.md` / `SKILLS.md` / `DRIFT.md` | 投影规范 / 集合划分 / 漂移政策（跟着程序走 = 对外契约） |
 | `PLAN.md` | **计划**（会变）：还没做的、已定的决定、要探的未知 |
 | `claims.txt` / `done-claims.txt` / `skills.lock.json` | 禁语表 / 已落地台账 / 体量指纹（每条指纹记着**属于哪个内容根**） |
+| `engine/highlight/` | **MoonBit 版引擎的第一块**（P8.1）：调色板 / 包装候选 / 薄垫片 —— 见下节「对账」 |
+| `tools/run-js.mjs` | js 那条图的**引导层**：先 `await` 装好 tree-sitter 与 5 份语法，再进 MoonBit（CJS 不能顶层 await） |
+| `tools/spike/` | P8.0 探针 + 对账的**基准生成器**（不进发布包，`.moonignore` 已排掉） |
+
+## 对账（迁移期最硬的两条判据）
+
+引擎正在从 Node 版搬进 MoonBit（`PLAN.md` 的 P8）。搬的过程**只认一条**：
+新实现的输出要与旧实现的产物**逐字节一致** —— "看着差不多"不算数。
+
+```bash
+# ① 上色：新实现 vs 旧实现（直接调 lib/highlight.mjs）在**全语料**上的读数必须逐字节一致
+SKILLPRESS_CORPUS=../moobile/skills bash tools/highlight-parity.sh
+# ② 文档块：新实现吐出的 `blocks: […]` vs **旧实现已经产出的** content.generated.mbt
+SKILLPRESS_CORPUS=../moobile/skills bash tools/blocks-parity.sh
+```
+
+两条脚本都会把两边的原始输出与 diff 落在 `_build/parity/`（产物目录，不进仓）。
 
 ## 程序自己的 skill（`skills/`）
 

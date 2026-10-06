@@ -306,6 +306,18 @@
 - 顺带修掉两个"自己骗自己"的坑：语料清单别把 `split().filter()` 的**视图迭代器**当数组（实测读出来 0 份，
   看起来像"没语料"）；汇总行按**固定顺序**打印，好让 `diff` 成为判据。
 
+**P8.1 后半：文档块管线（2026-10-06，进行中）**
+
+- **判据先行**：`bash tools/blocks-parity.sh`（`SKILLPRESS_CORPUS=<内容仓>/skills`）——
+  新实现（`engine/content` + CLI 的 `dump-blocks`）吐出的 `blocks: [ … ]`
+  与**旧实现已经产出的** `content.generated.mbt` 里的同名区段**逐字节一致**。
+  基准侧的切段器是 `tools/spike/old-doc-blocks.mjs`（按括号深度配对、跳过字符串里的括号；
+  实测切出 7 段 / 226 行）。
+- 为什么这条比"数一数块数"硬：那份生成物是**旧实现的产物 = 真相**；能原样吐出来才说明每条渲染细节
+  （`esc` 的转义、缩进、**链接拆成 `Txt(名字) + Code(目标)`**、表格单元格的空格、列表的 `indent`/`num`…）都搬对了。
+- 移植对象是 `lib/gen-content.mjs` 的 `parseFrontmatter` / `summarize`(46) / `inline` / `parseBlocks` /
+  `emitBlock` / `esc` / `spanList` / `runList`；代码块的 runs 用已经对账通过的 `engine/highlight`。
+
 **每一步都要守的一条**：**R6 通用性**（D16）—— 迁完不许变成「只有 moobile 能跑」。
 新建的门/管线一律先问一句：**一个只有 `skills/` 的陌生仓库，它跑得起来吗？**
 
