@@ -306,3 +306,28 @@
 | 起进程 / HTTP / WebSocket（CDP 那条链） | `moonbitlang/async`（`process` `http` `websocket` `tls` `fs` `socket`） | **moobile 本来就在依赖它**（`moon.mod` 的 `moonbitlang/async@0.21.0`）⇒ 这条链的原料是现成的 |
 | CLI 怎么发给别人 | `moon install <user/module/pkg>` | **全局装二进制包**（npm 之外的第二条分发路） |
 | 本机工具链 | `cc` / `gcc` **15.1.0**（MinGW-w64）在 PATH；**没有 `clang`** | 决定 native 那条路走不走得通 |
+
+## 6. 验收：这个项目的**完成判据**（用户定，2026-10-06）
+
+> 目标一句话：**完成 skillpress 直到打出并发布 moonbit 包**。
+> 下面三条**每条都要能被命令证明** —— 证明不了的不算完成（这是本仓库的老规矩：
+> "先测再断言：哪条命令的输出能证明这句话？"）。
+
+| # | 判据 | 怎么证明 |
+|---|---|---|
+| **A1** | **包存在、装得上** | 程序仓 `moon package` 打出 `XiLaiTL-skillpress-<ver>.zip`（`moon package --list` 复核内容）；别的工程 `moon add` 装得上并 `moon check` 编过。发布之后再加一条：**从 registry 装下来**编译过（照 moobile 的 `tools/check_published.sh` 那套：发布包 ≠ 工作区） |
+| **A2** | **站点直接依赖那个包，而不是抄界面** | 内容仓的站点实例 `moon.mod` 里写的是 `XiLaiTL/skillpress@<ver>`；实例的 `app.mbt` **只剩几行**（`@skillpress.site(...)`，验收取 ≤ 20 行）；**界面的第二份副本不存在**（引擎与 `shell` 都在包里） |
+| **A3** | **自家的 skills 真能出站** | `press` → `build` → `serve` 打开就是那 7 份 skill 的站点；`verify` **判据全过**；`check` 对内容**全绿**；`moon package` 出的包里带上 `skills/`（随包分发那份） |
+
+### 反过来：**这些情况不算完成**（防自欺）
+
+- 本机跑得通，但**包装不上** / 装上了编不过（"本机绿 ≠ 装出来绿"）。
+- 站点**还是抄的**：实例里留着一份 `app.mbt` 界面代码（那就等于包没起作用）。
+- 只有**我们自己这套仓库**能跑（R6 通用性：一个只有 `skills/` 的陌生仓库也得能起站）。
+- 包**缺件**：`grammars/` 的 wasm、规范账本、`skills/` 之类悄悄没打进去（`files` 白名单不报错 ⇒ 必须真打包真安装量）。
+- 判据被"跟着新实现改"来凑绿（过渡期铁律：先让新实现对旧实现的输出，再谈优化）。
+
+### 顺序（已经定过的，别再来回改）
+
+引擎的通用化与迁移（P8）→ 与 P6 的 `shell` 抽包合流 → 打出包 → **内容侧拆分与它同批做**
+（D19：引擎支持之前不动内容）。每个源文件 ≤ 400 行（R9 / D21）贯穿全程。
