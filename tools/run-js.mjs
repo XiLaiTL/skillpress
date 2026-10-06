@@ -33,6 +33,24 @@ function builtCli() {
   return p;
 }
 
+
+/** 语料库：把 `SKILLPRESS_CORPUS` 指到的目录下所有 `.md` 列出来（排序，逐字节可复现）。 */
+function mdFiles() {
+  const root = process.env.SKILLPRESS_CORPUS;
+  if (!root || !existsSync(root)) return [];
+  const out = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "_build" || e.name === "dist") continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".md")) out.push(p.split("\\").join("/"));
+    }
+  };
+  walk(root);
+  return out.sort();
+}
+
 /** 装 tree-sitter + 五份语法（名字取自 `grammars/<名字>.wasm`，与 scm 同名）。 */
 async function boot() {
   const ts = await import("web-tree-sitter");
@@ -43,13 +61,21 @@ async function boot() {
     const name = f.replace(/\.wasm$/, "");
     langs[name] = await ts.Language.load(readFileSync(join(dir, f)));
   }
-  globalThis.__skillpress_ts = { ts, langs, root: ROOT.split("\\").join("/") };
+  // query 也一起预装：MoonBit 侧要做的是"挑包装 → 刷色号 → 拼片段"，
+  // 读 .scm 这种 IO 归引导层（两边的分工与 P8.0 的结论一致）
+  const scms = {};
+  for (const name of Object.keys(langs)) {
+    const p = join(dir, `${name}.highlights.scm`);
+    if (existsSync(p)) scms[name] = readFileSync(p, "utf8");
+  }
+  globalThis.__skillpress_ts = { ts, langs, scms, root: ROOT.split("\\").join("/"), mdFiles: mdFiles() };
   return Object.keys(langs).sort();
 }
 
 const names = await boot();
 if (process.env.SKILLPRESS_DEBUG_LANGS === "1") {
   console.error(`引导层装好的语法：${names.join(", ")}`);
+  console.error(`语料根=${process.env.SKILLPRESS_CORPUS ?? "(没设)"} ｜ 列出的 .md = ${globalThis.__skillpress_ts.mdFiles.length}`);
 }
 // ⚠️ 必须走 file:// URL：ESM 的 `import()` 不认 Windows 盘符路径（报 ERR_UNSUPPORTED_ESM_URL_SCHEME）
 await import(pathToFileURL(builtCli()).href);
