@@ -9,11 +9,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "press": "node gen-content.mjs",
-    "check": "node check.mjs",
-    "selftest": "node check.mjs --selftest",
-    "audit": "node highlight.mjs --audit",
-    "verify": "node verify-site.mjs",
-    "facts": "node docfacts.mjs"
+    "press": "node tools/press.mjs",
+    "press:check": "node tools/press.mjs --check",
+    "check": "node bin/skillpress.mjs check",
+    "check:selftest": "node bin/skillpress.mjs check --selftest",
+    "verify": "node bin/skillpress.mjs verify",
+    "facts": "node bin/skillpress.mjs facts",
+    "audit": "node bin/skillpress.mjs audit",
+    "package-check": "bash tools/package-check.sh"
   }
 }
