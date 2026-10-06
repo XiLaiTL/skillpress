@@ -275,6 +275,30 @@ fn gen_file() -> Unit {
 
 ///|
 fn main {
+  let args = @env.args()
+  // 找出命令词的位置（`node tools/run-js.mjs <cmd> [参数…]`：引导层把 CLI 参数原样放在 argv 里）
+  let rest : Array[String] = []
+  let mut k = 0
+  while k < args.length() {
+    if args[k] == "hl" ||
+      args[k] == "batch" ||
+      args[k] == "dump-blocks" ||
+      args[k] == "gen-file" ||
+      args[k] == "check" {
+      break
+    }
+    k = k + 1
+  }
+  // ── `check`：**不需要引导层**，所以先于下面那道 tree-sitter 检查分发 ────────────────────
+  // 门不碰高亮 ⇒ 没装 tree-sitter 也该能跑门。这条对 R6 有实际意义：别人拿这个包跑门时，
+  // 不该被"高亮装好了没有"挡住（那两件事没有任何依赖关系）。
+  if k < args.length() && args[k] == "check" {
+    for j = k + 1; j < args.length(); j = j + 1 {
+      rest.push(args[j])
+    }
+    gate_check(rest)
+    return
+  }
   // 引导层没装好 ⇒ **退 2 且 stdout 什么都不打**。原先这里既能过、又往 stdout 打了句"✗"：
   // `gen-file > 产物` 那种用法会因此得到一份写着报错的"产物"、退出码还是 0 ——
   // 正是旧实现注释里骂过的"一个退出码不对的门比没有门更糟"（P8.1 自查发现，已改）。
@@ -283,23 +307,12 @@ fn main {
     @content.set_exit_code(2)
     return
   }
-  let args = @env.args()
-  let cmd = args[args.length() - 1]
-  ignore(cmd)
-  // 引导层把 CLI 参数原样放在 argv 里：node tools/run-js.mjs <cmd> [参数…]
-  let rest : Array[String] = []
-  let mut k = 0
-  while k < args.length() {
-    if args[k] == "hl" || args[k] == "batch" || args[k] == "dump-blocks" || args[k] == "gen-file" {
-      break
-    }
-    k = k + 1
-  }
   if k >= args.length() {
     println("用法：node tools/run-js.mjs hl <markdown 文件> <语言>")
     println("      SKILLPRESS_CORPUS=<根> node tools/run-js.mjs batch")
     println("      node tools/run-js.mjs dump-blocks <内容根>")
     println("      node tools/run-js.mjs gen-file <内容根>      # 整份 content.generated.mbt → stdout")
+    println("      node tools/run-js.mjs check [--repo <根>] [--skills <内容根>] [--update-lock [名字]]")
     println("垫片装的语法：\{@hl.languages()}")
     return
   }
@@ -369,3 +382,4 @@ fn main {
     }
   }
 }
+

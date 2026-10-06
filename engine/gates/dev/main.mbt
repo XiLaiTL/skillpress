@@ -34,54 +34,17 @@ extern "js" fn set_exit_code_js(code : Int) -> Unit =
 extern "js" fn eprintln_js(text : String) -> Unit =
   #|(text) => { process.stderr.write(text + "\n"); }
 
-///|
-/// 参数表：`--key value` 的取值；没给就 `None`。
-fn arg_value(args : Array[String], key : String) -> String? {
-  let mut i = 0
-  while i + 1 < args.length() {
-    if args[i] == key {
-      return Some(args[i + 1])
-    }
-    i = i + 1
-  }
-  None
-}
-
-///|
-/// 默认仓库根（旧实现 `defaultRepo`）：先找兄弟 `moobile/`，找不到退回往上三层。
-fn default_repo(host : @gates.Host, program : String) -> String {
-  let sibling = host.resolve(@gates.join_path(@gates.join_path(program, ".."), "moobile"))
-  if host.exists(@gates.join_path(sibling, "skills")) ||
-    host.exists(@gates.join_path(sibling, ".agents/skills")) {
-    return sibling
-  }
-  host.resolve(@gates.join_path(@gates.join_path(@gates.join_path(program, ".."), ".."), ".."))
-}
-
-///|
-/// 默认内容根（旧实现 `defaultSkills`）：`<仓库>/skills`，没有才退回老约定。
-fn default_skills(host : @gates.Host, repo : String) -> String {
-  let plain = @gates.join_path(repo, "skills")
-  if host.exists(plain) {
-    return plain
-  }
-  let legacy = @gates.join_path(@gates.join_path(repo, ".agents"), "skills")
-  if host.exists(legacy) {
-    return legacy
-  }
-  plain
-}
 
 ///|
 fn main {
-  let host = js_host()
+  let host = @gjs.js_host()
   let args = argv_lines().split("\n").filter(fn(l) { l != "" }).map(fn(l) { l.to_owned() }).collect()
-  let program = match arg_value(args, "--program") {
+  let program = match @gjs.arg_value(args, "--program") {
     Some(p) => host.resolve(p)
     None => host.resolve(host.cwd())
   }
   // 模式 A：造对账夹具（写进 `--emit-fixtures <目录>`，通常是 gitignore 的 `_build/`）
-  match arg_value(args, "--emit-fixtures") {
+  match @gjs.arg_value(args, "--emit-fixtures") {
     Some(dir) => {
       let root = host.resolve(dir)
       let written = emit_fixtures(host, root, program)
@@ -115,13 +78,13 @@ fn main {
     }
     return
   }
-  let repo = match arg_value(args, "--repo") {
+  let repo = match @gjs.arg_value(args, "--repo") {
     Some(r) => host.resolve(r)
-    None => default_repo(host, program)
+    None => @gjs.default_repo(host, program)
   }
-  let skills = match arg_value(args, "--skills") {
+  let skills = match @gjs.arg_value(args, "--skills") {
     Some(s) => host.resolve(s)
-    None => default_skills(host, repo)
+    None => @gjs.default_skills(host, repo)
   }
   // 前置：内容仓根不存在 ⇒ 退 2（旧实现 `main` 里那段，**在报告之前**）
   if !host.exists(repo) {
@@ -139,7 +102,7 @@ fn main {
   // 清单路径：`--ignore <路径>` 可覆盖（默认 `<仓库根>/skillpress.ignore.md`）。
   // 为什么需要这个开关：对账要在**副本**上跑（副本上一级没有清单），而旧门的 G5/G6 又要靠
   // 真仓库的 `.mbt` 索引 ⇒ 两边**不能**同时用"默认的清单路径"（那会把真清单漏进副本比较）。
-  let ignore_path = match arg_value(args, "--ignore") {
+  let ignore_path = match @gjs.arg_value(args, "--ignore") {
     Some(p) => host.resolve(p)
     None => ""
   }

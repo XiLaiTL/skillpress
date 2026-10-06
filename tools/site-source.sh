@@ -203,20 +203,39 @@ echo "⑥ 门在副本上与旧门逐字节一致"
 C10=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh 2>/dev/null) ||
   bad "⑥ 造不出副本（前提不成立）"
 if [ -n "${C10:-}" ]; then
-  CROOT=$(dirname "$C10")
   : > "$W/empty-ignore.md"
   node lib/check.mjs --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" > "$W/gate-old.txt" 2>&1
   ro=$?
-  node "$DEV" --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program . --ignore "$W/empty-ignore.md" \
+  # ⚠️ 跑的是**新 CLI**（`run-js.mjs check`），不是开发入口 —— 出厂那条路才是要钉的东西
+  node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --ignore "$W/empty-ignore.md" \
     > "$W/gate-new.txt" 2>&1
   rn=$?
   if [ "$ro" = "$rn" ] && diff -q "$W/gate-old.txt" "$W/gate-new.txt" > /dev/null; then
-    ok "⑥ 旧门与新门在副本上**逐字节一致**（rc 都是 $ro，$(grep -c . "$W/gate-new.txt") 行）"
+    ok "⑥ 旧门与新 CLI 在副本上**逐字节一致**（rc 都是 $ro，$(grep -c . "$W/gate-new.txt") 行）"
   else
-    bad "⑥ 门对账不一致（旧 rc=$ro 新 rc=$rn，diff 在 $W/gate-new.txt 旁边）"
+    bad "⑥ 门对账不一致（旧 rc=$ro 新 rc=$rn）"
     diff "$W/gate-old.txt" "$W/gate-new.txt" | head -8 | sed 's/^/      /'
   fi
 fi
+
+# ── ⑦ 落锁（写侧）走一遍完整循环（**在临时程序根里做，真锁一个字都不碰**）──────────
+# 为什么单列：写侧是"让门变绿"的唯一入口，它坏掉的样子最危险 —— 要么悄悄不写、要么把别人的指纹
+# 一起锁掉。所以：落锁 ⇒ 不再报「新增」；改一个字节 ⇒ **必须**报「指纹变了」。
+echo "⑦ 落锁写侧（临时程序根）"
+P7=$(mktemp -d)
+node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" \
+  --update-lock > "$W/lock1.txt" 2>&1
+grep -q '已落锁：7 个 skill' "$W/lock1.txt" &&
+  ok "⑦ 落锁：打印与旧实现同形（$(head -1 "$W/lock1.txt")）" || bad "⑦ 落锁没打那句（$(head -2 "$W/lock1.txt" | tr '\n' ' ')）"
+[ -f "$P7/skills.lock.json" ] && ok "⑦ 锁写到了指定的程序根（不是别处）" || bad "⑦ 锁没写出来"
+out=$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" 2>&1)
+printf '%s' "$out" | grep -q 'G8 新增 skill' &&
+  bad "⑦ 刚落完锁还报「新增」⇒ 写侧与读侧对不上" || ok "⑦ 落锁后不再报「新增」（读写同一套口径）"
+printf '\n<!-- 判据探针 -->\n' >> "$C10/moobile-pitfalls/SKILL.md"
+printf '%s' "$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" 2>&1)" |
+  grep -q 'G8 指纹变了：moobile-pitfalls' &&
+  ok "⑦ 改一个字节 ⇒ 「指纹变了」当场红（门的意义就在这一条）" || bad "⑦ 指纹变了没被抓住"
+rm -rf "$P7"
 
 
 # ── 诱饵（--selftest）：把上面那些"必须红"的用例反过来验一遍 ─────────────────────

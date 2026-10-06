@@ -1,8 +1,9 @@
 import {
   "XiLaiTL/skillpress/engine/gates" @gates,
+  "XiLaiTL/skillpress/engine/gates/js" @gjs,
 }
 
-// 门本身是纯逻辑；只有"宿主真身"（node:fs / node:path）是 js 专用的
+// 门本身是纯逻辑；这里只是"开发/对账用的入口"（宿主真身在库里：`engine/gates/js/`）
 supported_targets = "+js"
 
 pkgtype(kind: "executable")

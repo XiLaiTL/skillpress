@@ -3,6 +3,8 @@ import {
   "XiLaiTL/skillpress/engine/highlight" @hl,
   "XiLaiTL/skillpress/engine/content" @content,
   "XiLaiTL/skillpress/engine/ignore" @ig,
+  "XiLaiTL/skillpress/engine/gates" @gates,
+  "XiLaiTL/skillpress/engine/gates/js" @gjs,
 }
 
 supported_targets = "+js"

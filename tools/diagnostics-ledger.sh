@@ -85,6 +85,9 @@ lib/check.mjs:542|项不合格|ok|项不合格|-|同上
 lib/check.mjs:557|全部通过（|ok|全部通过（|-|同上
 lib/check.mjs:522|还没有 skill|ok|还没有 skill|-|同上
 lib/check.mjs:610|找不到 moobile 根目录|ok|找不到 moobile 根目录|-|engine/gates/dev（库接受根参数，CLI 默认打仓库名）
+lib/check.mjs:631|skills.lock.json 已落锁：|ok|skills.lock.json 已落锁：|-|新 CLI 的 check（`--update-lock` 写侧）
+lib/check.mjs:632|⚠️ 落锁 = 你**看过**这次的体量变化|ok|⚠️ 落锁 = 你**看过**这次的体量变化|-|新 CLI 的 check
+lib/check.mjs:627|✗ --update-lock：没有这个 skill：|ok|✗ --update-lock：没有这个 skill：|-|新 CLI 的 check（指名不存在的 skill ⇒ 退 2）
 lib/docfacts.mjs:564|根目录不存在：|ow|-|DG-facts|无（按 D18 搬去内容仓，不在核心里）
 lib/verify-site.mjs:325|没有 site/dist/bundle.js|ow|-|DG-verify|无（P8.3 未做）
 lib/verify-site.mjs:329|这条判据要真浏览器（RNW 的行为在 jsdom 里不可信）|ow|-|DG-verify|无（P8.3 未做）

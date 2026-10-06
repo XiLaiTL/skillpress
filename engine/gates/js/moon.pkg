@@ -1,0 +1,7 @@
+import {
+  "XiLaiTL/skillpress/engine/gates" @gates,
+}
+
+// **js 宿主的真身**住在库里（不是可执行包里）：`cmd/skillpress` 的 `check` 也要用它，
+// 而可执行包不能被别人 import。`engine/gates/dev/` 那边只是"开发用的入口"。
+supported_targets = "+js"
