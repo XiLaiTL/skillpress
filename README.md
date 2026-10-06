@@ -93,8 +93,10 @@ node bin/skillpress.mjs verify           # 20 条全过（真 Chrome 无头）
 
 ## 诚实清单
 
-1. **还没发布**：现在靠**源码路径**调用（`node bin/skillpress.mjs …`）。发 npm 包 / moonbit 包
-   是计划里的事，不是现状。
+1. **还没发布**：现在靠**源码路径**调用（`node bin/skillpress.mjs …`）。
+   ⚠️ 发布形态已改（`PLAN.md` 的 D15）：**不单独发 npm 引擎包** —— 引擎要从这 3404 行 `.mjs`
+   迁到 MoonBit，最后由**一个月亮包**装下引擎 + 站点界面 + skills，CLI 用 `moon install` 装。
+   迁移的阶段与判据见 `PLAN.md` 的 **P8**（**还没动手**）。
 2. **界面还没抽成包**：站点壳的代码现在**住在实例里**（`app.mbt`），目标是把界面变成程序里的一个
    MoonBit 包（`shell`），实例只剩几行 `@skillpress.site(...)` —— 零复制、升包即升级。
 3. **`pack` / `attach` 还没做**：命令存在，但会明说"还没做"并以非零退出（不做"看着像跑了"的假动作）。

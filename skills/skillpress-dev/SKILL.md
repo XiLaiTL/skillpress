@@ -104,7 +104,9 @@ node bin/skillpress.mjs check --skills skills --update-lock
 
 ## 六、诚实清单（现状，别写成"已支持"）
 
-- **还没发布**：靠源码路径调用（`node bin/skillpress.mjs …`）；发 npm / moonbit 包在 `PLAN.md` 里。
+- **引擎今天还是 Node**（3404 行 `.mjs`）—— ⚠️ **要动引擎之前先看 `PLAN.md` 的 P8**：
+  已经定了要迁到 MoonBit（D15），阶段、判据与风险都在那儿。**不单独发 npm 包了。**
+- **还没发布**：靠源码路径调用（`node bin/skillpress.mjs …`）；发布形态见 P8 与 P6。
 - `pack` / `attach` **还没做**：命令存在，但会明说"还没做"并非零退出（不做"看着像跑了"的假动作）。
 - 界面**还没抽成 `shell` 包**：整套界面住在内容侧的实例 `app.mbt` 里，实例与程序之间隔着一份界面代码。
 

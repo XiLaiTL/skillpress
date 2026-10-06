@@ -40,6 +40,7 @@
 | D12 | 吸顶：**先探、拿不到证据就不写"已吸顶"** —— 探到底之后发现**是一行 CSS 的事**（根因在宿主 `#root` 是块盒 + 应用根是弹性项），见 P2 那一节 | 用户定（P2 执行期选的兜底档）；"探到底"这一步救了它 |
 | D13 | **程序独立成一个 git 仓库**（`interest/skillpress`），与内容仓 `interest/moobile` **平级**（兄弟） | 用户定（2026-10-06）；理由：程序要能独立发布与协作（那正是"待在内容仓里"给不了的）。代价写在明处：内容里的命令多一层 `../skillpress/`；门那边补上了 G3 的**第二个根 = 程序根**（原先那个根写的是仓库根、与第一个重复 ⇒ 讲程序的指针一个都没查过），并加了诱饵 `bad-program-path` 守着它 |
 | D14 | 站点应用顶栏那条**换模式的标签必须有它自己的名字**（`i == -2` ⇒ 「文档 / SKILL」），不许落到 `i < 0 ⇒ "首页"` 的兜里 | 执行期定的（2026-10-06 逮到）；代价是一次真 bug + 一条假绿判据，见 [`docs/FINDINGS.md`](https://github.com/XiLaiTL/moobile/blob/main/docs/FINDINGS.md) —— 实测：顶栏两条「首页」，`verify` 里 3 条判据被静默跳过（19 条 → 22 条） |
+| D15 | **引擎迁到 MoonBit**（今天的 3404 行 `.mjs` 逐步换成 MoonBit，**不单独发 npm 引擎包**） | 用户定（2026-10-06）。⚠️ 这条**推翻了"程序将来发 npm 包"那半**（D7）：引擎原来写成 Node 是**继承既有工具链的惯性，从来没有过这个决定**（我 grep 过 SPEC/PLAN/DRIFT/README，一句理由都没有）。查实之后"MoonBit 做不到"的顾虑不成立 —— 需要的包全在（见 §5），所以按"我们本来就是 MoonBit"来。阶段与判据见 **P8** |
 
 ## 2. 阶段
 
@@ -220,6 +221,28 @@
 判据补齐（等 D8 解除）｜文档对齐（`SPEC.md` / 内容侧 `references/layout.md` / 两份 README）｜
 发布前清单（包形态、副本新鲜度那条门）。
 
+### P8 引擎迁到 MoonBit（D15）—— **还没动手，先落方案**
+
+**为什么迁**：这套东西本来就是 MoonBit 生态（库与站点界面都是 MoonBit），而引擎是 **3404 行 `.mjs`**
+（`gen-content` 834 ｜ `verify-site` 776 ｜ `check` 635 ｜ `docfacts` 567 ｜ `highlight` 332 ｜
+`roots`+`kids` 180 ｜ `bin` 80），只因为**继承了既有工具链的语言**才长成这样。
+迁完的收益不只是"整齐"：**一个月亮包装下引擎 + shell + skills**，CLI 用 `moon install` 装，
+不必再维护 npm 那条线（也就不必再有两个 registry、两条发布命令）。
+
+**怎么迁**（照本仓库自己的迁移纪律：**新实现与旧实现逐条对账 + 证伪**，先例是 moobile 的 `tools/mbtools`）：
+
+| 步 | 做什么 | 怎么算"成了"（判据） |
+|---|---|---|
+| **P8.0 探针** | 一个独立嵌套模块：`mizchi/markdown` 解析一份 `SKILL.md`；`tree_sitter_*` 对同一段代码块上色 | ① 块结构与我们 `gen-content` 对得上；② 色号片段拼回去**逐字节等于原文**（照搬现有硬断言）；③ **同一块的未上色比例不比 Node 侧差**（audit 那道闸门）；④ 定下 native 还是 js |
+| **P8.1 管线** | `lib/gen-content.mjs` + `lib/kids.mjs` → MoonBit | `--check` 语义照搬（生成物与内容源**逐字节一致**）；现有 7 份 skill 全绿 |
+| **P8.2 门** | `lib/check.mjs`（含 13 个诱饵）+ `lib/docfacts.mjs` → MoonBit | 诱饵**全被点名**、正例不误杀；`facts` 的读数与 Node 侧一致 |
+| **P8.3 站点判据** | `lib/verify-site.mjs`：真 Chrome + CDP + 起静态服务 | 那条链在 `moonbitlang/async` 上跑通；**22 条判据语义不变** |
+| **P8.4 收口** | 与 P6 的 `shell` 包合流：一个月亮装下引擎 + shell + skills | `moon install` 装出来的 CLI 在内容仓跑通 `check` / `press` / `verify` |
+
+**过渡期唯一那条纪律**：两套实现会**同时存在**一段时间，所以
+**任何一条判据的期望值都不许"跟着新实现改"** —— 先让新实现对齐旧实现的输出，再谈优化。
+（这正是 D9 那次"逐条对账"的教训：门只能证明"结构没坏"，证明不了"信息没丢"。）
+
 ## 3. 风险与未知（要探的）
 
 | 项 | 为什么是风险 | 兜底 |
@@ -230,8 +253,30 @@
 | 拆 ref 的尺度 | "门禁 vs 细则"靠人判断，容易拆碎或拆不动 | 一个主题一份；宁可合，不许丢信息 |
 | 实例进不进 `moon.work` | 进了 `moon check` 会连它一起编（多一层覆盖），也让它依赖工作区布局 | 先独立构建（现状），P6 里定 |
 | 发布形态 | npm 包名 / moonbit scope 都没定 | P6 再定，先不影响仓库内路径 |
+| **上色召回在 MoonBit 侧掉下来** | 现在的召回是**调出来的**（裸解析 12% → 包装候选 93%）：换实现很容易"跑起来了但质量掉了" | P8.0 的判据③：与 Node 侧**同一个块**比未上色比例；不许只报"能上色" |
+| **native 还是 js** | native 要 C 工具链（本机有 MinGW `gcc` 15.1.0，**没有 `clang`**）；js 走的正是**同一个 `web-tree-sitter`**（等于没摆脱 npm） | P8.0 两条都试，按"能不能零 npm + 判据不掉"定 |
+| **真 Chrome 那条链** | 776 行 CDP 判据是这套东西里最脆的一环（真鼠标事件、动态端口、Chrome 的 stderr 必须留着） | `moonbitlang/async` 自带 process / http / websocket / tls；P8.3 先做最小探针（起 Chrome → 连 CDP → 发一次真鼠标事件） |
+| **过渡期两套实现漂移** | "改了 Node 侧忘了 MoonBit 侧" = 两份会漂的真相，而门只会查其中一套 | 过渡期**只让一套是"真相"**（判据以它为准），另一套要么只读、要么立刻删 |
 
 ## 4. 明确不做（这轮）
 
+> ⚠️ 这一节记的是**那一轮**的边界（2026-10-06 之前）。发布形态后来被 D15 改了：
+> **不单独发 npm 引擎包**，路线见 P8；站点那条见 P6。
+
 深浅色主题 ｜ 站内搜索（要用同一份标题索引，排在 TOC 之后）｜ PWA / 离线 ｜ 真机（Android / iOS）
 上的站点 ｜ 真机判据（`verify_android.py` 那套与站点无关）｜ 发布到 registry。
+
+## 5. 调研记录：MoonBit 侧要用的包（2026-10-06 查实）
+
+**先记一条方法论教训**：别只查本机 `~/.moon/registry/cache` —— 那里只有**下载过**的东西。
+我一度据此写下"MoonBit 没有 tree-sitter 绑定"，**是错的**；权威查法是 `moon search <关键词>`
+与 `moon view <用户名>`（都能直接查注册表）。
+
+| 要的东西 | 包（实测存在） | 关键细节 |
+|---|---|---|
+| tree-sitter 绑定 | `tonyfettes/tree_sitter@0.4.6`、`tonyfettes/tree_sitter_language@0.1.3`（官方另有 `moonbitlang/moonbit-tree-sitter`） | **js** target 上是 `await import("web-tree-sitter")`（跟今天我们用的**同一个 npm 包**）；**native** 上链 `tree-sitter.c`（`supported-targets: "+native"`） |
+| 我们那 5 种语法 | `tree_sitter_moonbit` ｜ `tree_sitter_bash` ｜ `tree_sitter_json` ｜ `tree_sitter_javascript` ｜ `tree_sitter_toml`（都 `@0.1.26`） | **一个不缺**（该用户下另有 30 个左右语法：c / python / rust / markdown…） |
+| markdown 解析 | `mizchi/markdown@0.8.3` | CommonMark 0.31.2 + GFM 表格；描述写明支持 JS / Wasm / MoonBit |
+| 起进程 / HTTP / WebSocket（CDP 那条链） | `moonbitlang/async`（`process` `http` `websocket` `tls` `fs` `socket`） | **moobile 本来就在依赖它**（`moon.mod` 的 `moonbitlang/async@0.21.0`）⇒ 这条链的原料是现成的 |
+| CLI 怎么发给别人 | `moon install <user/module/pkg>` | **全局装二进制包**（npm 之外的第二条分发路） |
+| 本机工具链 | `cc` / `gcc` **15.1.0**（MinGW-w64）在 PATH；**没有 `clang`** | 决定 native 那条路走不走得通 |
