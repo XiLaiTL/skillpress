@@ -1,0 +1,8 @@
+import {
+  "XiLaiTL/skillpress/engine/gates" @gates,
+}
+
+// 门本身是纯逻辑；只有"宿主真身"（node:fs / node:path）是 js 专用的
+supported_targets = "+js"
+
+pkgtype(kind: "executable")

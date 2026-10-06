@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/string" @string,
+}
+
+// 门（G1–G4 / G7 / G8）—— 纯逻辑包：**要碰磁盘的地方一律走 `Host`**（宿主注入），
+// 所以这一包自己不挑 target。js 那份宿主实现在 `dev/`（那个包是 js 专用的可执行件）。
+//
+// ⚠️ 没有把 `engine/content` 拉进来是**刻意的**：旧门用的是**它自己那套**正则扫描
+// （`fencedBlocks` / `inlineCodes`），与内容管线的解析器口径**不完全一样**。
+// 判据是"与旧门逐字节一致"，所以这里照着旧门的扫描口径写了一套自己的 —— 见 `text.mbt`。
