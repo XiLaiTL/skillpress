@@ -64,7 +64,7 @@ npm install && npm run press && npm run build && npm run serve   # → http://12
 | `engine/content/` + `cmd/skillpress/` | 内容管线与 CLI 的 MoonBit 版（P6/P8）：生成物由 `cmd/skillpress` 的 `gen-file` 吐到 stdout |
 | `shell/` | **站点界面包**（P6）：顶栏 / 分栏下拉 / 侧栏树 / 正文渲染 + 公开契约（那 7 个类型）—— 实例只依赖它 |
 | `tools/press.mjs` | 内容源 → 实例的 `content/`（**新引擎**那条日常路径；`--check` 是门）。先写临时文件成功才替换：引擎有问题时**不吐产物**，别让一次失败顺手毁掉上一份 |
-| `tools/baseline/` | 旧形状生成物的**冻结基线**（旧引擎印的）+ `EXPECTED.sha256` + 刷新步骤 —— 见它的 `README.md` |
+| `tools/baseline/` | 只剩一件事：**P6 搬界面前的 DOM 取证**（历史证据，不参与判据）。旧的"对账基线"已退役 —— 见它的 `README.md` 与 PLAN 的 D29 |
 | `tools/normalize-gen.mjs` | 把"旧形状 / 新形状"化到同一条基准线（三条规则），带 `--selftest` 钉住"值改一个字符必须红"的边界 |
 | `tools/dom-dump.mjs` | 真 Chrome 抓**渲染后的 DOM**（P6 搬界面的对账仪器）：`--repeat 2` 先自证仪器稳定，再比搬前搬后 |
 | `tools/run-js.mjs` | js 那条图的**引导层**：先 `await` 装好 tree-sitter 与 5 份语法，再进 MoonBit（CJS 不能顶层 await） |
@@ -80,9 +80,9 @@ npm install && npm run press && npm run build && npm run serve   # → http://12
 
 ```bash
 export SKILLPRESS_CORPUS=../moobile/skills     # 下面的命令都按这个内容根跑
-bash tools/file-parity.sh         # ① 整份生成物：与**基线**（旧引擎现场印出来的那份，冻在 tools/baseline/）归一化后逐字节一致
-bash tools/highlight-parity.sh    # ② 上色：与旧实现（lib/highlight.mjs）在全语料上逐字节一致（**空集合不许通过**）
-bash tools/blocks-parity.sh       # ③ 文档块：与旧实现已产出的 content.generated.mbt 逐字节一致
+bash tools/file-parity.sh         # ① 整份生成物：两个引擎在**同一份副本**上归一化后逐字节一致（副本 = 真语料去掉 WEBSITE.md / 清单）
+bash tools/highlight-parity.sh    # ② 上色：与旧实现（lib/highlight.mjs）在同一份副本上逐字节一致（**空集合不许通过**）
+bash tools/blocks-parity.sh       # ③ 文档块：同一份副本上，旧实现现印的块 vs 新引擎 `dump-blocks`
 bash tools/blocks-fixtures.sh     # ④ 夹具：现场用旧生成器造基准，专打 7 份真内容覆盖不到的边界
 bash tools/line-budget.sh         # ⑤ R9：每个源文件 ≤400 行（默认全覆盖 + 显式豁免；--selftest 造 401 行的诱饵证明它会红）
 bash tools/diagnostics-ledger.sh  # ⑥ 诊断口径账本：旧实现 76 条诊断逐条"有对应物"或"记了账"（--selftest 改坏锚点即红）

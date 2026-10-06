@@ -1,106 +1,101 @@
 #!/usr/bin/env bash
-# file-parity.sh —— **整份文件对账**（P6 换过一次口径，下面写清为什么）。
+# file-parity.sh —— **整份文件对账**（v3：R2 起改成"在两边读法相同的副本上跑"）。
 #
 #   SKILLPRESS_CORPUS=<内容仓>/skills bash tools/file-parity.sh
 #   SKILLPRESS_INSTANCE=<站点实例目录>   覆盖实例位置（默认取内容根下的那份）
-#   SKILLPRESS_PARITY_BASE=<文件>        覆盖基线（只给 --selftest 用）
-#   SKILLPRESS_PARITY_NEW=<文件>         不跑引擎、直接拿这个文件当"新产物"（只给 --selftest 用）
+#   SKILLPRESS_PARITY_OLD=<文件>         注入"旧侧产物"（只给 --selftest 用）
+#   SKILLPRESS_PARITY_NEW=<文件>         注入"新侧产物"（只给 --selftest 用）
 #
-# ── 口径（P6 起）───────────────────────────────────────────────────────────────
+# ── 为什么换口径（v2 的基线为什么退役）────────────────────────────────────────
+# v2 拿"旧引擎从**当前内容源**印出来的那份"当冻结基线，比的是"新引擎在**真语料**上的产物"。
+# 但 R2 之后内容仓会有 `skillpress/WEBSITE.md`（新首页源），R4 之后还有忽略清单 ——
+# **冻结的旧实现不认识这两样** ⇒ 它在真语料上必然与新引擎分叉。那不是 bug，是设计。
 #
-# 真相仍然在**旧实现**（`lib/gen-content.mjs`）。它的产物冻在 `tools/baseline/`：
+# 于是改成：两个引擎都跑在**同一份副本**上（`tools/mk-parity-corpus.sh` 把真语料的 skill 原样拷来、
+# 去掉 WEBSITE.md、且副本上一级不放清单）⇒ 读的内容相同 ⇒ 仍然**整份文件逐字节**比，
+# 而内容的**广度一点没丢**（真语料的链接 / 表格 / 代码块 / 子页顺序都还在）。
+# ⚠️ "两边读法相同"是这条判据的**前提**，不是假设：它由 `mk-parity-corpus.sh` 自己断言
+#    （副本里不许有 WEBSITE.md、上一级不许有清单），`--selftest` 还会专门证一遍"破了前提必须红"。
 #
-#   基线 = 旧引擎从**当前内容源**印出来的那份（刷新方式见 tools/baseline/README.md）
-#
-# P6 把 7 个类型从生成物搬进了包 `shell`，生成物因此换了**形状**（值带 `@shell.` 前缀、签名
-# 带包前缀、文件头不再声明类型）。形状差**不是**判据里该检查的东西 —— 内容的映射才是。
-# 所以这里用 `tools/normalize-gen.mjs` 把两边都归一化（三条规则：去头注释 / 去类型声明块 / 去包前缀），
-# 然后**逐字节**比。归一化只抹形状、不抹内容（值、顺序、缩进、转义、runs、正文空行都还在判据里），
-# `node tools/normalize-gen.mjs --selftest` 就是钉这条边界的（"值改一个字符"必须红）。
-#
-# ⚠️ 三条形状判据（0a/0b/0c）不是装饰：没有它们，"基线被新引擎覆盖"或"基线被手改"这两件事
-#    会让上面那条 diff **恒真** —— 判据就废了。sha 钉住基线，形状判据钉住它是旧形状。
+# 形状差（`@shell.` 前缀 / 类型声明搬家）仍然由 `tools/normalize-gen.mjs` 抹掉 —— 只抹形状、不抹内容。
 set -u
 cd "$(dirname "$0")/.."
 
-# 前置：确保 CLI 的 js 产物新鲜（干净克隆里 _build 不存在 —— 实测过）
 source tools/_ensure-built.sh
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定内容仓（例：../moobile/skills）}"
 
-BASE="${SKILLPRESS_PARITY_BASE:-tools/baseline/content/content.generated.mbt}"
-EXPECTED_SHA_FILE="tools/baseline/EXPECTED.sha256"
 INSTANCE="${SKILLPRESS_INSTANCE:-$SKILLPRESS_CORPUS/skillpress/scripts/.skillpress}"
 OUT=./_build/parity
 mkdir -p "$OUT"
-: > "$OUT/file-new.err"   # 上一轮的诊断不要漏到这一轮
+: > "$OUT/file-new.err"
 
 bad=0
 fail() { echo "✗ $1"; bad=1; }
 
-# ── 0a 基线必须是**旧形状**（含类型声明、不含包前缀）─────────────────────────────
-if [ ! -f "$BASE" ]; then
-  echo "✗ 找不到基线：$BASE（见 tools/baseline/README.md）"
+# ── 0 前提：造副本（两个引擎读法相同）。它自己会断言"没有 WEBSITE.md / 没有清单 / 不是空集合"──
+COPY=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh) || {
+  echo "✗ 造不出「两个引擎读法相同」的副本 —— 对账的**前提**就不成立，别比了（见上面的原因）"
+  # ⚠️ 子脚本的报错在**它的 stdout**（被我捕获了）⇒ 这里必须打出来，不然"为什么红"就丢了
+  [ -n "$COPY" ] && printf '%s\n' "$COPY" | sed 's/^/    /'
   exit 2
-fi
-grep -q '^pub enum Span {' "$BASE" || fail "基线里没有 \`pub enum Span {\` —— 它已经不是旧形状了（被新引擎覆盖？）"
-if grep -q '@shell\.' "$BASE"; then
-  fail "基线里出现了 \`@shell.\` —— 旧形状不可能有它（基线被新引擎/手改动过？）"
-fi
+}
 
-# ── 0b 基线的 sha256 必须与钉住的值一致（防**静默**刷新）───────────────────────
-# ⚠️ 钉子文件**必须存在**：原先这里是 `if [ -f "$EXPECTED_SHA_FILE" ]; then …` ⇒ 谁把它删掉，
-#    这道锁就**被悄悄关掉**，而判据照样绿（"不许有静默后门"）。缺文件直接判红。
-if [ ! -f "$EXPECTED_SHA_FILE" ]; then
-  fail "找不到钉子文件：$EXPECTED_SHA_FILE —— 它是防基线被静默刷新的那道锁，缺了就是关锁，判红"
+# ── 1 旧侧：现跑冻结的旧实现（--selftest 可注入）───────────────────────────────
+OLD="$OUT/file-old.txt"
+if [ -n "${SKILLPRESS_PARITY_OLD:-}" ]; then
+  cp "$SKILLPRESS_PARITY_OLD" "$OLD"
 else
-  actual=$(sha256sum "$BASE" | awk '{print $1}')
-  expected=$(awk '{print $1}' "$EXPECTED_SHA_FILE")
-  if [ "$actual" != "$expected" ]; then
-    fail "基线的 sha256 变了（expected=$expected actual=$actual）—— 换基线是**刻意**动作：跑 tools/baseline/README.md 里的刷新步骤，并一起更新 EXPECTED.sha256"
-  fi
+  APP="$OUT/old-app"
+  rm -rf "$APP"
+  mkdir -p "$APP"
+  SKILLPRESS_SKILLS="$COPY" node lib/gen-content.mjs --skills "$COPY" --app "$APP" > "$OUT/old.log" 2>&1 || {
+    echo "✗ 旧实现那一侧跑失败（退出码非零）—— 末尾："
+    tail -6 "$OUT/old.log" | sed 's/^/    /'
+    exit 1
+  }
+  cp "$APP/content/content.generated.mbt" "$OLD"
 fi
 
-# ── 新产物：现跑引擎（--selftest 时可以换成注入的文件）────────────────────────
+# ── 2 新侧：现跑新引擎（--selftest 可注入）─────────────────────────────────────
+NEW="$OUT/file-new.txt"
 if [ -n "${SKILLPRESS_PARITY_NEW:-}" ]; then
-  cp "$SKILLPRESS_PARITY_NEW" "$OUT/file-new.txt"
-  NEWNOTE="（注入：$SKILLPRESS_PARITY_NEW）"
+  cp "$SKILLPRESS_PARITY_NEW" "$NEW"
 else
-  node tools/run-js.mjs gen-file "$SKILLPRESS_CORPUS" > "$OUT/file-new.txt" 2> "$OUT/file-new.err" || {
+  node tools/run-js.mjs gen-file "$COPY" > "$NEW" 2> "$OUT/file-new.err" || {
     echo "✗ 新实现那一侧跑失败（退出码非零）—— stderr 末尾："
     tail -8 "$OUT/file-new.err" | sed 's/^/    /'
     exit 1
   }
-  NEWNOTE=""
 fi
 
-# ── 0c 新产物必须是**新形状**（含包前缀、没有类型声明）────────────────────────
-grep -q '@shell\.' "$OUT/file-new.txt" || fail "新产物里没有 \`@shell.\` —— 引擎没吐新形状（类型没搬进包？）"
-if grep -q '^pub enum Span {' "$OUT/file-new.txt"; then
-  fail "新产物里还有 \`pub enum Span {\` —— 类型声明的搬家没生效"
-fi
+# ── 3 形状判据（不是装饰：没有它们，"两边形状被换过"会让下面那条 diff 恒真）──────
+grep -q '^pub enum Span {' "$OLD" || fail "旧侧产物里没有 \`pub enum Span {\` —— 它已经不是旧形状了（跑错引擎了？）"
+grep -q '@shell\.' "$OLD" && fail "旧侧产物里出现了 \`@shell.\` —— 旧形状不可能有它（新引擎写进了旧侧？）"
+grep -q '@shell\.' "$NEW" || fail "新侧产物里没有 \`@shell.\` —— 引擎没吐新形状（类型没搬进包？）"
+grep -q '^pub enum Span {' "$NEW" && fail "新侧产物里还有 \`pub enum Span {\` —— 类型声明的搬家没生效"
 
-# ── 1 归一化后**逐字节**比 ────────────────────────────────────────────────────
-node tools/normalize-gen.mjs "$BASE" > "$OUT/file-base.norm"
-node tools/normalize-gen.mjs "$OUT/file-new.txt" > "$OUT/file-new.norm"
-if diff -u "$OUT/file-base.norm" "$OUT/file-new.norm" > "$OUT/file-diff.txt"; then
+# ── 4 归一化后**逐字节**比（旧 vs 新，同一份副本）──────────────────────────────
+node tools/normalize-gen.mjs "$OLD" > "$OUT/file-old.norm"
+node tools/normalize-gen.mjs "$NEW" > "$OUT/file-new.norm"
+if diff -u "$OUT/file-old.norm" "$OUT/file-new.norm" > "$OUT/file-diff.txt"; then
   lines=$(wc -l < "$OUT/file-new.norm" | tr -d ' ')
-  if [ "$bad" = 0 ]; then
-    echo "✓ 整份文件对账通过：归一化后 $lines 行与旧实现产物（tools/baseline/）**逐字节一致** $NEWNOTE"
-  fi
+  [ "$bad" = 0 ] && echo "✓ 整份文件对账通过：同一份副本上，旧实现与新引擎归一化后 $lines 行**逐字节一致**"
 else
   fail "整份文件对账**不一致**（差异在 $OUT/file-diff.txt）："
   head -30 "$OUT/file-diff.txt" | sed 's/^/    /'
 fi
 
-# ── 2 实例里的那份 == 新引擎现跑（逐字节，不归一化）──────────────────────────
-# 这是旧的 `press --check` 在这个阶段对应的口径：**实例里的生成物必须是新引擎的产物**。
-# 比基线那条更严（同一个形状，所以一个字节都不许差），专治"改了内容源忘了重跑 gen-file"。
-if [ -z "${SKILLPRESS_PARITY_NEW:-}" ] && [ -f "$INSTANCE/content/content.generated.mbt" ]; then
-  if diff -q "$INSTANCE/content/content.generated.mbt" "$OUT/file-new.txt" > /dev/null; then
-    echo "✓ 实例里的生成物与新引擎现跑**逐字节一致**（$(wc -l < "$OUT/file-new.txt" | tr -d ' ') 行）"
+# ── 5 实例里那份 == 新引擎在**真语料**上现跑（逐字节，不归一化）──────────────────
+# 专治"改了内容源/引擎却忘了重跑"（旧的 `press --check` 在这个阶段对应的口径）。
+if [ -z "${SKILLPRESS_PARITY_NEW:-}" ] && [ -z "${SKILLPRESS_PARITY_OLD:-}" ] &&
+  [ -f "$INSTANCE/content/content.generated.mbt" ]; then
+  SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" node tools/run-js.mjs gen-file "$SKILLPRESS_CORPUS" \
+      > "$OUT/file-real.txt" 2> /dev/null || fail "新引擎在真语料上跑失败"
+  if diff -q "$INSTANCE/content/content.generated.mbt" "$OUT/file-real.txt" > /dev/null 2>&1; then
+    echo "✓ 实例里的生成物与新引擎现跑**逐字节一致**（$(wc -l < "$OUT/file-real.txt" | tr -d ' ') 行）"
   else
-    fail "实例里的生成物与新引擎现跑**不一致** —— 改了内容源或引擎之后忘了重跑（差异：$OUT/file-instance-diff.txt）"
-    diff -u "$INSTANCE/content/content.generated.mbt" "$OUT/file-new.txt" > "$OUT/file-instance-diff.txt"
+    fail "实例里的生成物与新引擎现跑**不一致** —— 改了内容源或引擎之后忘了重跑"
+    diff -u "$INSTANCE/content/content.generated.mbt" "$OUT/file-real.txt" > "$OUT/file-instance-diff.txt" 2>&1
     head -12 "$OUT/file-instance-diff.txt" | sed 's/^/    /'
   fi
 fi
@@ -114,17 +109,20 @@ fi
 if [ "$bad" != 0 ]; then
   exit 1
 fi
+if [ -n "${SKILLPRESS_PARITY_OLD:-}${SKILLPRESS_PARITY_NEW:-}" ]; then
+  exit 0   # 注入模式只给自证用
+fi
 
 # ── --selftest：证明这条判据**会红**（不然它可能是一条永远绿的判据）────────────
 if [ "${1:-}" = "--selftest" ]; then
   echo
-  echo "── 自证（file-parity）──────────────────────────────────────────────"
+  echo "── 自证（file-parity v3）────────────────────────────────────────────"
   ST="$OUT/selftest"
   rm -rf "$ST"
   mkdir -p "$ST"
-  self() { # self <名字> <期望> <base文件> <new文件>
-    local name="$1" want="$2" b="$3" n="$4" got
-    SKILLPRESS_PARITY_BASE="$b" SKILLPRESS_PARITY_NEW="$n" SKILLPRESS_INSTANCE=/nonexistent \
+  self() { # self <名字> <期望 green|red> <旧侧> <新侧>
+    local name="$1" want="$2" o="$3" n="$4" got
+    SKILLPRESS_PARITY_OLD="$o" SKILLPRESS_PARITY_NEW="$n" SKILLPRESS_INSTANCE=/nonexistent \
       bash "$0" > "$ST/log" 2>&1
     local rc=$?
     case "$want" in
@@ -139,29 +137,34 @@ if [ "${1:-}" = "--selftest" ]; then
       bad=1
     fi
   }
-
-  cp "$OUT/file-new.txt" "$ST/new-ok.txt"
-  cp "$BASE" "$ST/base-ok.mbt"
-  # ① 正常：必须绿
-  self "合规的一对（旧形状基线 + 新形状产物）" green "$ST/base-ok.mbt" "$ST/new-ok.txt"
-  # ② 值改一个字符：必须红
-  sed '0,/Txt("/s//Txt("改/' "$ST/new-ok.txt" > "$ST/new-bad-value.txt"
-  self "值改了一个字符" red "$ST/base-ok.mbt" "$ST/new-bad-value.txt"
-  # ③ 基线被换成新形状（模拟"有人用新引擎覆盖了基线"）：必须红
-  self "基线被新引擎覆盖（形状判据 0a）" red "$ST/new-ok.txt" "$ST/new-ok.txt"
-  # ④ 把前缀去掉（形状差）—— ⚠️ 这条**期望红**，而且红的理由要看清：
-  #    归一化只抹"合法的形状差"（旧形状 ↔ 新形状），而 0c 还要求新产物**确实是新形状**。
-  #    所以"新产物没有前缀"不该被放过去（那正是"类型没搬进包"的症状）。
+  cp "$NEW" "$ST/new-ok.txt"
+  cp "$OLD" "$ST/old-ok.mbt"
+  # ① 正常一对：绿
+  self "合规的一对（旧实现产物 + 新引擎产物）" green "$ST/old-ok.mbt" "$ST/new-ok.txt"
+  # ② 新侧的值改一个字符：红
+  sed '0,/Txt("/s//Txt("改/' "$ST/new-ok.txt" > "$ST/new-bad.txt"
+  self "新侧的值改了一个字符" red "$ST/old-ok.mbt" "$ST/new-bad.txt"
+  # ③ 旧侧的值改一个字符：红（两个方向都要抓得住）
+  sed '0,/Txt("/s//Txt("改/' "$ST/old-ok.mbt" > "$ST/old-bad.mbt"
+  self "旧侧的值改了一个字符" red "$ST/old-bad.mbt" "$ST/new-ok.txt"
+  # ④ 新侧少了包前缀（形状判据该抓）：红
   sed 's/@shell\.//g' "$ST/new-ok.txt" > "$ST/new-noprefix.txt"
-  self "新产物少了包前缀（形状判据 0c 该抓它）" red "$ST/base-ok.mbt" "$ST/new-noprefix.txt"
-  # ⑤ 只改**基线里类型声明块**的一个字符 —— 这一处**归一化看不见**（规则②会整块砍掉），
-  #    所以只有 0b（sha256 钉子）能抓。没有 0b，这条会**绿**：那就等于"基线可以被悄悄改"。
-  sed 's/^pub enum Span {$/pub enum Span { \/\/ 被手改了（归一化看不见）/' "$ST/base-ok.mbt" > "$ST/base-tampered.mbt"
-  if cmp -s "$ST/base-ok.mbt" "$ST/base-tampered.mbt"; then
-    echo "✗ 用例⑤自己造歪了（sed 一个字符都没改到）—— 自证无效"
-    bad=1
+  self "新侧少了包前缀（形状判据）" red "$ST/old-ok.mbt" "$ST/new-noprefix.txt"
+  # ⑤ **前提诱饵**：语料里放了 `WEBSITE.md` ⇒ 两个引擎的读法就不同了 ⇒ 必须**拒绝比**
+  #    （这条最要紧：v3 的整个合法性都压在「两边读同一份内容」上）
+  #    ⚠️ 造这份坏语料时用**副本**打底（真语料里有 node_modules，`cp -r` 会把几百兆拖进来）
+  BADC="$ST/bad-corpus"
+  rm -rf "$BADC"
+  mkdir -p "$BADC"
+  cp -r ./_build/parity-corpus/skills/. "$BADC/"
+  printf '# 站名\n\n引言。\n\n## 一栏\n\n正文。\n' > "$BADC/skillpress/WEBSITE.md"
+  out=$(SKILLPRESS_CORPUS="$BADC" bash "$0" 2>&1); rc=$?
+  if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q '还有 WEBSITE.md'; then
+    echo "✓ 前提被破（语料里有 WEBSITE.md）⇒ 拒绝对账并点名（期望 red，实得 red）"
   else
-    self "基线被手改（只在归一化看不见的地方）" red "$ST/base-tampered.mbt" "$ST/new-ok.txt"
+    echo "✗ 前提被破时没被拦住（rc=$rc）—— 那 v3 就可能拿两份不同内容当「一致」比"
+    printf '%s' "$out" | head -6 | sed 's/^/      /'
+    bad=1
   fi
 
   if [ "$bad" = 0 ]; then

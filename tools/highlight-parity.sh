@@ -13,7 +13,16 @@ cd "$(dirname "$0")/.."
 # 前置：确保 CLI 的 js 产物新鲜（干净克隆里 _build 不存在 —— 实测过）
 source tools/_ensure-built.sh
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定语料（例：../moobile/skills）}"
-export SKILLPRESS_CORPUS
+
+# ── 语料：换成"两个引擎读法相同的副本"（R2 起必须）──────────────────────────────
+# 旧实现不认识 `WEBSITE.md`（R2 的新首页源）与忽略清单（R4）⇒ 在真语料上两边读的文件集合会不同，
+# 一比就是"内容不同"而不是"上色退步"。副本由 `mk-parity-corpus.sh` 造，它自己断言前提。
+COPY=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh) || {
+  echo "✗ 造不出「两个引擎读法相同」的副本 —— 对账前提不成立"
+  [ -n "$COPY" ] && printf '%s\n' "$COPY" | sed 's/^/    /'
+  exit 2
+}
+export SKILLPRESS_CORPUS="$COPY"
 
 OUT=./_build/parity
 mkdir -p "$OUT"
@@ -38,6 +47,17 @@ if diff <(tail -n +2 "$OUT/old.txt") <(tail -n +2 "$OUT/new.txt") > "$OUT/diff.t
   fi
   echo "✓ 上色对账通过：$blocks 个代码块 + 各语言汇总，与旧实现**逐字节一致**"
   grep '块|dark=' "$OUT/new.txt" | sed 's/^/    /'
+  # ── 诱饵（--selftest）：**空集合必须红** ──────────────────────────────────────
+  # 审计点名过这条洞：语料路径写错/语料被挪走时，两侧读数会同样为空、diff 当然一致 ——
+  # 判据会兴高采烈地打"✓ 0 个代码块"。这里证一遍"空语料确实红"。
+  if [ "${1:-}" = "--selftest" ]; then
+    E=$(mktemp -d)
+    if SKILLPRESS_CORPUS="$E" bash "$0" > /dev/null 2>&1; then
+      echo "✗ 诱饵没生效：**空语料**下判据居然是绿的 ⇒ 它会在什么都没测的时候报成功"
+      exit 1
+    fi
+    echo "✓ 诱饵生效：空语料下判据红了（空集合不许通过）"
+  fi
 else
   echo "✗ 上色对账不一致（差异在 $OUT/diff.txt）—— 这就是"悄悄退步"的样子："
   head -20 "$OUT/diff.txt" | sed 's/^/    /'

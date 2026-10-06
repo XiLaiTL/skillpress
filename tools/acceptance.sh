@@ -132,20 +132,20 @@ if [ -d "$INSTANCE/shell" ]; then bad "实例里还有一份 shell/（界面副�
 
 # ── A3：自家的 skills 真能印成一个站点 ──────────────────────────────────────
 echo "A3 自家的 skills 能印成站点"
-# ① 真相还在：**旧引擎**（lib/gen-content.mjs）仍然能从当前内容源印出 `tools/baseline/` 里那份。
-#    这一条同时是"基线不是手抄的、也不是新引擎覆盖过的"的**现场**证据（形状判据只是旁证）。
-if SKILLPRESS_APP_DIR="$(pwd -W)/tools/baseline" node bin/skillpress.mjs press --check > /tmp/acc-press.log 2>&1; then
-  ok "旧引擎对基线：press --check 一致（真相仍是 lib/gen-content.mjs 印的那份）"
-else
-  bad "旧引擎与基线不一致（有意改了内容源？按 tools/baseline/README.md 刷基线）"; tail -3 /tmp/acc-press.log | sed 's/^/      /'
-fi
-# ② 新引擎（包里的 `cmd/skillpress`）印出来的那份与基线**归一化后逐字节一致**，
-#    并且**实例里那份就是新引擎现跑的产物** —— 这是 P6 起 `press --check` 对应的口径
-#    （形状搬进包了，所以先归一化；见 tools/normalize-gen.mjs 的文件头）。
+# ① 两个引擎在**同一份副本**上产物逐字节一致（v3 起；细节见 file-parity.sh 的文件头与 PLAN 的 D29）。
+#    "基线"（旧引擎从当前内容源冻下来的那一份）已退役：R2 之后内容仓有 `WEBSITE.md`，
+#    而冻结的旧实现不认识它 ⇒ 基线必然分叉 —— 那不是 bug，是设计。
 if bash tools/file-parity.sh > /tmp/acc-fileparity.log 2>&1; then
-  ok "整份文件对账通过（基线 + 实例两份都绿）"
+  ok "整份文件对账通过（副本上旧 vs 新逐字节一致 + 实例那份 = 新引擎现跑）"
 else
   bad "整份文件对账红了"; grep '^✗' /tmp/acc-fileparity.log | head -3 | sed 's/^/      /'
+fi
+# ② 生成物的**形状**与**内容**各自另有守卫：形状由 file-parity 的 0a/0c 判据看，
+#    内容由副本上的逐字节 diff 看（归一化只抹形状）。
+if [ -f "$INSTANCE/content/content.generated.mbt" ]; then
+  ok "实例里那份生成物在位（$(wc -l < "$INSTANCE/content/content.generated.mbt" | tr -d ' ') 行）"
+else
+  bad "实例里没有生成物：$INSTANCE/content/content.generated.mbt"
 fi
 if node bin/skillpress.mjs check > /tmp/acc-check.log 2>&1; then ok "check 全绿（$(tail -1 /tmp/acc-check.log | tr -d '\r')）"; else bad "check 红了"; tail -3 /tmp/acc-check.log | sed 's/^/      /'; fi
 if [ "$DO_BUILD" = "--build" ]; then

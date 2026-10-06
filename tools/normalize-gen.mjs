@@ -7,7 +7,7 @@
  * P6 把 `Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home` 这 7 个类型
  * 从**生成物**搬进了包 `shell` —— 于是同一个内容源印出来的文件换了"形状"：
  *
- * | | 旧形状（`tools/baseline/` 那份，旧引擎 `lib/gen-content.mjs` 的产物） | 新形状（MoonBit 引擎 `cmd/skillpress gen-file`） |
+ * | | 旧形状（旧引擎 `lib/gen-content.mjs` 现印的产物） | 新形状（MoonBit 引擎 `cmd/skillpress gen-file`） |
  * |---|---|---|
  * | 文件头 | 一段 `//` 注释（说"由 gen-content.mjs 生成"） | 一段 `//` 注释（说实话：类型在包里） |
  * | 类型声明 | 7 个类型都在文件里 | **没有**（唯一声明处是 `shell/types.mbt`） |

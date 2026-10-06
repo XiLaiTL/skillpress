@@ -1,61 +1,34 @@
-# `tools/baseline/` —— 旧形状生成物的**冻结基线**（P6 起）
-
-这里只有一样东西：
+# `tools/baseline/` —— 这里只剩**历史证据**（对账基线已退役）
 
 ```
-tools/baseline/content/content.generated.mbt   ← 旧引擎（lib/gen-content.mjs）印出来的那份
-tools/baseline/EXPECTED.sha256                 ← 上者的 sha256（钉住它，防"静默换基线"）
-tools/baseline/dom-before-p6.html              ← P6 **搬界面之前**那份站点渲染出来的 DOM（一次性证据，见文末）
+tools/baseline/dom-before-p6.html   ← P6 搬界面之前那份站点渲染出来的 DOM（一次性证据，见文末）
 ```
 
-## 它是什么、为什么在这里
+## 对账基线去哪了（2026-10-06，R2 那一批）
 
-P6 把 `Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home` 这 7 个类型
-从**生成物**搬进了包 `shell` —— 生成物换了形状（值带 `@shell.` 前缀、签名带包前缀、文件头不再声明类型）。
-**映射本身没变**，但"逐字节比对旧产物"这条判据从此比不出东西了。
+P6 起这里曾冻着**旧引擎**（`lib/gen-content.mjs`）从当时内容源印出来的那份产物，
+给 `tools/file-parity.sh` 当"真相"。**R2 之后这条路走到头了**：
 
-于是把**旧形状**的那份产物挪到这里当作**真相**（它由**旧引擎**印出来，是 3412 行 Node 实现干出来的东西）：
+内容仓现在有 `skillpress/WEBSITE.md`（新首页源，D19/D20）与 `skillpress.ignore.md`（R4），
+而**冻结的旧实现不认识这两样** —— 它照旧拿 `skillpress/SKILL.md` 当首页、也不跳过任何 skill。
+于是"旧引擎在**真语料**上的产物"与新引擎**必然分叉**：那不是 bug，是设计（新引擎实现了 R2/R4）。
 
-* `tools/file-parity.sh` 拿**新引擎**的产物与它比 —— 经过 `tools/normalize-gen.mjs` 归一化
-  （只抹形状差：去头注释 / 去类型声明块 / 去 `@shell.` 前缀），然后**逐字节**比。
-* 那份基线自己也被三道判据钉着：**是旧形状**（含类型声明、无 `@shell.`）、**sha256 与
-  `EXPECTED.sha256` 一致**、以及（在 `acceptance.sh` 的 A3 里）**能被旧引擎现场重印出来**。
-  没有这三道，"基线被新引擎覆盖/被手改"会让 diff 变成恒真，判据就废了。
+继续把旧产物冻成基线，只会落进两个坑之一：
 
-## 刷新（**只能在内容源真的改了之后做，而且只能用旧引擎**）
+- **判据红了** ⇒ 逼人去"刷基线"，而刷基线的命令（用旧引擎印）产出的**仍是旧读法**的那一份 ⇒ **无解的死循环**；
+- **判据绿了** ⇒ 只可能是有人把**新引擎**的产物塞进了基线 ⇒ 判据**恒真**，等于没有判据。
 
-```bash
-# ① 用**旧引擎**按当前内容源重印基线（程序根跑；内容仓与程序是兄弟）
-SKILLPRESS_APP_DIR="$(pwd -W)/tools/baseline" node bin/skillpress.mjs press
+所以换成 **v3 口径**（PLAN 的 D29）：两个引擎都跑在**同一份副本**上 ——
+`tools/mk-parity-corpus.sh` 把真语料的 skill 原样拷来、去掉 `WEBSITE.md`、副本上一级也不放清单 ——
+⇒ 读的内容相同 ⇒ 仍然**整份文件逐字节**比，而且内容的**广度一点没丢**
+（真语料的链接 / 表格 / 代码块 / 子页顺序都还在）。三支吃语料的判据（`file-parity` /
+`blocks-parity` / `highlight-parity`）都走这条路。
 
-# ② 立刻复核：旧引擎说"与磁盘一致"（= 刚才那次重印就是它的产物，不是手抄的）
-SKILLPRESS_APP_DIR="$(pwd -W)/tools/baseline" node bin/skillpress.mjs press --check
+⚠️ "两边读法相同"是这些判据的**前提**，不是假设：`mk-parity-corpus.sh` 自己断言
+（副本里不许有 `WEBSITE.md`、上一级不许有清单、不许是空集合），
+`tools/file-parity.sh --selftest` 还会专门证一遍"**前提被破 ⇒ 拒绝比并点名**"。
 
-# ③ 更新钉住的 sha256
-sha256sum tools/baseline/content/content.generated.mbt > tools/baseline/EXPECTED.sha256
-
-# ④ 对账必须仍然绿（形状差被归一化吃掉）
-SKILLPRESS_CORPUS=../moobile/skills bash tools/file-parity.sh
-```
-
-⚠️ **不许用新引擎（`cmd/skillpress gen-file`）刷这个文件**：那样基线与被测对象就成了同一份东西，
-`file-parity` 变成恒真 —— 判据里那条"基线里没有 `@shell.`"就是专门拦这个的。
-
-## 什么时候该刷
-
-内容源（`skills/**`、首页那份 `SKILL.md`…）**有意**改动之后。`press --check` 会先红给你看，
-红本身就是提醒："你改了内容，基线得跟着刷，而且要刷得明明白白"。
-
-## 2026-10-06（P6）冻结时的读数
-
-| 项 | 值 |
-|---|---|
-| 行数 | 1143 |
-| sha256 | `4fd41b3c2968411ad7e3ca8d7925a10ddc92670cfd03cbdbea6cf18ef0e27cc8` |
-| 与实例里那份（当时还是旧形状）对比 | 逐字节相同 |
-| 旧引擎现场重印对比 | 逐字节相同（`press` 之后 `diff` 无输出） |
-
-## ★ `dom-before-p6.html`：搬界面之前的渲染（**一次性证据，不是判据**）
+## ★ `dom-before-p6.html`：搬界面之前的渲染（**历史证据，不是判据**）
 
 P6 把实例的 `app.mbt`（1062 行界面）机械切进了包 `shell/`。切完之后**两边都编得过**这件事
 **不构成证据** —— 少画一个块、下拉菜单少一条、块的顺序换一下，编译器一声不响。
@@ -68,12 +41,12 @@ P6 把实例的 `app.mbt`（1062 行界面）机械切进了包 `shell/`。切�
 | 大小 | 22061 字节（21142 个 JS 字符） |
 
 搬完之后（期间 bundle 的 sha256 换了三次：`07450605…` → `89ebb71a…` → 之后的清理版）：
-**DOM 逐字节相同**，且真浏览器判据 `verify` **22/22**。
+**DOM 逐字节相同**，且真浏览器判据 `verify` **22/22**。这件事到此已经证完。
 
-复核方式（内容源**有意**改动之后这条会合法地不匹配 —— 那时重抓一份覆盖它即可）：
+⚠️ **之后内容侧拆分（WEBSITE.md / 忽略清单）会让 DOM 合法地变**（首页换了源、书架上少一份），
+所以这个文件从现在起是**历史记录**：它证明"界面搬家没改渲染"，不再参与任何判据，
+也不要拿它去卡现在的站点。想再要一份当期的证据，就重抓一份并另存名字：
 
 ```bash
 node tools/dom-dump.mjs --app <实例目录> --out /tmp/now.html --repeat 2
-diff tools/baseline/dom-before-p6.html /tmp/now.html    # 现在的站点应该仍与它逐字节相同
 ```
-

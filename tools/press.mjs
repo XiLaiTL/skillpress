@@ -3,8 +3,9 @@
  * press.mjs —— **内容源 → 站点实例的 `content` 包**（P6 起由**新引擎**干这件事）。
  *
  * 旧的 Node 引擎（`lib/gen-content.mjs`）仍然在，但从 P6 开始它有了新身份：
- * **真相的参照实现** —— 它印出来的那份冻在 `tools/baseline/`，用来给新引擎对账
- * （`tools/file-parity.sh`）。往**实例**里写产物的这条日常路径换成新引擎（`cmd/skillpress gen-file`）。
+ * **真相的参照实现** —— 对账时拿它在**同一份副本**上现印一份与新引擎比
+ * （`tools/file-parity.sh` + `tools/mk-parity-corpus.sh`；旧的冻结基线已退役，见 PLAN 的 D29）。
+ * 往**实例**里写产物的这条日常路径换成新引擎（`cmd/skillpress gen-file`）。
  *
  *   node tools/press.mjs            # 生成并写进实例的 content/content.generated.mbt
  *   node tools/press.mjs --check    # 只校验（门：磁盘上那份与现跑一致）
