@@ -61,6 +61,12 @@ for d in "$SKILLPRESS_CORPUS"/*/; do
   fi
 done
 
+# ── 去掉"新功能会改变读法"的那两样（**必须在拷完之后删**）──────────────────────
+# ⚠️ 第一版把 `rm` 写在拷贝循环**之前** —— R2 之前没有 WEBSITE.md，所以那个顺序 bug 看不出来；
+#    R2 落地当天它立刻冒出来（副本里还有 WEBSITE.md ⇒ 前提守卫判红）。这就是"顺序也是判据"。
+rm -f "$OUT/skills/skillpress/WEBSITE.md"
+rm -f "$OUT/skillpress.ignore.md"
+
 # ── 副本的**前提**必须自己验一遍（不然"两边读法相同"这句话就是空的）────────────────
 fail=0
 if [ -e "$OUT/skills/skillpress/WEBSITE.md" ]; then

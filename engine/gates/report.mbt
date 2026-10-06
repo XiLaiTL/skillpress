@@ -43,7 +43,13 @@ pub fn skill_dirs(host : Host, skills_dir : String) -> Array[String] {
 ///
 /// 退出码 2（"找不到内容仓根"）不在这里 —— 那是调用方的前置检查（旧实现 `main` 里那段），
 /// 见 `dev/main.mbt`：报告还没开始打就先退 2。
-pub fn run(ctx : Ctx, repo : String, program_dir : String, repo_label : String) -> RunOutput {
+pub fn run(
+  ctx : Ctx,
+  repo : String,
+  program_dir : String,
+  repo_label : String,
+  ignore_path : String,
+) -> RunOutput {
   let out : Array[String] = []
   out.push("skillpress check —— " + repo_label + " 根：" + repo)
   out.push(
@@ -59,7 +65,8 @@ pub fn run(ctx : Ctx, repo : String, program_dir : String, repo_label : String) 
   // ⚠️ 清单解析出问题 ⇒ 退 2 且**一份都不套用**（"半套用"是最难查的状态）。
   // ⚠️ 全被忽略 ⇒ **判红**：门在空集合上通过等于什么都没查（旧实现那句"不允许在空集合上通过"）。
   // ⚠️ 没有清单文件时（`read` 给空串）一行为都不变 —— 与旧实现的对账因此不受影响。
-  let ig_path = join_path(repo, "skillpress.ignore.md")
+  // 清单路径可由调用方指定（`--ignore`）—— R6：清单住哪不该写死；默认仍是`<仓库根>/skillpress.ignore.md`
+  let ig_path = if ignore_path == "" { join_path(repo, "skillpress.ignore.md") } else { ignore_path }
   let parsed = @ig.parse(ctx.host.read(ig_path), dirs0)
   if parsed.problems.length() > 0 {
     out.push("忽略清单有问题（**不静默容忍**，逐条点名）：" + ig_path)
@@ -167,7 +174,7 @@ pub fn run(ctx : Ctx, repo : String, program_dir : String, repo_label : String) 
       "    · 首页源还没进 G8 指纹（D20 的另一半）：等指纹锁的写侧搬进新引擎后一起补 —— 现在要求就会永远报「新增」",
     )
   }
-  let (lock_fails, lock_notes) = check_lock(ctx.host, ctx.skills_dir, program_dir, dirs)
+  let (lock_fails, lock_notes) = check_lock(ctx.host, ctx.skills_dir, program_dir, dirs, dirs0)
   for n in lock_notes {
     out.push("    · " + n)
   }

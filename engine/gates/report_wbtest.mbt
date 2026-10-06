@@ -32,7 +32,7 @@ test "G8 指纹变了 / 新增 / 已删 / 别的内容根" {
   )
   let dirs = skill_dirs(host, fake_skills)
   assert_eq(dirs, ["alpha", "delta"])
-  let (fails, notes) = check_lock(host, fake_skills, fake_program, dirs)
+  let (fails, notes) = check_lock(host, fake_skills, fake_program, dirs, dirs)
   assert_eq(fails.length(), 1)
   assert_true(hit(fails, "G8 指纹变了：alpha（"))
   assert_true(
@@ -48,7 +48,7 @@ test "G8 指纹变了 / 新增 / 已删 / 别的内容根" {
 /// 没有锁文件时的原文（旧实现的**第一句**，也是 G8 的门槛）。
 test "G8 没有 skills.lock.json" {
   let host = mk_host([(fake_skills + "/alpha/SKILL.md", fm_of("alpha"))], [(fake_skills, ["alpha"])])
-  let (fails, notes) = check_lock(host, fake_skills, fake_program, skill_dirs(host, fake_skills))
+  let (fails, notes) = check_lock(host, fake_skills, fake_program, skill_dirs(host, fake_skills), skill_dirs(host, fake_skills))
   assert_eq(fails, [
     "G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
   ])
@@ -86,7 +86,7 @@ test "报告：多文件 skill 的逐行输出与退出码" {
     claims: [],
     index: { files: 3, names: ["foo", "Bar"] },
   }
-  let out = run(ctx, fake_repo, fake_program, "moobile")
+  let out = run(ctx, fake_repo, fake_program, "moobile", "")
   assert_eq(out.lines, [
     "skillpress check —— moobile 根：/fake/moobile",
     "索引：3 个 .mbt 文件 / 2 个名字（供 G5 对账）",
@@ -114,7 +114,7 @@ test "报告：空内容根的提示与退出码 0" {
     claims: [],
     index: { files: 0, names: [] },
   }
-  let out = run(ctx, fake_repo, fake_program, "moobile")
+  let out = run(ctx, fake_repo, fake_program, "moobile", "")
   assert_eq(out.lines.length(), 3)
   assert_eq(out.lines[2], "（skills/ 下还没有 skill —— 先写一个，门才有东西可查）")
   assert_eq(out.code, 0)
@@ -131,7 +131,7 @@ test "报告：目录里没有 SKILL.md" {
     claims: [],
     index: { files: 0, names: [] },
   }
-  let out = run(ctx, fake_repo, fake_program, "moobile")
+  let out = run(ctx, fake_repo, fake_program, "moobile", "")
   assert_true(out.lines.contains("✗ ghost"))
   assert_true(out.lines.contains("    ✗ 缺 SKILL.md"))
   assert_eq(out.code, 1)

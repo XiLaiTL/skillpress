@@ -214,6 +214,33 @@ pub fn pick_home(
 }
 
 ///|
+/// 首页里那条链接指向**哪一页**。
+///
+/// ① 先按**首页目录相对**解析（旧实现的口径：`references/x.md` ⇒ `<首页目录>/references/x.md`）；
+/// ② 认不出再按**内容根相对**解析（`moobile-app-development` ⇒ 那份 skill 的主文档）。
+///
+/// ⚠️ 为什么加 ②：R2 之后首页从"那份 skill"里拆了出来，而 `skillpress` 那份 skill 自己**进忽略清单**
+/// （D19）—— 它的 `references/**` 就从站点上消失了。只认 ① 的话，首页就**再也指不到任何一页**
+/// （回退那一路也救不了：它的页也全没了）。② 让首页能指向**书架上任何一页** —— 这才是 R6 要的
+/// "通用产品"：首页与书架是两个东西，凭什么首页只能指自己目录里的页。
+/// ⚠️ 对账不受影响：老形状语料上 ① 都能命中（命中就不走 ②）⇒ 行为一字不变。
+fn resolve_page(index : Map[String, String], raw : String, home_label : String) -> String {
+  let home_dir = match home_label.rev_find("/") {
+    Some(i) => home_label[:i].to_owned()
+    None => ""
+  }
+  let k1 = if home_dir == "" {
+    ""
+  } else {
+    index.get(normalize_rel(home_dir + "/" + raw)).unwrap_or("")
+  }
+  if k1 != "" {
+    return k1
+  }
+  index.get(normalize_rel(raw)).unwrap_or("")
+}
+
+///|
 /// 首页那一份**源文件**的解析（H1 标题 + 首屏 + 分栏）。
 ///
 /// 返回 `HomeResult`：问题清单**不静默丢**（旧实现逐条点名，并让退出码非零）。
@@ -250,7 +277,7 @@ pub fn read_home(
         sections.push({ title: spans, link: "", nav: [], blocks: [] })
         // 纯链接节：把目标折成页面键
         if raw != "" {
-          let key = index.get(normalize_rel("skillpress/" + raw)).unwrap_or("")
+          let key = resolve_page(index, raw, pick.label)
           if key != "" {
             let s = sections[sections.length() - 1]
             sections[sections.length() - 1] = { title: s.title, link: key, nav: s.nav, blocks: s.blocks }
@@ -311,7 +338,7 @@ pub fn read_home(
     let mut bad = ""
     for it in items {
       let target = it.links[0]
-      let key = index.get(normalize_rel("skillpress/" + target)).unwrap_or("")
+      let key = resolve_page(index, target, pick.label)
       if key == "" {
         bad = target
         break

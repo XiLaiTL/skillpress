@@ -192,7 +192,31 @@ g10=$?
   bad "⑤ 坏首页源没被抓住（rc=$g10）—— 首页就又成了没人复核的那块"
 grep -q '首页源还没进 G8 指纹' "$C9/good.txt" &&
   ok "⑤ D20 的另一半（进指纹）**明着记着**没做，不是悄悄跳过" ||
-  bad "⑤ 少了那条"指纹那一半还没做"的声明（不许有静默的缺口）"
+  bad "⑤ 少了那条「指纹那一半还没做」的声明（不许有静默的缺口）"
+
+# ── ⑥ 门与**旧门**在同一份副本上逐字节一致 ──────────────────────────────────────
+# 为什么必须挪到副本上：R4 之后旧实现不认识忽略清单 ⇒ 在真语料上两边**必然**差出"被跳过的那一份"
+# （那不是 bug，是设计）。副本上没有清单、没有 WEBSITE.md ⇒ 读的内容相同 ⇒ 可以整份报告逐字节比。
+# ⚠️ 跑法要用**真仓库根**（旧门的 G5/G6 要靠那边的 `.mbt` 索引）+ **显式空清单**（不然默认路径会把
+#    真清单漏进来）。G5/G6 按 D18 不搬 —— 用真索引时它们在旧门那一侧**通过**，所以两边输出仍然相等。
+echo "⑥ 门在副本上与旧门逐字节一致"
+C10=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh 2>/dev/null) ||
+  bad "⑥ 造不出副本（前提不成立）"
+if [ -n "${C10:-}" ]; then
+  CROOT=$(dirname "$C10")
+  : > "$W/empty-ignore.md"
+  node lib/check.mjs --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" > "$W/gate-old.txt" 2>&1
+  ro=$?
+  node "$DEV" --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program . --ignore "$W/empty-ignore.md" \
+    > "$W/gate-new.txt" 2>&1
+  rn=$?
+  if [ "$ro" = "$rn" ] && diff -q "$W/gate-old.txt" "$W/gate-new.txt" > /dev/null; then
+    ok "⑥ 旧门与新门在副本上**逐字节一致**（rc 都是 $ro，$(grep -c . "$W/gate-new.txt") 行）"
+  else
+    bad "⑥ 门对账不一致（旧 rc=$ro 新 rc=$rn，diff 在 $W/gate-new.txt 旁边）"
+    diff "$W/gate-old.txt" "$W/gate-new.txt" | head -8 | sed 's/^/      /'
+  fi
+fi
 
 
 # ── 诱饵（--selftest）：把上面那些"必须红"的用例反过来验一遍 ─────────────────────

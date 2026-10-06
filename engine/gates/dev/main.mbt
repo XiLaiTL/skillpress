@@ -136,7 +136,14 @@ fn main {
     @gates.load_claims(host, program),
     @gates.build_index(host, repo),
   )
-  let out = @gates.run(ctx, repo, program, "moobile")
+  // 清单路径：`--ignore <路径>` 可覆盖（默认 `<仓库根>/skillpress.ignore.md`）。
+  // 为什么需要这个开关：对账要在**副本**上跑（副本上一级没有清单），而旧门的 G5/G6 又要靠
+  // 真仓库的 `.mbt` 索引 ⇒ 两边**不能**同时用"默认的清单路径"（那会把真清单漏进副本比较）。
+  let ignore_path = match arg_value(args, "--ignore") {
+    Some(p) => host.resolve(p)
+    None => ""
+  }
+  let out = @gates.run(ctx, repo, program, "moobile", ignore_path)
   for line in out.lines {
     println(line)
   }

@@ -188,7 +188,8 @@ pub fn check_lock(
   host : Host,
   skills_dir : String,
   program_dir : String,
-  dirs : Array[String],
+  kept : Array[String],
+  all : Array[String],
 ) -> (Array[String], Array[String]) {
   let lock = load_lock(host, program_dir)
   match lock {
@@ -203,11 +204,15 @@ pub fn check_lock(
       let fails : Array[String] = []
       let notes : Array[String] = []
       let seen : Array[String] = []
-      for d in dirs {
-        if !host.exists(join_path(join_path(skills_dir, d), "SKILL.md")) {
-          continue
+      // ⚠️ 两份名单：`kept` 是**过门**的那些（R4 之后忽略清单里的不在里面），
+      //    `all` 是内容根下**真有的**所有 skill。分开是必须的 —— 用 `kept` 去判"锁里还有已删除的"
+      //    会把**被忽略**的 skill 误报成"已删除"（假红），而它其实还在仓库里、只是不上桌。
+      for a in all {
+        if host.exists(join_path(join_path(skills_dir, a), "SKILL.md")) {
+          seen.push(a)
         }
-        seen.push(d)
+      }
+      for d in kept {
         let now = fingerprint_skill(host, skills_dir, d)
         let mut was : LockEntry? = None
         for pair in l.skills {
