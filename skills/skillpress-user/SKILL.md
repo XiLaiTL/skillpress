@@ -40,7 +40,7 @@ node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无�
 
 | 你放什么 | 站点上变成什么 |
 |---|---|
-| `<内容根>/skillpress/SKILL.md` | **首页**：H1 = 站名与大标题，首个 `##` 之前 = 首屏引言 |
+| `<内容根>/skillpress/SKILL.md` | **首页**：H1 = 站名与大标题，首个 `##` 之前 = 首屏引言。⚠️ **已定要改（D19/D20，还没落地）**：首页的内容源要改成 `skillpress/WEBSITE.md`，`SKILL.md` 只讲工具本身 —— 今天仍读 `SKILL.md`。 |
 | 它里面的每个 `##` | 顶栏的**一条栏位**（换的是正文里的哪一节） |
 | `<内容根>/<别的名字>/SKILL.md` | 文档区里的**一份 skill**（侧栏按名字排序） |
 | `references/*.md` ｜ `FAQ.md` ｜ `scripts/*` | 那份 skill 的**子页**（树上展开） |

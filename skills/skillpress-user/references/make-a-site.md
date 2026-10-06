@@ -21,7 +21,7 @@ description: 站点怎么从内容源长出来：一个 skill 的最小站点、
 
 ## 二、一份 skill 的最小站点
 
-1. 内容根里建 `<内容根>/skillpress/SKILL.md` —— ⚠️ **首页那份的名字写死是 `skillpress`**：
+1. 内容根里建 `<内容根>/skillpress/SKILL.md` —— ⚠️ **首页那份的名字写死是 `skillpress`**（⚠️ **已定要改（D19/D20，还没落地）**：首页的内容源要改成 `skillpress/WEBSITE.md`，`SKILL.md` 只讲工具本身 —— 今天仍读 `SKILL.md`。）：
    生成器直接取 `join(SKILLS, "skillpress", "SKILL.md")`，名字不对**报错**，不会静默给你一个空首页。
 2. 写它 —— H1 = 站名与首屏大标题，首个 `##` 之前 = 首屏引言，每个 `##` = 顶栏一条栏位。
 3. `press` → `press --check`。
