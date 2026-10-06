@@ -352,6 +352,23 @@
 - 结果：`moon check --target js` **干净通过**（零警告）。
 - ⚠️ 但"**moon add 装上**"这条判据**仍然只能靠发布**：`moon add` 只认注册表模块名，没有本地路径形式。
 
+**P8.1 收官（2026-10-06）：整份生成物由 MoonBit 引擎产出，逐字节一致**
+
+- `engine/content/` 十个文件 / 1809 行（每份 ≤400，R9 已核）：`md`（frontmatter + `inline`）｜
+  `blocks`（块解析）｜`text`（文本工具，为守 R9 从 md 拆出）｜`home`（首页 + 分栏 + 下拉 + 纯链接节）｜
+  `file`（整份拼装 + 类型声明 + 取数函数）｜`kids`（子页）｜`generate`（总装）｜`emit`（转义/字面量）｜
+  `io`（读文件）｜`doc`（一份 md → 段）。
+- **判据**：`SKILLPRESS_CORPUS=<内容根> bash tools/file-parity.sh`
+  → **整份 1143 行与旧实现产出的 `content.generated.mbt` 逐字节一致**（含旧实现那些诊断输出）。
+- 配套：`blocks-parity` ｜ `highlight-parity` ｜ `blocks-fixtures` ｜ `line-budget`（含证伪）全绿；
+  `moon build` 零警告；`check` 7/7 与 `check --skills skills` 2/2 不受影响。
+- **意义**：**"press 生成"已经真由 MoonBit 引擎完成** —— 旧引擎的产物能被原样复现，
+  所以旧引擎自己的 `press --check` 对这份输出同样成立（两份文件逐字节相同）。
+
+**下一步的岔口**（两条都要，顺序待定）：
+1. **P8.2 门**：`check`（G1–G4 / G7 / G8 + 13 个诱饵 + 落锁）搬进 MoonBit（`facts` 按 D18 搬去内容仓自己）。
+2. **P6 抽 `shell` 包**：界面搬进包（目标形状见下），实例 `app.mbt` 缩到 ≤20 行 —— **A2 就靠它**。
+
 **每一步都要守的一条**：**R6 通用性**（D16）—— 迁完不许变成「只有 moobile 能跑」。
 新建的门/管线一律先问一句：**一个只有 `skills/` 的陌生仓库，它跑得起来吗？**
 
