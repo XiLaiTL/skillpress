@@ -218,7 +218,61 @@ else
   head -30 "$W/diff3.txt" | sed 's/^/    /'
   fail=1
 fi
+if [ "$fail" = 0 ]; then
+  echo "✓ 夹具三对账通过：4 类认不出的构造 $n_new 条点名，行号/措辞/顺序与旧实现**逐字节一致**，且两边都没吐产物"
+else
+  # 不早退：让夹具四照样出声 —— 红的地方要一次看全，别让前一段把后一段的读数挡住
+  echo "✗ 夹具三**未通过**（仍然继续跑夹具四）"
+fi
+
+# ── 夹具四：**空内容根**（一份 SKILL.md 都没有）⇒ 行为一致、措辞**故意**不一致 ─────
+#
+# 为什么单列一段：这是本项目**唯一一条记账过的口径偏差**（PLAN 决定表 **D22**）。
+#   旧实现：`skills/ 下没有 SKILL.md`，**还会多报一条**「找不到首页」（它接着往下读首页了）；
+#   新实现：「内容根下没有带 SKILL.md 的目录（引导层按 `gen-file <内容根>` 列举，检查那个参数）」。
+# 偏差的理由（D22 里写着）：旧句把根名**写死**成 `skills/`，而内容根现在可配置
+#   （`--skills <目录>` / `SKILLPRESS_CORPUS`）—— 照抄旧句在新设计下就成了**假话**。
+# 这一段盯两件事：① 「行为」（**退 2 + 不吐产物**）两边不许漂；② 新措辞**逐字节冻住**，改动即红。
+# 诱饵：再跑一次**有内容**的内容根，断言那句话**不出现** —— 证明它不是"永远都打"。
+W4="$W/empty-corpus"
+mkdir -p "$W4/empty" "$W4/app4"
+SKILLPRESS_SKILLS="$W4/empty" node lib/gen-content.mjs --skills "$W4/empty" --app "$W4/app4" > "$W4/old4.out" 2> "$W4/old4.err"
+old4_rc=$?
+node tools/run-js.mjs gen-file "$W4/empty" > "$W4/new4.out" 2> "$W4/new4.err"
+new4_rc=$?
+node tools/run-js.mjs gen-file "$W/root" > "$W4/new4b.out" 2> "$W4/new4b.err"
+
+[ "$old4_rc" = 2 ] || { echo "✗ 夹具四：旧实现退出码是 $old4_rc（应当是 2）"; fail=1; }
+grep -q 'skills/ 下没有 SKILL.md' "$W4/old4.err" ||
+  { echo "✗ 夹具四：旧实现没点名「skills/ 下没有 SKILL.md」—— 这条偏差的『旧句』就是它，基准变了"; fail=1; }
+[ ! -e "$W4/app4/content/content.generated.mbt" ] ||
+  { echo "✗ 夹具四：旧实现竟然写了产物（基准本身就不该存在）"; fail=1; }
+[ "$new4_rc" = 2 ] || { echo "✗ 夹具四：新实现退出码是 $new4_rc（应当是 2）"; fail=1; }
+[ ! -s "$W4/new4.out" ] ||
+  { echo "✗ 夹具四：新实现有问题却还往 stdout 吐了产物 —— 正是旧实现刻意不做的事"; fail=1; }
+frozen4='✗ 内容根下没有带 SKILL.md 的目录（引导层按 `gen-file <内容根>` 列举，检查那个参数）'
+grep -qxF "$frozen4" "$W4/new4.err" || {
+  echo "✗ 夹具四：新实现的措辞与 D22 冻住的那句**不一致** —— 要么改了话（那就同步改 D22 + 本判据），要么这条规矩整个丢了："
+  echo "      期望：$frozen4"
+  sed 's/^/      实际：/' "$W4/new4.err" | head -5
+  fail=1
+}
+if grep -q '没有带 SKILL.md 的目录' "$W4/new4b.err"; then
+  echo "✗ 夹具四（诱饵）：内容根里**有** SKILL.md，居然也打了这句 ⇒ 这句话不是『只在空内容根时』才打的"
+  fail=1
+fi
+grep -q 'D22' PLAN.md || {
+  echo "✗ 夹具四：这条口径偏差没记账 —— PLAN 决定表里补 D22（豁免必须写在文档里）"; fail=1;
+}
+
+if [ "$fail" = 0 ]; then
+  echo "✓ 夹具四对账通过：空内容根两边都退 2、都不吐产物；新措辞与 D22 记账的那句**逐字节一致**，且有内容的内容根不会打这句"
+else
+  echo "✗ 夹具四**未通过**"
+fi
+
 if [ "$fail" != 0 ]; then
+  echo
+  echo "✗ 夹具对账：上面有红 —— 修完再看一遍，别拿部分绿当绿"
   exit 1
 fi
-echo "✓ 夹具三对账通过：4 类认不出的构造 $n_new 条点名，行号/措辞/顺序与旧实现**逐字节一致**，且两边都没吐产物"
