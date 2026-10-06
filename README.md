@@ -89,7 +89,8 @@ bash tools/diagnostics-ledger.sh  # ⑥ 诊断口径账本：旧实现 76 条诊
 bash tools/fresh-clone-check.sh   # ⑦ 干净克隆自查：把 HEAD 克隆到临时目录（只有 tracked 文件）、现装现编，再跑上面几条 + R9 + 账本
 bash tools/package-check.sh       # ⑧ 发布包内容复核：该含的缺一个也红、不该含的多一个也红（--selftest 三向诱饵）
 bash tools/mbt-traps.sh           # ⑨ MoonBit 坑位（第一条：`Array::sort()` 排字符串**不是字典序**；--selftest 两向诱饵）
-bash tools/acceptance.sh          # ⑩ 验收：按 PLAN §6 的 A1/A2/A3 逐条查（红在哪 = 还差什么）
+bash tools/site-source.sh         # ⑩ 首页源（R2：WEBSITE.md 优先 / 回退 SKILL.md / --home）+ 忽略清单（R4：站点与门都跳过）
+bash tools/acceptance.sh          # ⑪ 验收：按 PLAN §6 的 A1/A2/A3 逐条查（红在哪 = 还差什么）
 ```
 
 **P6 补的两台自证过的仪器**（判据不只看"产物对不对"，还看"判据自己会不会红"）：

@@ -1,6 +1,7 @@
 import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/string" @string,
+  "XiLaiTL/skillpress/engine/ignore" @ig,
 }
 
 // 门（G1–G4 / G7 / G8）—— 纯逻辑包：**要碰磁盘的地方一律走 `Host`**（宿主注入），

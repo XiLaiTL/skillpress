@@ -171,12 +171,38 @@ fn dump_blocks() -> Unit {
 
 
 ///|
+/// 从 `@env.args()` 里取 `--<名字> <值>` 选项（没给就空串）。只认这种**两段式**写法。
+fn opt(name : String) -> String {
+  let args = @env.args()
+  let mut i = 0
+  while i + 1 < args.length() {
+    if args[i] == name {
+      return args[i + 1]
+    }
+    i = i + 1
+  }
+  ""
+}
+
+///|
+/// 路径的上一级（只按 `/` 切；内容仓根 = 内容根的上一级，这是 R4 定的清单位置）。
+fn parent_dir(p : String) -> String {
+  match p.rev_find("/") {
+    Some(i) => p[:i].to_owned()
+    None => ""
+  }
+}
+
+///|
 /// **`gen-file <内容根>`**：把**整份** `content.generated.mbt` 打到 stdout。
 ///
 /// stdout 只有那份文件（判据对它做逐字节 diff）；诊断与问题清单走 **stderr**。
 /// 有问题（认不出的死链、没有 `##`、找不到首页、图片/原始 HTML 这类认不出的构造…）时
 /// **退出码 2 且 stdout 是空的** —— 旧实现就是"有问题就不写产物"（那个 `else` 分支才 `writeFileSync`）。
 /// 照抄这条不只是为了对齐：`gen-file > 产物文件` 是常见用法，有问题还照吐就等于**把一份坏产物落盘**。
+///
+/// 选项：`--home <路径>`（首页源覆盖，R2）、`--ignore <路径>`（忽略清单覆盖，R4 —— 默认取
+/// **内容仓根**下的 `skillpress.ignore.md`）。
 fn gen_file() -> Unit {
   let dirs0 = skill_dirs()
   let dirs = dirs0.split("\n").filter(fn(l) { l != "" }).map(fn(l) { l.to_owned() }).collect()
@@ -186,8 +212,46 @@ fn gen_file() -> Unit {
     return
   }
   let root = dump_root()
+  // ── 忽略清单（R4）：站点**不上桌**，门**也跳过** ────────────────────────────────
+  // ⚠️ 解析出问题就**退 2 且一份都不套用** —— "半套用"是最难查的状态。
+  let ignore_given = opt("--ignore")
+  let ignore_path = if ignore_given != "" {
+    ignore_given
+  } else {
+    parent_dir(root) + "/skillpress.ignore.md"
+  }
+  let ig_text = read_text(ignore_path)
+  if ignore_given != "" && ig_text == "" {
+    @content.note("✗ `--ignore` 指的清单读不到：`" + ignore_path + "` —— 指定的清单不存在**不静默**")
+    @content.set_exit_code(2)
+    return
+  }
+  let parsed = @ig.parse(ig_text, dirs)
+  if parsed.problems.length() > 0 {
+    @content.note("忽略清单有问题（**不静默容忍**，逐条点名）：`" + ignore_path + "`")
+    for p in parsed.problems {
+      @content.note("  ✗ " + p)
+    }
+    @content.set_exit_code(2)
+    return
+  }
+  let (kept, skipped) = @ig.split_names(dirs, parsed)
+  for line in @ig.notice_lines(skipped) {
+    @content.note(line)
+  }
+  if kept.length() == 0 {
+    @content.note("⚠️ 忽略清单之后**一份 skill 都不剩**：站点只剩首页（不是错，但你要知道）")
+  }
   let (text, problems) = try {
-    @content.gen_content(root, dirs, read_text, @content.md_kids, @content.script_kids, @content.note)
+    @content.gen_content(
+      root,
+      kept,
+      opt("--home"),
+      read_text,
+      @content.md_kids,
+      @content.script_kids,
+      @content.note,
+    )
   } catch {
     e => {
       @content.note("✗ 生成失败：\{e}")

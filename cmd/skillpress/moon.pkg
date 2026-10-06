@@ -2,6 +2,7 @@ import {
   "moonbitlang/core/env" @env,
   "XiLaiTL/skillpress/engine/highlight" @hl,
   "XiLaiTL/skillpress/engine/content" @content,
+  "XiLaiTL/skillpress/engine/ignore" @ig,
 }
 
 supported_targets = "+js"

@@ -50,7 +50,7 @@ lib/gen-content.mjs:283|不支持的构造（图片）|ok|不支持的构造（�
 lib/gen-content.mjs:288|不支持的构造（原始 HTML）|ok|不支持的构造（原始 HTML）|-|blocks-fixtures 夹具三
 lib/gen-content.mjs:795|内容里有解不开的东西|ok|内容里有解不开的东西|-|blocks-fixtures 夹具三
 lib/gen-content.mjs:796|  ✗ ${p}|ok|  ✗ |-|blocks-fixtures 夹具三
-lib/gen-content.mjs:379|找不到首页：|ok|找不到首页：skillpress/SKILL.md|DG-首页标签|无（夹具三刻意用干净首页）
+lib/gen-content.mjs:379|找不到首页：|ok|找不到首页：`skillpress/WEBSITE.md` 与|DG-首页标签|tools/site-source.sh（R2 三路首页源）
 lib/gen-content.mjs:401|里没有 `##` 标题|ok|里没有 `##` 标题|DG-首页标签|无
 lib/gen-content.mjs:414|还带着|ok|还带着|DG-提示走 stderr|无
 lib/gen-content.mjs:419|：纯链接节「|ow|-|DG-丢前缀|无

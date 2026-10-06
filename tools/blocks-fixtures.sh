@@ -230,7 +230,13 @@ done
 n_old=$(grep -c '✗' "$W/old3.err" || true)
 n_new=$(grep -c '✗' "$W/new3.err" || true)
 [ "$n_old" = 5 ] && [ "$n_new" = 5 ] || { echo "✗ 夹具三：点名条数 旧=$n_old 新=$n_new（都应当是 5）"; fail=1; }
-if diff -u "$W/old3.err" "$W/new3.err" > "$W/diff3.txt"; then
+# ⚠️ stderr 里**现在还有信息行**（`· ` 开头）—— 例如 R2 要求的「首页源：`skillpress/SKILL.md`（没有
+#    `WEBSITE.md` ⇒ 按 R2 回退…）」 + `--home` 指定时那一行。这个夹具比的是**问题清单**
+#    （点名逐字节一致），所以先把信息行滤掉再 diff；信息行本身归 `tools/site-source.sh` 管
+#    （它是 R2/小 R4 的判据），别在这儿重复管 —— 也别让"多打了一句实话"把这条判据弄红。
+grep -v '^· ' "$W/old3.err" > "$W/old3.cmp"
+grep -v '^· ' "$W/new3.err" > "$W/new3.cmp"
+if diff -u "$W/old3.cmp" "$W/new3.cmp" > "$W/diff3.txt"; then
   :
 else
   echo "✗ 夹具三：诊断**不一致**（完整 diff 在 $W/diff3.txt）："
@@ -261,34 +267,37 @@ node tools/run-js.mjs gen-file "$W4/empty" > "$W4/new4.out" 2> "$W4/new4.err"
 new4_rc=$?
 node tools/run-js.mjs gen-file "$W/root" > "$W4/new4b.out" 2> "$W4/new4b.err"
 
-[ "$old4_rc" = 2 ] || { echo "✗ 夹具四：旧实现退出码是 $old4_rc（应当是 2）"; fail=1; }
+f4=0
+[ "$old4_rc" = 2 ] || { echo "✗ 夹具四：旧实现退出码是 $old4_rc（应当是 2）"; f4=1; }
 grep -q 'skills/ 下没有 SKILL.md' "$W4/old4.err" ||
-  { echo "✗ 夹具四：旧实现没点名「skills/ 下没有 SKILL.md」—— 这条偏差的『旧句』就是它，基准变了"; fail=1; }
+  { echo "✗ 夹具四：旧实现没点名「skills/ 下没有 SKILL.md」—— 这条偏差的『旧句』就是它，基准变了"; f4=1; }
 [ ! -e "$W4/app4/content/content.generated.mbt" ] ||
-  { echo "✗ 夹具四：旧实现竟然写了产物（基准本身就不该存在）"; fail=1; }
-[ "$new4_rc" = 2 ] || { echo "✗ 夹具四：新实现退出码是 $new4_rc（应当是 2）"; fail=1; }
+  { echo "✗ 夹具四：旧实现竟然写了产物（基准本身就不该存在）"; f4=1; }
+[ "$new4_rc" = 2 ] || { echo "✗ 夹具四：新实现退出码是 $new4_rc（应当是 2）"; f4=1; }
 [ ! -s "$W4/new4.out" ] ||
-  { echo "✗ 夹具四：新实现有问题却还往 stdout 吐了产物 —— 正是旧实现刻意不做的事"; fail=1; }
+  { echo "✗ 夹具四：新实现有问题却还往 stdout 吐了产物 —— 正是旧实现刻意不做的事"; f4=1; }
 frozen4='✗ 内容根下没有带 SKILL.md 的目录（引导层按 `gen-file <内容根>` 列举，检查那个参数）'
 grep -qxF "$frozen4" "$W4/new4.err" || {
   echo "✗ 夹具四：新实现的措辞与 D22 冻住的那句**不一致** —— 要么改了话（那就同步改 D22 + 本判据），要么这条规矩整个丢了："
   echo "      期望：$frozen4"
   sed 's/^/      实际：/' "$W4/new4.err" | head -5
-  fail=1
+  f4=1
 }
 if grep -q '没有带 SKILL.md 的目录' "$W4/new4b.err"; then
   echo "✗ 夹具四（诱饵）：内容根里**有** SKILL.md，居然也打了这句 ⇒ 这句话不是『只在空内容根时』才打的"
-  fail=1
+  f4=1
 fi
 grep -q 'D22' PLAN.md || {
-  echo "✗ 夹具四：这条口径偏差没记账 —— PLAN 决定表里补 D22（豁免必须写在文档里）"; fail=1;
+  echo "✗ 夹具四：这条口径偏差没记账 —— PLAN 决定表里补 D22（豁免必须写在文档里）"; f4=1;
 }
 
-if [ "$fail" = 0 ]; then
+if [ "$f4" = 0 ]; then
   echo "✓ 夹具四对账通过：空内容根两边都退 2、都不吐产物；新措辞与 D22 记账的那句**逐字节一致**，且有内容的内容根不会打这句"
 else
   echo "✗ 夹具四**未通过**"
 fi
+# 夹具四自己的失败并进总账（f4 与 fail 分开是刻意的：夹具三留下的 fail 不该让夹具四**看起来也红了**）
+[ "$f4" = 0 ] || fail=1
 
 if [ "$fail" != 0 ]; then
   echo

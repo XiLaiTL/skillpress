@@ -158,29 +158,76 @@ pub fn heading_links(body : String) -> Array[String] {
 }
 
 ///|
-/// 首页那一份 skill 的解析（H1 标题 + 首屏 + 分栏）。
+/// 首页解析的结果：首页本体 + **首页源的内容根相对标签**（进生成物的注释与问题清单）+ 问题。
+pub struct HomeResult {
+  home : HomeLit?
+  source : String
+  problems : Array[String]
+}
+
+///|
+/// 首页**源**的选择（R2 / D19 / D20）：`WEBSITE.md` 优先，没有就**回退** `SKILL.md`，并打印用了哪个。
 ///
-/// 返回 `(首页, 问题清单)`：问题清单**不静默丢**（旧实现逐条点名，并让退出码非零）。
+/// 为什么回退要**打印**：没有这句，"首页怎么一直是旧内容"会变成一道没人查得出来的谜。
+/// 为什么优先 `WEBSITE.md`：`SKILL.md` 原先**同时**当主页和当 skill —— 一份文件混两种规矩
+/// （顶栏栏名要短 vs skill 门禁要自足）；拆开之后 `skillpress/SKILL.md` 只讲 skillpress 本身。
+///
+/// ⚠️ `--home <路径>` 覆盖：那个路径**直接**当源（绝对路径或相对内容根的路径都行），标签就用给的这条。
+priv struct HomePick {
+  label : String
+  text : String
+}
+
+///|
+fn pick_home(
+  root : String,
+  home_file : String,
+  read : (String) -> String,
+  note : (String) -> Unit,
+) -> HomePick {
+  if home_file != "" {
+    note("· 首页源：`" + home_file + "`（--home 指定）")
+    return { label: home_file, text: read(home_file) }
+  }
+  let website = read(root + "/skillpress/WEBSITE.md")
+  if website != "" {
+    note("· 首页源：`skillpress/WEBSITE.md`")
+    return { label: "skillpress/WEBSITE.md", text: website }
+  }
+  let skill = read(root + "/skillpress/SKILL.md")
+  if skill != "" {
+    note("· 首页源：`skillpress/SKILL.md`（没有 `WEBSITE.md` ⇒ 按 R2 回退；想换源就写一份 `WEBSITE.md`）")
+  }
+  { label: "skillpress/SKILL.md", text: skill }
+}
+
+///|
+/// 首页那一份**源文件**的解析（H1 标题 + 首屏 + 分栏）。
+///
+/// 返回 `HomeResult`：问题清单**不静默丢**（旧实现逐条点名，并让退出码非零）。
 pub fn read_home(
   root : String,
   index : Map[String, String],
+  home_file : String,
   read : (String) -> String,
   note : (String) -> Unit,
-) -> (HomeLit?, Array[String]) {
-  let home_dir = root + "/skillpress"
-  let path = home_dir + "/SKILL.md"
-  let text = read(path)
+) -> HomeResult {
+  let pick = pick_home(root, home_file, read, note)
   let problems : Array[String] = []
-  if text == "" {
-    problems.push("找不到首页：skillpress/SKILL.md —— 站点的首页**就是**这份 skill（见内容侧的 references/layout.md）")
-    return (None, problems)
+  if pick.text == "" {
+    problems.push(
+      "找不到首页：`skillpress/WEBSITE.md` 与 `skillpress/SKILL.md` 都没有 —— 站点的首页**就是**它" +
+      "（H1 = 站名、首个 `##` 之前 = 首屏、每个 `##` = 顶栏一栏）。便携目录由 pack 生成它；" +
+      "项目里也可以自己写一份（见内容侧的 references/layout.md）。",
+    )
+    return { home: None, source: "", problems }
   }
-  let body = frontmatter_body(text)
+  let body = frontmatter_body(pick.text)
   // 首页正文里认不出的构造（图片 / 原始 HTML / 围栏没闭合 / 表格缺分隔行）同样**点名**。
   // ⚠️ 旧实现这里给的标签是"相对**程序仓**的路径"（`relative(REPO, readme)`）—— 跑在不同机器上
   // 长得都不一样（P8.1 实测：探针语料下打出 `..\..\..\tmp\...`）。这里统一成内容根口径
-  // `skillpress/SKILL.md`，与本文件其它几条首页问题的写法一致。
-  let blocks = parse_blocks(body, "skillpress/SKILL.md", fn(p) { problems.push(p) })
+  // `skillpress/SKILL.md`（或 `WEBSITE.md`），与本文件其它几条首页问题的写法一致。
+  let blocks = parse_blocks(body, pick.label, fn(p) { problems.push(p) })
   let links = heading_links(body)
   let lede : Array[Block] = []
   let sections : Array[SectionLit] = []
@@ -271,5 +318,9 @@ pub fn read_home(
     sections[i] = { title: s.title, link: s.link, nav, blocks: s.blocks }
   }
   let title = summarize(first_h1(body), 200)
-  (Some({ title: if title == "" { "首页" } else { title }, lede, sections }), problems)
+  {
+    home: Some({ title: if title == "" { "首页" } else { title }, lede, sections }),
+    source: pick.label,
+    problems,
+  }
 }

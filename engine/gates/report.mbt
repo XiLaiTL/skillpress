@@ -53,8 +53,30 @@ pub fn run(ctx : Ctx, repo : String, program_dir : String, repo_label : String) 
     ctx.index.names.length().to_string() +
     " 个名字（供 G5 对账）",
   )
-  let dirs = skill_dirs(ctx.host, ctx.skills_dir)
+  let dirs0 = skill_dirs(ctx.host, ctx.skills_dir)
+  // ── 忽略清单（R4）：列进去的 skill，**站点不上桌、门也跳过** ──────────────────────
+  // ⚠️ 跳过的形状必须与通过**不一样**（`⊘`），并且**逐条打理由** —— 不然这就是一条静默的后门。
+  // ⚠️ 清单解析出问题 ⇒ 退 2 且**一份都不套用**（"半套用"是最难查的状态）。
+  // ⚠️ 全被忽略 ⇒ **判红**：门在空集合上通过等于什么都没查（旧实现那句"不允许在空集合上通过"）。
+  // ⚠️ 没有清单文件时（`read` 给空串）一行为都不变 —— 与旧实现的对账因此不受影响。
+  let ig_path = join_path(repo, "skillpress.ignore.md")
+  let parsed = @ig.parse(ctx.host.read(ig_path), dirs0)
+  if parsed.problems.length() > 0 {
+    out.push("忽略清单有问题（**不静默容忍**，逐条点名）：" + ig_path)
+    for p in parsed.problems {
+      out.push("  ✗ " + p)
+    }
+    return { lines: out, code: 2 }
+  }
+  let (dirs, skipped) = @ig.split_names(dirs0, parsed)
+  for line in @ig.notice_lines(skipped) {
+    out.push(line)
+  }
   if dirs.length() == 0 {
+    if skipped.length() > 0 {
+      out.push("✗ 一份 skill 都不剩（全被忽略清单跳过了）—— 门在空集合上通过等于没查，判红")
+      return { lines: out, code: 1 }
+    }
     out.push("（skills/ 下还没有 skill —— 先写一个，门才有东西可查）")
     return { lines: out, code: 0 }
   }

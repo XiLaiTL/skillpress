@@ -19,6 +19,7 @@ fn field(data : Map[String, String], key : String) -> String {
 pub fn gen_content(
   root : String,
   dirs : Array[String],
+  home_file : String,
   read : (String) -> String,
   md_kids : (String) -> Array[String],
   script_kids : (String) -> Array[String],
@@ -48,13 +49,13 @@ pub fn gen_content(
       kids: read_kids(root + "/" + d, read, md_kids, script_kids, fn(p) { problems.push(p) }),
     })
   }
-  // ③ 首页
-  let (home0, home_problems) = read_home(root, index, read, note)
-  for p in home_problems {
+  // ③ 首页（源：`WEBSITE.md` 优先、回退 `SKILL.md`、`--home` 可覆盖 —— 见 home.mbt）
+  let hr = read_home(root, index, home_file, read, note)
+  for p in hr.problems {
     problems.push(p)
   }
   // ④ 统一贴 runs（首页的 lede + 每一栏 + 每份 skill + 它的每个子页）
-  let home : HomeLit? = match home0 {
+  let home : HomeLit? = match hr.home {
     None => None
     Some(h) => {
       let sections : Array[SectionLit] = []
@@ -87,7 +88,18 @@ pub fn gen_content(
   }
   // ⑤ 发射（顺序与空行都照抄旧实现）
   let out = header_lines()
-  out.push("///| 首页（来自 `skills/skillpress/SKILL.md`）。")
+  // 这条注释里点名的**首页源**要与实际用的一致（否则生成物在撒谎）。
+  // ⚠️ 回退那一路必须与旧实现**逐字节一致** —— 旧实现把 `skills/skillpress/SKILL.md` 写死在这句里，
+  //    而这句话在归一化规则里**不会被抹掉**（规则①只抹开头的 `//` 块，`///|` 文档注释算正文）。
+  //    所以内容根口径写成 `skills/<相对路径>`；`--home` 覆盖时就用给的那条路径（那是"用户指定"，不猜）。
+  let home_src = if hr.source == "" {
+    "skills/skillpress/SKILL.md"
+  } else if hr.source.has_prefix("skillpress/") {
+    "skills/" + hr.source
+  } else {
+    hr.source
+  }
+  out.push("///| 首页（来自 `" + home_src + "`）。")
   out.push("pub fn home() -> " + REC + "Home {")
   match home {
     Some(h) => for line in home_lit_lines(h, "  ") {
