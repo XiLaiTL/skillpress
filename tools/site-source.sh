@@ -257,6 +257,25 @@ printf '%s' "$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skil
   ok "⑧ 改一个字节 ⇒ 「指纹变了」当场红（门的意义就在这一条）" || bad "⑧ 指纹变了没被抓住"
 rm -rf "$P7"
 
+# ── ⑨ 从**内容仓**跑、不带 `--program`：必须找到程序仓的锁（实测踩过的一个真 bug）──────────
+# 指纹锁与禁语表都住在**程序**仓，而 `check` 常常是从内容仓里跑的（我们自己的文档就那么教）⇒
+# 程序根默认取 cwd 的话，门会去内容仓找 `skills.lock.json`（不存在）⇒ 红着说"没有锁"。
+echo "⑨ 从内容仓跑（不带 --program）"
+# ⚠️ 程序根的绝对路径要**先取好**：`$(pwd -W)` 写在 `cd … && node …` 里会在 cd **之后**展开
+#    ⇒ 变成 `<内容仓>/tools/run-js.mjs`（不存在）⇒ node 崩掉。
+# ⚠️ 断言也收紧：光"没有那句报错"会被一次崩溃蒙过去（第一版就是这样**假绿**的：末行是
+#    `Node.js v24.14.1` 而判据说 ✓）。所以要求 **rc=0** 且末行是结论行（`全部通过（N 个 skill）`）。
+PROGABS=$(pwd -W)
+out=$(cd "$SKILLPRESS_CORPUS/.." && node "$PROGABS/tools/run-js.mjs" check 2>&1)
+rc9=$?
+last9=$(printf '%s' "$out" | tail -1)
+if [ "$rc9" = 0 ] && printf '%s' "$last9" | grep -qE '^(全部通过（[0-9]+ 个 skill）|[0-9]+ 项不合格)$'; then
+  ok "⑨ 不带 --program 也能找到程序仓的锁（rc=0，末行：$last9）"
+else
+  bad "⑨ 从内容仓跑失败（rc=$rc9，末行：$last9）—— 程序根默认或路径展开有问题"
+  printf '%s' "$out" | tail -3 | sed 's/^/      /'
+fi
+
 
 # ── 诱饵（--selftest）：把上面那些"必须红"的用例反过来验一遍 ─────────────────────
 # 光有"坏清单必须红"不够 —— 还得证明**好清单必须绿**，否则这条判据可能只是"永远红"的摆设。

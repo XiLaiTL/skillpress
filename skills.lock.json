@@ -23,7 +23,7 @@
       "bytes": 19801,
       "rows": 52,
       "codeBlocks": 11,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     },
     "moobile-custom-component": {
       "files": 4,
@@ -31,7 +31,7 @@
       "bytes": 18142,
       "rows": 44,
       "codeBlocks": 4,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     },
     "moobile-library-development": {
       "files": 6,
@@ -39,7 +39,7 @@
       "bytes": 18650,
       "rows": 48,
       "codeBlocks": 3,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     },
     "moobile-migrate-from-rabbita": {
       "files": 6,
@@ -47,7 +47,7 @@
       "bytes": 24643,
       "rows": 80,
       "codeBlocks": 3,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     },
     "moobile-pitfalls": {
       "files": 6,
@@ -55,7 +55,7 @@
       "bytes": 18965,
       "rows": 75,
       "codeBlocks": 1,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     },
     "moobile-react-library": {
       "files": 5,
@@ -63,15 +63,23 @@
       "bytes": 19746,
       "rows": 56,
       "codeBlocks": 6,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     },
     "skillpress": {
       "files": 3,
-      "lines": 409,
-      "bytes": 29835,
+      "lines": 419,
+      "bytes": 30805,
       "rows": 79,
       "codeBlocks": 6,
-      "root": "D:\\ai_project\\interest\\moobile\\skills"
+      "root": "D:\\ai_project\\interest\\moobile/skills"
+    },
+    "skillpress/WEBSITE.md": {
+      "files": 1,
+      "lines": 63,
+      "bytes": 3749,
+      "rows": 0,
+      "codeBlocks": 1,
+      "root": "D:\\ai_project\\interest\\moobile/skills"
     }
   }
 }

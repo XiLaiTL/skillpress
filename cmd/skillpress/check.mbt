@@ -10,10 +10,20 @@
 /// 落在 `engine/gates/gates_wbtest.mbt` 里）。G5 / G6 / `facts` 按 D18 **不在核心里**。
 fn gate_check(rest : Array[String]) -> Unit {
   let host = @gjs.js_host()
-  // ⚠️ 门这一侧只看 `rest`（命令词之后的参数）—— 与旧实现的 `process.argv` 口径一致
+  // ⚠️ **程序根默认取"引导层给的程序根"，不是 cwd** —— 这条是实测踩出来的：
+  //    `check` 从**内容仓**跑（我们自己的文档就那么教）时 cwd 是内容仓 ⇒ 指纹锁会被算成
+  //    `<内容仓>/skills.lock.json`（不存在）⇒ 门红着说"没有 skills.lock.json"，
+  //    而锁与 `claims.txt` 其实都住在**程序**仓里（它们是"跟着程序走"的东西）。
   let program = match @gjs.arg_value(rest, "--program") {
     Some(p) => host.resolve(p)
-    None => host.resolve(host.cwd())
+    None => {
+      let boot = program_root()
+      if boot != "" {
+        host.resolve(boot)
+      } else {
+        host.resolve(host.cwd())
+      }
+    }
   }
   let repo = match @gjs.arg_value(rest, "--repo") {
     Some(r) => host.resolve(r)
@@ -75,3 +85,12 @@ fn gate_check(rest : Array[String]) -> Unit {
   }
   @gjs.set_exit_code(out.code)
 }
+
+///|
+/// **引导层给的程序根**（`tools/run-js.mjs` / `launcher/skillpress.mjs` 都会挂上 `root`）。
+///
+/// 为什么门需要它：指纹锁（`<程序根>/skills.lock.json`）与禁语表（`<程序根>/claims.txt`）都是
+/// **跟着程序走**的东西，而 `check` 常常是从**内容仓**里跑的 ⇒ 拿 cwd 当程序根会去内容仓找锁。
+/// ⚠️ 拿不到（例如 `moon run engine/gates/dev` 那条路没有引导层）就给空串，调用方退回 cwd。
+extern "js" fn program_root() -> String =
+  #|() => (globalThis.__skillpress_ts && globalThis.__skillpress_ts.root) || ""
