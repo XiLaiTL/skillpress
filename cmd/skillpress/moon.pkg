@@ -3,4 +3,6 @@ import {
   "XiLaiTL/skillpress/engine/highlight" @hl,
 }
 
+supported_targets = "+js"
+
 pkgtype(kind: "executable")
