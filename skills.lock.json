@@ -59,11 +59,11 @@
     },
     "skillpress-dev": {
       "files": 4,
-      "lines": 369,
-      "bytes": 24909,
+      "lines": 374,
+      "bytes": 25309,
       "rows": 71,
       "codeBlocks": 4,
-      "root": "D:\\ai_project\\interest\\skillpress\\.dsh\\skills"
+      "root": "D:\\ai_project\\interest\\skillpress\\skills"
     },
     "skillpress-user": {
       "files": 3,
@@ -71,7 +71,7 @@
       "bytes": 17994,
       "rows": 84,
       "codeBlocks": 4,
-      "root": "D:\\ai_project\\interest\\skillpress\\.dsh\\skills"
+      "root": "D:\\ai_project\\interest\\skillpress\\skills"
     }
   }
 }

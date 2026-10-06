@@ -46,7 +46,7 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | 路径 | 是什么 |
 |---|---|
 | `bin/skillpress.mjs` | 门面：子命令转发的唯一入口（**换实现不改文档**） |
-| `.dsh/skills/` | **程序自己的 skill**（见下节）—— `.agents/skills` 是"给别人看的内容"，不是这里 |
+| `skills/` | **程序自己的 skill**（见下节）—— `.agents/skills` 是"给别人看的内容"，不是这里 |
 | `lib/gen-content.mjs` | 内容管线：markdown → 类型化数据（解析边界见它文件头） |
 | `lib/highlight.mjs` | 构建期上色：tree-sitter → 色号；`--audit` 是它的闸门 |
 | `lib/check.mjs` | 门：G1–G8（含 `--selftest` 证伪、`--update-lock` 落锁） |
@@ -57,7 +57,7 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | `PLAN.md` | **计划**（会变）：还没做的、已定的决定、要探的未知 |
 | `claims.txt` / `done-claims.txt` / `skills.lock.json` | 禁语表 / 已落地台账 / 体量指纹（每条指纹记着**属于哪个内容根**） |
 
-## 程序自己的 skill（`.dsh/skills/`）
+## 程序自己的 skill（`skills/`）
 
 按**身份**拆成两份 —— 一份给"用这套工具的人"，一份给"改这套程序的人"：
 
@@ -66,15 +66,17 @@ npm install && npm run build && npm run serve      # → http://127.0.0.1:8123/
 | `skillpress-user` | 用它做站点的人 | 一份 / 多份 skill → 站点、主页怎么写、配色与字号改哪儿、加一块新构造、验收 |
 | `skillpress-dev` | 改这套程序的人 | 四个根、改什么跑哪条门、怎么加判据与诱饵、落锁、会安静咬人的坑 |
 
-为什么是 `.dsh/skills/` 而不是 `.agents/skills/`：后者是**内容**（会被印成站点、给别人看的那份），
-而这两份是**我们自己的开发须知**。harness 的扫描根里 `.dsh/skills` 是 project-dsh（rank 100），
-`.agents/skills` 是 project-agents（rank 200）—— 两个都被扫，但语义不同。
+为什么是 `skills/` 而不是 `.agents/skills/`：后者是**内容** —— 会被印成站点、给别人看的那份
+（由内容仓持有）；而这个 `skills/` 是**给用这个仓库的人**看的那份（用它的、改它的）。
 
-跑门要**显式指内容根**（默认那个根是内容仓的）：
+⚠️ 顺带一件好事：`skills/` 的形状和内容根**一模一样**（`skills/<名字>/SKILL.md`）——
+所以将来"自举"（把程序自己的 skill 也印成站点）时，它天然就是那个内容根。
+
+跑门要**显式指这个根**（默认那个根是内容仓的）：
 
 ```bash
-node bin/skillpress.mjs check --skills .dsh/skills
-node bin/skillpress.mjs check --skills .dsh/skills --update-lock   # 复核体量后落锁
+node bin/skillpress.mjs check --skills skills
+node bin/skillpress.mjs check --skills skills --update-lock   # 复核体量后落锁
 ```
 
 ⚠️ **还没自举**：`press` 只往内容仓那个实例写，所以这两份 skill **暂时上不了站点**。

@@ -68,14 +68,17 @@ node bin/skillpress.mjs verify            # 站点判据：真 Chrome 无头 + C
 
 ## 五、程序自己的 skill 住哪儿（这份就在这儿）
 
-程序自己的 skill 住在 **`.dsh/skills/`** —— harness 的项目根扫描里那是 `project-dsh`（rank 100），
-而 `.agents/skills`（rank 200）是**内容**（"给别人看的"那份，由内容仓持有）。
-差别不是风格问题：`.agents/skills/**` 是会被印成站点的**投影源**，程序自己的开发须知不该混进去。
+程序自己的 skill 住在 **`skills/`** —— 给**用这个仓库的人**看的那份（用它的人 + 改它的人）。
+它和内容根**不是一回事**：`.agents/skills/**` 是**内容**，也就是会被印成站点、给别人看的那份
+（由内容仓持有）；`skills/**` 是本仓库自己的那一批。
 
-跑门时**显式指内容根**（默认那个根是内容仓的）：
+⚠️ 这不是风格问题：`skills/` 的形状**和内容根一模一样**（`skills/<名字>/SKILL.md`），
+所以将来把程序自己的 skill 印成站点（自举）时，它天然就是那个内容根。
+
+跑门时**显式指这个根**（默认那个根是内容仓的）：
 
 ```bash
-node bin/skillpress.mjs check --skills .dsh/skills
+node bin/skillpress.mjs check --skills skills
 ```
 
 落锁同样认这个根，而且 `--update-lock` **出现在哪儿都认**（曾经它必须正好是第一个参数，
@@ -83,14 +86,14 @@ node bin/skillpress.mjs check --skills .dsh/skills
 其实什么都没发生）：
 
 ```bash
-node bin/skillpress.mjs check --skills .dsh/skills --update-lock
+node bin/skillpress.mjs check --skills skills --update-lock
 ```
 
 `skills.lock.json` 仍然**只有一份**（跟着程序走 = 它是机制的契约），但每条指纹都记着
 **它属于哪个内容根** ⇒ 查 A 根不会把 B 根的条目报成"已删除的 skill"。
 
-⚠️ **还没自举**（诚实清单）：`press` 只往内容仓那个实例写，所以 `.dsh/skills` 里的 skill
-暂时**上不了站点**（自举 = 程序自己也有内容根 + 实例，是下一步）。
+⚠️ **还没自举**（诚实清单）：`press` 只往内容仓那个实例写，所以 `skills/` 里的这两份
+暂时**上不了站点**（自举 = 程序自己也有实例，是下一步）。
 
 ## 六、诚实清单（现状，别写成"已支持"）
 
