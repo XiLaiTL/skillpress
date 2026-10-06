@@ -16,6 +16,10 @@ license = "Apache-2.0"
 
 description = "把一堆给 AI 看的 skill 印成一个给人看的站点：内容管线、通用门、构建期上色"
 
+readme = "README.md"
+
+repository = "https://github.com/XiLaiTL/skillpress"
+
 preferred_target = "js"
 
 import {

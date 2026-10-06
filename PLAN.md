@@ -439,3 +439,20 @@
 
 引擎的通用化与迁移（P8）→ 与 P6 的 `shell` 抽包合流 → 打出包 → **内容侧拆分与它同批做**
 （D19：引擎支持之前不动内容）。每个源文件 ≤ 400 行（R9 / D21）贯穿全程。
+
+## 7. 发布清单（`moon publish` **之前**要过的）
+
+> 这一节是"目标最后一步"的清单。⚠️ **发布是不可逆的对外动作** —— 走到这里要先停下来跟用户确认。
+
+| # | 要过的 | 怎么证 |
+|---|---|---|
+| 1 | **`moon.mod` 的元数据齐全** | 实测：`readme` 与 `repository` **原先没设**，`moon package` 每次警告两行（2026-10-06 已补）。发布前再跑一次 `moon package --list`，警告应为 0 |
+| 2 | **包内容复核** | `moon package --list`：要含 `engine/**`（含 `shell/`）、`skills/**`、规范与账本、`THIRD-PARTY-NOTICE.md`；**不该含** `tools/`、`_build/`、`.mooncakes/`、`skills.lock.json`（`.moonignore` 钉着） |
+| 3 | **许可与署名** | `LICENSE`（Apache-2.0）+ `THIRD-PARTY-NOTICE.md`（随包分发的语法资产是 MIT / Apache-2.0 —— 这条是**发出去才有的义务**） |
+| 4 | **判据全绿** | `tools/acceptance.sh`（A1/A2/A3）+ 四条对账判据 + `line-budget.sh` |
+| 5 | **凭据** | `moon login`（**需要用户**）—— 到这一步先问 |
+| 6 | 发布 | `moon publish` |
+| 7 | **发布后：外部视角** | 另一个工程 `moon add XiLaiTL/skillpress@<ver>` → `moon check` 编过（**这才是 A1 的注册表那条判据** —— 本地工作区那套不算数）；再跑一次 `tools/acceptance.sh` |
+
+⚠️ `moon package --list` 的读数**只在模块没人在改时可信**（实测：有子代理在改时它会报"20 个错误"，
+看着像包坏了，其实是半成品）。
