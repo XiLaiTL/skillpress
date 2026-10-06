@@ -15,6 +15,28 @@ cd "$(dirname "$0")/.."
 
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定内容仓（例：../moobile/skills）}"
 INSTANCE="${SKILLPRESS_INSTANCE:-$SKILLPRESS_CORPUS/skillpress/scripts/.skillpress}"
+
+# ── 证伪：判据**自己**也要被证明会红、也会绿 ──────────────────────────────────
+# A2 那三条要在"合规实例"上全绿、在"不合规实例"上全红 —— 不然它可能是一条**永远红**（或永远绿）的判据。
+# 只对 A2 做：A1 要编译本模块（读数受"有没有人在改"影响），A3 要真站点，都不适合造假的对照。
+if [ "${1:-}" = "--selftest" ]; then
+  W=./_build/accept-selftest
+  rm -rf "$W"; mkdir -p "$W/good" "$W/bad/shell"
+  printf 'pub fn app() {\n  @skillpress.shell.site()\n}\n' > "$W/good/app.mbt"
+  printf 'name = "x"\n\nimport {\n  "XiLaiTL/skillpress@0.1.0",\n}\n' > "$W/good/moon.mod"
+  for _ in $(seq 1 100); do echo "// 界面代码" >> "$W/bad/app.mbt"; done
+  printf 'name = "x"\n' > "$W/bad/moon.mod"
+  a2() { SKILLPRESS_INSTANCE="$(pwd -W)/_build/accept-selftest/$1" bash "$0" 2>&1 | sed -n '/^A2/,/^A3/p' | grep -c '✓'; }
+  good=$(a2 good)
+  bad=$(a2 bad)
+  rm -rf "$W"
+  if [ "$good" = 3 ] && [ "$bad" = 0 ]; then
+    echo "✓ 证伪通过：合规实例 A2 全绿（$good/3），不合规实例 A2 全红（$bad/3）"
+    exit 0
+  fi
+  echo "✗ 证伪失败：合规=$good/3（应为 3）｜不合规=$bad/3（应为 0）—— A2 那几条有问题"
+  exit 1
+fi
 GENERATED="$INSTANCE/content/content.generated.mbt"
 DO_BUILD="${1:-}"
 
