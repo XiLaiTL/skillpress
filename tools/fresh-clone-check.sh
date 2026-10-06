@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fresh-clone-check.sh —— **干净克隆自查**：把 HEAD 克隆到临时目录（**只有 tracked 文件**），
-# 装依赖，跑四条对账判据 + R9。
+# 装依赖，跑四条对账判据 + R9 + 诊断口径账本。
 #
 #   SKILLPRESS_CORPUS=<内容仓>/skills bash tools/fresh-clone-check.sh
 #   SKILLPRESS_CORPUS=<内容仓>/skills bash tools/fresh-clone-check.sh --selftest   # 诱饵
@@ -57,6 +57,7 @@ run blocks-parity bash tools/blocks-parity.sh
 run highlight-parity bash tools/highlight-parity.sh
 run blocks-fixtures bash tools/blocks-fixtures.sh
 run line-budget bash tools/line-budget.sh
+run diagnostics-ledger bash tools/diagnostics-ledger.sh
 echo
 
 # ── 诱饵（--selftest）：把一条检测规矩的**措辞**改掉 ⇒ blocks-fixtures 必须点出这一条 ──────
