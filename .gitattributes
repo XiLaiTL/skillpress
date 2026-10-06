@@ -11,6 +11,7 @@
 
 # 无扩展名的那几份：字节必须稳定，别做任何转换
 .gitignore     -text
+.moonignore    -text
 .gitattributes -text
 .editorconfig  -text
 LICENSE        -text

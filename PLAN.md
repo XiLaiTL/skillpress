@@ -274,6 +274,22 @@
 `highlights.scm`；上色质量是这条路上最要紧的风险，必须在 P8.1 用同一块 + 同一份 scm 量）；
 **字节偏移 ↔ 字符下标**（tree-sitter 给 UTF-8 字节偏移，MoonBit 的 `String` 在 js 后端是 UTF-16）。
 
+**P8.1 起步（2026-10-06，js 主路）**：
+
+- 正式模块落位：程序仓根上的 `moon.mod`（`XiLaiTL/skillpress` v0.1.0，`preferred_target = js`）
+  + `.moonignore`（`/tools/`、`/_build/`、`skills.lock.json` 不进包）。
+- **上色链在 js 上打通**（`engine/highlight/`）：`hl.mbt` = 色号表 / 区间收集 / 片段拼装 / 未上色计数（**纯逻辑**）；
+  `ts_shim.mbt` = 一层**薄垫片**，只把 tree-sitter 的 capture 压成"名字	起点	终点"三列文本，其余全在 MoonBit。
+  异步留在**引导层** `tools/run-js.mjs`（Node 先 `await` 装好 `web-tree-sitter` 与我们 vendor 的 5 份 wasm，
+  挂 `globalThis`）—— 因为 `moon run --target js` 产出的是 **CJS**，顶层 await 不成立。
+- **读数对账（同一块 + 同一份 scm）**：bash 块与旧实现**逐项一致**（未上色 19/23 ｜ 色号 6 → 0 ｜ 拼回原文 true）；
+  moonbit 块差 **1/93**（31 vs 30）—— 差在旧实现的"**包装候选**"还没搬（**已知缺口**，下一步补）。
+- **A1 的机制已经活了**：`moon package --list` 打出 `XiLaiTL-skillpress-0.1.0.zip`（42 文件 / 437 KB，含 `engine/`）。
+  ⚠️ 但"**别的工程装上**"这条**必须真发布才能证** —— `moon add` **只认注册表模块名**，没有本地路径形式
+  （本地联调只能靠 `moon.work` 工作区）；发布要凭据（等用户点头）。
+- ⚠️ 包里**暂时还带着 Node 版引擎**（`lib/*.mjs`、`bin/`、`package.json`）：过渡期如此，
+  等 MoonBit 侧与它对齐（P8.1–P8.3）之后再把它请出包。
+
 **每一步都要守的一条**：**R6 通用性**（D16）—— 迁完不许变成「只有 moobile 能跑」。
 新建的门/管线一律先问一句：**一个只有 `skills/` 的陌生仓库，它跑得起来吗？**
 

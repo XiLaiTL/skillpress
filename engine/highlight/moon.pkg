@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/core/string" @string,
+}
+
+supported_targets = "+js"
+
+options(
+  targets: {
+    "ts_shim.mbt": [ "js" ],
+  },
+)

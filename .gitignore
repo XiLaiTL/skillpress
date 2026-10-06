@@ -15,3 +15,6 @@ Thumbs.db
 tools/spike/.mooncakes/
 tools/spike/_build/
 tools/spike/node_modules/
+
+# MoonBit 依赖缓存与构建产物（下载来的 / 编出来的，不进仓）
+.mooncakes/

@@ -1,0 +1,13 @@
+# .moonignore —— 发布到 mooncakes.io 的文件策略（它会**替换** .gitignore，不是叠加）
+#
+# 发布范围 = **引擎 + shell + 程序自己的 skill**：
+#   engine/** ｜ shell/** ｜ cmd/** ｜ skills/** ｜ SPEC.md / SKILLS.md / DRIFT.md / PLAN.md
+#
+# 不进包的：
+/tools/
+/_build/
+/.mooncakes/
+/node_modules/
+/.git/
+# 体量指纹是**某一份内容**的，而且记的是本机绝对路径 ⇒ 不随包走
+/skills.lock.json
