@@ -261,6 +261,19 @@
 ⚠️ **内容侧的拆分（`WEBSITE.md` + `SKILL.md` 瘦身 + 第一个 ignore）与这批同批做** —— 用户定（2026-10-06）：
 引擎支持之前不动内容，免得"文档/内容先跑在实现前面"。
 
+**P8.0 探针已跑（2026-10-06，代码与结论在 `tools/spike/`）**：
+
+| 问 | 答 |
+|---|---|
+| `mizchi/markdown` 够不够映射我们的 `Block`/`Span` | **够**（块类型齐全 + **自带 frontmatter 解析**；与正则真值逐项一致），跑在 **js** |
+| tree-sitter 上色链 | **两条路各缺一块**：js 被包声明的 `supported-targets: +native` 挡住；native 被**上游缺 C 源**挡住（`tree_sitter@0.4.6` 的 `tree-sitter.c` include 了包里没有的 `tree-sitter/lib/src/lib.c`） |
+| 走哪条 | **js 是主路**（就那一个 `web-tree-sitter` 依赖，与现状一致；语法用我们自己 vendor 的 wasm）；native 记为备选 = "零 npm"那条，等上游修 |
+| 额外两条硬结论 | ① **native 必须先设 MSVC 环境**（不设时报的是 `LNK1120`，像"没装工具链"，其实是 `INCLUDE`/`LIB` 没设；本机用 `native-build.bat` 包 vcvars64）② **js 与 native 是两张构建图**（一个入口 import 了只支持 native 的包，js 整张图就编不出来）⇒ 探针拆成 `cmd/js` 与 `cmd/native` |
+
+⚠️ 探针**没**回答的（别当成已覆盖）：**召回率对账**（它的 query 是精简 4 条 pattern，不是完整
+`highlights.scm`；上色质量是这条路上最要紧的风险，必须在 P8.1 用同一块 + 同一份 scm 量）；
+**字节偏移 ↔ 字符下标**（tree-sitter 给 UTF-8 字节偏移，MoonBit 的 `String` 在 js 后端是 UTF-16）。
+
 **每一步都要守的一条**：**R6 通用性**（D16）—— 迁完不许变成「只有 moobile 能跑」。
 新建的门/管线一律先问一句：**一个只有 `skills/` 的陌生仓库，它跑得起来吗？**
 

@@ -1,0 +1,7 @@
+import {
+  "XiLaiTL/skillpress-spike/probe" @probe,
+  "XiLaiTL/skillpress-spike/hl" @hl,
+  "mizchi/markdown" @markdown,
+}
+
+pkgtype(kind: "executable")

@@ -15,6 +15,14 @@
 .editorconfig  -text
 LICENSE        -text
 
+# MoonBit 源码与模块文件：LF（照 moobile 的规矩 —— 本机 core.autocrlf=true，
+# 不钉的话检出来是 CRLF，diff 噪声大且与上游文件不一致）
+*.mbt    text eol=lf
+*.mbt.md text eol=lf
+*.mbti   text eol=lf
+moon.pkg text eol=lf
+moon.mod text eol=lf
+
 # 程序与数据：UTF-8 + LF
 *.mjs  text eol=lf
 *.js   text eol=lf

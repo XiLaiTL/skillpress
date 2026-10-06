@@ -10,3 +10,8 @@ dist/
 # 杂项
 .DS_Store
 Thumbs.db
+
+# P8.0 探针（tools/spike）：依赖缓存与构建产物不进仓
+tools/spike/.mooncakes/
+tools/spike/_build/
+tools/spike/node_modules/

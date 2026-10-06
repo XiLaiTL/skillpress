@@ -1,0 +1,7 @@
+import {
+  "tonyfettes/tree_sitter" @ts,
+  "tonyfettes/tree_sitter_bash" @bash,
+}
+
+// tree_sitter 声明了 supported-targets，这里跟着声明（moon 的警告要求依赖方也说清楚）
+options("supported-targets": "+native")

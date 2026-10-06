@@ -1,0 +1,10 @@
+import {
+  "mizchi/markdown" @markdown,
+}
+
+options(
+  targets: {
+    "io.js.mbt": [ "js" ],
+    "io.native.mbt": [ "native" ],
+  },
+)
