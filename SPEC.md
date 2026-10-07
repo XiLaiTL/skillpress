@@ -2,7 +2,7 @@
 
 > **一句话**：`docs/**` 是事实的家；skill 是**给 AI 用的投影** —— 只收慢变的、不可推导的、会让人踩坑的东西，其余留指针。
 >
-> 状态：**v0**（2026-10-04 起草；2026-10-06 补 §0 需求）。判据见 §6，工具见程序根的 `bin/skillpress.mjs`，分工见 [`SKILLS.md`](SKILLS.md)。
+> 状态：**v0**（2026-10-04 起草；2026-10-06 补 §0 需求）。判据见 §6，工具见 `cmd/skillpress`（门与 CLI）与 `engine/site/`（站点判据），分工见 [`SKILLS.md`](SKILLS.md)。
 
 ---
 
@@ -105,7 +105,7 @@ skills/<name>/
 4. **`_meta.json` 不是事实的家**：它只管打包（版本、owner）。**事实仍然只在 `docs/**`**。
 5. **子页的位置不限**：`references/` 只是**推荐**位置 —— **任何子目录里的 `.md`** 都会被收成子页
    （`docs/…`、`notes/…` 都行），并且一样过门、一样进指纹。跳过的是产物与点开头目录
-   （`node_modules/`、`_build/`、`dist/`、`.mooncakes/`、`.git/`…），规矩写在 `lib/kids.mjs`。
+   （`node_modules/`、`_build/`、`dist/`、`.mooncakes/`、`.git/`…），规矩写在 `engine/content/kids.mbt`。
 
 > 为什么值得外置：SKILL.md 是**一次性全量进上下文**的（§1），而 refs 只在需要时读。
 > 把 34 道门的逐条说明塞进主文档，等于让每次加载都付那笔 token。
@@ -148,7 +148,7 @@ skills/<name>/
 
 ---
 
-## 6. 门（`check.mjs`，住在**程序根**的 `lib/` 里 —— 程序是与内容仓平级的另一个仓库）
+## 6. 门（`engine/gates/`，由 `cmd/skillpress` 就是**程序根**的 CLI 调起来 —— 程序是与内容仓平级的另一个仓库）
 
 | # | 判据 | v0 状态 |
 |---|---|---|
@@ -165,7 +165,7 @@ skills/<name>/
 它会让 AI 自信地写错代码，而且没人会发现。
 
 > **G3 / G4 为什么查三个根**：多数 skill 讲 moobile，路径相对**内容仓根**；
-> 但内容里也有"这套工具自己在哪儿"的指针（`bin/skillpress.mjs`、`lib/check.mjs`、
+> 但内容里也有「这套工具自己在哪儿」的指针（`cmd/skillpress`、`engine/gates/`、
 > `grammars/PROVENANCE.md`），它们相对**程序根** —— 而程序是**另一个仓库**（内容仓的兄弟）；
 > 还有 `scripts/**` 这种相对**那个 skill 自己的目录**的（站点实例就住在里面）。
 > 只认一个根会让另两边全红，而人红了之后的处置通常是**把真引用删掉** ——
@@ -181,7 +181,7 @@ skills/<name>/
 ✅ **已搬去内容仓自己**（D18，2026-10-06 落地）：它查的是 **moobile 的 `docs/**`** 有没有撒谎 ——
 对别人的内容仓毫无意义。今天住在 `moobile/tools/skillpress-gates.mjs`（和 G5 / G6 一个入口：
 `--gate g5|g6|facts|check`），台账 `done-claims.txt` 也跟着**搬进内容仓根**了
-（它的证据路径本来就全是相对 moobile 的）。程序这边只留**冻结的旧实现**（`lib/docfacts.mjs`
+（它的证据路径本来就全是相对 moobile 的）。程序这边当时只留**冻结的旧实现**（`lib/docfacts.mjs`，**已随 `lib/` 退役**）
 与 `facts` 子命令）：身份从"现役门"变成"搬走时的对照物"——搬的时候逐字节对过账
 （真仓库 facts 整份 **diff 0 行**、真内容夹具 647 行 **diff 0 行**）。
 

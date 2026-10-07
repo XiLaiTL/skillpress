@@ -81,7 +81,7 @@
 
 | # | skill | 场景 | 主要来源 | 状态 |
 |---|---|---|---|---|
-| **D1** | `skillpress` | **写一份 skill / 跑门 / 动站点**：收录判据、结构预算（门禁 vs 深水区）、两道门、站点管线 | **程序根**的 `SPEC.md` §2 / §3 / §6 / §8、`DRIFT.md` §4、`claims.txt`、`lib/check.mjs` | ✅ |
+| **D1** | `skillpress` | **写一份 skill / 跑门 / 动站点**：收录判据、结构预算（门禁 vs 深水区）、两道门、站点管线 | **程序根**的 `SPEC.md` §2 / §3 / §6 / §8、`DRIFT.md` §4、`claims.txt`、`engine/gates/` | ✅ |
 
 **它为什么自成一族**：A / B / C 三族讲的是 **moobile**，D 讲的是**这套投影机制本身** ——
 读者是"要写/改 skill 的人"（多半也是 AI），来源不是 `docs/**` 而是**程序根**的规范与工具。
@@ -132,5 +132,5 @@
 每份产出**必须跑门跑到全绿**：
 
 ```bash
-cd ../moobile && node ../skillpress/bin/skillpress.mjs check
+cd ../moobile && node ../skillpress/tools/run-js.mjs check
 ```
