@@ -40,6 +40,12 @@ fn mk_host(files : Array[(String, String)], dirs : Array[(String, Array[String])
     fn(p) { p },
     fn(_p, _t) { () },
     fn() { "/fake/cwd" },
+    // 脚手架那三件：假宿主上"建目录"是空操作（内存树里没有真目录）、
+    // **不是终端**（默认不问人）、**没有答案**（每次给空串 ⇒ 走默认值那条路）。
+    // ⚠️ 这三条是**门用不到**的注入点，所以这里给的是最笨的合法值，不是"门的假数据"。
+    fn(_p) { () },
+    fn() { false },
+    fn(_prompt) { "" },
   )
 }
 

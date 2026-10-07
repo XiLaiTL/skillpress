@@ -95,7 +95,7 @@ PKG=".mooncakes/XiLaiTL/skillpress"
 echo "③ 发布包内容复核（跟工作区那份分开看）"
 miss=0
 for need in moon.mod engine/gates/moon.pkg engine/content/moon.pkg shell/moon.pkg \
-  cmd/skillpress/main.mbt launcher/skillpress.mjs grammars/moonbit.wasm claims.txt \
+  cmd/skillpress/cli/cli.mbt launcher/skillpress.mjs grammars/moonbit.wasm claims.txt \
   skills/skillpress-user/SKILL.md LICENSE THIRD-PARTY-NOTICE.md; do
   [ -e "$PKG/$need" ] || { echo "  ✗ 缺 $need"; miss=1; }
 done

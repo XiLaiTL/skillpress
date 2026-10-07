@@ -1,0 +1,18 @@
+// **native（本机）宿主** —— 与 `engine/gates/js` 对称的那一份。
+//
+// `Host` 是注入的（见 `engine/gates/host.mbt` 的文件头）：门的判据是纯逻辑，
+// "磁盘上到底有没有 / 终端是不是终端"是运行时的事 ⇒ 换 target 只换这一份。
+//
+// ⚠️ 只有 **native**：这个包**不能**被需要在 js 上编的东西依赖（moon 没有条件 import，
+//    见 P10 第 ⑦ 条）—— 所以它只给 native 的可执行件用。js 那份在 `engine/gates/js`。
+import {
+  "XiLaiTL/skillpress/engine/gates" @gates,
+  "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/path" @path,
+}
+
+supported_targets = "+native"
+
+options(
+  "native-stub": [ "host.c" ],
+)

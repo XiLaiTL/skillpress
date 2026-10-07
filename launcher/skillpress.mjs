@@ -7,7 +7,9 @@
  *   · **这里**（Node，能 await）：装好 tree-sitter + 这份包自带的 `grammars/*.wasm` 与 `.scm`，
  *     挂到 `globalThis.__skillpress_ts`；
  *   · **MoonBit 那边**只做同步调用（`engine/highlight/ts_shim.mbt`），色号与拼装都在 MoonBit 里。
- * 开发仓里同一件事由 `tools/run-js.mjs` 干（那个文件是**判据用的**，不进包）。
+ *
+ * ⚠️ **这份是唯一实现**：开发期的 `tools/run-js.mjs` 只是一行转发（`/tools/` 不进包，
+ *    所以"一份实现"只能落在这儿）。别把那 170 行抄回去 —— 2026-10-07 实测的账写在那边文件头。
  *
  * ## 拿到这个包的人怎么用它（R6 要回答的那一问）
  *
@@ -26,9 +28,8 @@
  *
  * ⚠️ **`check` 连 tree-sitter 都不 import**（门不碰高亮）—— 那一条在 `gen-file` 之前就分发掉了。
  *    需要高亮的只有 `gen-file` / `hl` / `batch` / `dump-blocks`（`dump-blocks` 里也带高亮片段）。
- *
- * ⚠️ **如实记下的代价**：`grammars/`（wasm + scm）随包发（署名见 `THIRD-PARTY-NOTICE.md`），
- *    但 `web-tree-sitter` 只能由使用者 `npm i` —— 这是"js target + 树剖析"这条路本身的账。
+ *    这不只是省事：`check` 是**唯一**一条"不装 tree-sitter 也该能跑"的路，判据
+ *    `tools/consumer-check.sh` 拿它证明"只想跑门的人不被高亮挡住"。
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -83,7 +84,16 @@ const skipName = (name) => SKIP_DIRS.has(name) || name.startsWith(".");
 function mdKids(skillDir) {
   const out = [];
   const walk = (dir, prefix) => {
-    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    // ⚠️ 列不到的目录 = **空表**，不是崩溃（与宿主那一侧同一口径：读不到给空串、列不到给空表）。
+    //    实测踩到：脚手架的 `attach` 会把"这次要创建、但磁盘上还没有"的 skill 目录交给内容管线
+    //    （它得按"写完之后"的语料算书架），没有这句兜底就当场 ENOENT 崩掉。
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    } catch {
+      return;
+    }
+    for (const e of entries) {
       if (skipName(e.name)) continue;
       const rel = prefix ? `${prefix}/${e.name}` : e.name;
       const abs = join(dir, e.name);

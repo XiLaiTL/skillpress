@@ -1,0 +1,12 @@
+// 脚手架（`attach`）的**纯逻辑**：扫内容根、算路径与名字、把 README 改写成首页、拼忽略清单、
+// 替换模板里的占位符。
+//
+// ⚠️ **刻意不 import `engine/content`**：内容管线那条链是 js 专用的（读文件 / 上色走垫片），
+//    而这里的东西全是字符串与路径的算术 —— 分开之后 `moon test` 在任何 target 上都能跑它们，
+//    真正"碰内容管线"的那一步留给 `cmd/skillpress/attach.mbt`。
+// ⚠️ 也不 import `engine/gates` 的**实现**以外的东西：宿主是注入的（`Host`），
+//    所以判据可以喂内存树，不必往磁盘上造一个假项目。
+import {
+  "XiLaiTL/skillpress/engine/gates" @gates,
+  "XiLaiTL/skillpress/engine/ignore" @ig,
+}

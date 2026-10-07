@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# blocks-fixtures.sh —— **夹具对账**：拿一组"刁钻但合法"的 markdown 当内容源，
-# 用**旧生成器**现场产出基准，再拿新实现（`engine/content`）与它逐字节对账。
+# blocks-fixtures.sh —— **夹具对账**：拿一组「刁钻但合法」的 markdown 当内容源，
+# 再拿新实现（`engine/content`）的读数与**入库的 golden**逐字节对账。
+#
+# ⚠️ 2026-10-07（PLAN 的 D43）：参照物从「现场跑冻结的旧生成器」换成了入库 golden
+#    —— 旧生成器随 `lib/` 一起退役了。期望值在 `tools/fixtures/expected/`覆盖的是
+#    「both 个引擎都同意」的那份产物（换之前这条判据已经在它上报过一次绿）。
 #
 #   bash tools/blocks-fixtures.sh
 #
@@ -17,6 +21,7 @@ cd "$(dirname "$0")/.."
 source tools/_ensure-built.sh
 
 W=./_build/fixtures
+EXPECT=tools/fixtures/expected
 rm -rf "$W"
 mkdir -p "$W/root/alpha/references" "$W/root/beta" "$W/root/skillpress" "$W/app"
 
@@ -118,39 +123,28 @@ whenToUse: 测试
 ```
 MD
 
-# ── 旧生成器现场产出基准（写进临时 app）──────────────────────────────────────
-node lib/gen-content.mjs --skills "$W/root" --app "$W/app" > "$W/gen.log" 2>&1 || {
-  echo "✗ 旧生成器跑失败（$W/gen.log）："; tail -5 "$W/gen.log"; exit 1;
-}
-node tools/spike/old-doc-blocks.mjs "$W/app/content/content.generated.mbt" > "$W/base.raw.txt" || {
-  echo "✗ 基准切不出来"; exit 1;
-}
+# ── 新引擎现跑 → 与**入库 golden** 逐字节比 ────────────────────────────
+# ⚠️ 2026-10-07（PLAN D43）：参照物从「现场跑冻结的旧生成器」换成了**入库的 golden**（旧生成器随 `lib/` 一起退役）。
+#    golden 里那份期望是**两个引擎都同意**的那份产物（换之前这条判据已经在它上报过一次绿）。
 node tools/run-js.mjs dump-blocks "$W/root" > "$W/new.raw.txt" 2>&1 || {
   echo "✗ 新实现跑失败："; tail -5 "$W/new.raw.txt"; exit 1;
 }
-
-# ── 归一化（P6 的口径）：两边都过 `tools/normalize-gen.mjs` ───────────────────
-# P6 把类型搬进包 `shell` ⇒ 新实现的每个构造器带 `@shell.` 前缀，而基准那侧（旧生成器的产物，现场产出）
-# 是裸构造器。**形状差不是内容差**，所以先归一化再逐字节比 —— 规则与理由见
-# `tools/normalize-gen.mjs` 的文件头（那边还带 `--selftest`，证明"值改一个字符必须红"）。
-# ⚠️ 两条形状守卫不是装饰：没有它们，"旧生成器哪天也被改成吐前缀"会让这条 diff 变成**恒真**。
-if grep -q '@shell\.' "$W/base.raw.txt"; then
-  echo "✗ 夹具一：基准里出现了 \`@shell.\` —— 旧生成器不该吐新形状（基准侧被换掉了？）"; exit 1
-fi
+# 形状守卫（不是装饰）：没有它，「引擎哪天改成吐旧形状」会让下面那条 diff 变成**恒真**。
 if ! grep -q '@shell\.' "$W/new.raw.txt"; then
-  echo "✗ 夹具一：新实现里没有 \`@shell.\` —— 类型没搬进包（新形状没生效？）"; exit 1
+  echo "✗ 夹具一：新实现里没有 @shell. 前缀 —— 类型没搬进包（新形状没生效？）"; exit 1
 fi
-node tools/normalize-gen.mjs "$W/base.raw.txt" > "$W/base.txt"
-node tools/normalize-gen.mjs "$W/new.raw.txt" > "$W/new.txt"
+# 归一化（P6 的口径，三条规则）：只抹**形状差**（文件头注释 / 类型声明块 / `@shell.` 前缀）。
+# ⚠️ golden 里存的就是**归一化之后**的那份（与这里同一条管道）—— 两边都过同一个归一化器，否则比的就不是同一件事。
+bash tools/normalize-gen.sh "$W/new.raw.txt" > "$W/new.txt"
 
-if diff -u "$W/base.txt" "$W/new.txt" > "$W/diff.txt"; then
-  # 诱饵：把新产物改**一个字符**，这条 diff 必须红 —— 证明归一化没把判据吃空
+if diff -u "$EXPECT/blocks-fixtures.txt" "$W/new.txt" > "$W/diff.txt"; then
+  # 诱饵：把产物改**一个字符**，这条 diff 必须红 —— 证明归一化没把判据吃空
   sed '0,/Txt("/s//Txt("诱/' "$W/new.txt" > "$W/new-decoy.txt"
-  if diff -q "$W/base.txt" "$W/new-decoy.txt" > /dev/null; then
+  if diff -q "$EXPECT/blocks-fixtures.txt" "$W/new-decoy.txt" > /dev/null; then
     echo "✗ 夹具一（诱饵）：值改一个字符居然还判「一致」—— 归一化把这条判据吃空了"; exit 1
   fi
   docs=$(grep -c '^### ' "$W/new.txt")
-  echo "✓ 夹具对账通过：$docs 段（含结尾标记）与**旧生成器现场产出**的基准逐字节一致（归一化后；诱饵已证会红）"
+  echo "✓ 夹具对账通过：$docs 段（含结尾标记）与入库 golden 逐字节一致（归一化后；诱饵已证会红）"
 else
   echo "✗ 夹具对账不一致（完整 diff 在 $W/diff.txt）："
   head -30 "$W/diff.txt" | sed 's/^/    /'
@@ -214,65 +208,51 @@ title: 子页
 正文。
 MD
 
-SKILLPRESS_SKILLS="$W3" node lib/gen-content.mjs --skills "$W3" --app "$W/app3" > "$W/old3.out" 2> "$W/old3.err"
-old_rc=$?
 node tools/run-js.mjs gen-file "$W3" > "$W/new3.out" 2> "$W/new3.err"
 new_rc=$?
 
 fail=0
-[ "$old_rc" = 2 ] || { echo "✗ 夹具三：旧实现退出码是 $old_rc（应当是 2）"; fail=1; }
-[ "$new_rc" = 2 ] || { echo "✗ 夹具三：新实现退出码是 $new_rc（应当是 2）"; fail=1; }
-[ ! -e "$W/app3/content/content.generated.mbt" ] || { echo "✗ 夹具三：旧实现竟然写了产物（基准本身就不该存在）"; fail=1; }
-[ ! -s "$W/new3.out" ] || { echo "✗ 夹具三：新实现有问题却还往 stdout 吐了产物 —— 正是旧实现刻意不做的事"; fail=1; }
+[ "$new_rc" = 2 ] || { echo "✗ 夹具三：退出码是 $new_rc（应当是 2）"; fail=1; }
+[ ! -s "$W/new3.out" ] || { echo "✗ 夹具三：有问题却还往 stdout 吐了产物 —— 刻意不做的事"; fail=1; }
 for kind in '不支持的构造（图片）' '不支持的构造（原始 HTML）' '表格缺分隔行' '代码块没闭合'; do
-  grep -q "$kind" "$W/new3.err" || { echo "✗ 夹具三：新实现没点名「$kind」（夹具没触发，或规矩漏了）"; fail=1; }
+  grep -q "$kind" "$W/new3.err" || { echo "✗ 夹具三：没点名「$kind」（夹具没触发，或规矩漏了）"; fail=1; }
 done
-n_old=$(grep -c '✗' "$W/old3.err" || true)
 n_new=$(grep -c '✗' "$W/new3.err" || true)
-[ "$n_old" = 5 ] && [ "$n_new" = 5 ] || { echo "✗ 夹具三：点名条数 旧=$n_old 新=$n_new（都应当是 5）"; fail=1; }
-# ⚠️ stderr 里**现在还有信息行**（`· ` 开头）—— 例如 R2 要求的「首页源：`skillpress/SKILL.md`（没有
-#    `WEBSITE.md` ⇒ 按 R2 回退…）」 + `--home` 指定时那一行。这个夹具比的是**问题清单**
-#    （点名逐字节一致），所以先把信息行滤掉再 diff；信息行本身归 `tools/site-source.sh` 管
-#    （它是 R2/小 R4 的判据），别在这儿重复管 —— 也别让"多打了一句实话"把这条判据弄红。
-grep -v '^· ' "$W/old3.err" > "$W/old3.cmp"
+[ "$n_new" = 5 ] || { echo "✗ 夹具三：点名条数 $n_new（应当是 5）"; fail=1; }
+# ⚠️ stderr 里**现在还有信息行**（`· ` 开头）—— 例如 R2 要求的「首页源…」。这个夹具比的是**问题清单**
+#    （点名逐字节一致），所以先把信息行滤掉再 diff —— 也别让「多打了一句实话」把这条判据弄红。
 grep -v '^· ' "$W/new3.err" > "$W/new3.cmp"
-if diff -u "$W/old3.cmp" "$W/new3.cmp" > "$W/diff3.txt"; then
+if diff -u "$EXPECT/blocks-fixture3.err" "$W/new3.cmp" > "$W/diff3.txt"; then
   :
 else
-  echo "✗ 夹具三：诊断**不一致**（完整 diff 在 $W/diff3.txt）："
+  echo "✗ 夹具三：诊断与入库 golden **不一致**（完整 diff 在 $W/diff3.txt）："
   head -30 "$W/diff3.txt" | sed 's/^/    /'
   fail=1
 fi
 if [ "$fail" = 0 ]; then
-  echo "✓ 夹具三对账通过：4 类认不出的构造 $n_new 条点名，行号/措辞/顺序与旧实现**逐字节一致**，且两边都没吐产物"
+  echo "✓ 夹具三对账通过：4 类认不出的构造 $n_new 条点名，行号/措辞/顺序与入库 golden**逐字节一致**，且没吐产物"
 else
-  # 不早退：让夹具四照样出声 —— 红的地方要一次看全，别让前一段把后一段的读数挡住
+  # 不早退：让夹具四照样出声 —— 红的地方要一次看全
   echo "✗ 夹具三**未通过**（仍然继续跑夹具四）"
 fi
 
-# ── 夹具四：**空内容根**（一份 SKILL.md 都没有）⇒ 行为一致、措辞**故意**不一致 ─────
+# ── 夹具四：**空内容根**（一份 SKILL.md 都没有）⇒ 退 2、不吐产物、措辞逐字节冻住 ─────────
 #
 # 为什么单列一段：这是本项目**唯一一条记账过的口径偏差**（PLAN 决定表 **D22**）。
 #   旧实现：`skills/ 下没有 SKILL.md`，**还会多报一条**「找不到首页」（它接着往下读首页了）；
 #   新实现：「内容根下没有带 SKILL.md 的目录（引导层按 `gen-file <内容根>` 列举，检查那个参数）」。
 # 偏差的理由（D22 里写着）：旧句把根名**写死**成 `skills/`，而内容根现在可配置
 #   （`--skills <目录>` / `SKILLPRESS_CORPUS`）—— 照抄旧句在新设计下就成了**假话**。
-# 这一段盯两件事：① 「行为」（**退 2 + 不吐产物**）两边不许漂；② 新措辞**逐字节冻住**，改动即红。
+# 这一段盯两件事：① 「行为」（**退 2 + 不吐产物**）不许漂；② 措辞**逐字节冻住**，改动即红。
+#    （旧实现那一侧的断言已随 `lib/` 退役；「旧句」本身仍留在 D22 的记账里作为出处。）
 # 诱饵：再跑一次**有内容**的内容根，断言那句话**不出现** —— 证明它不是"永远都打"。
 W4="$W/empty-corpus"
 mkdir -p "$W4/empty" "$W4/app4"
-SKILLPRESS_SKILLS="$W4/empty" node lib/gen-content.mjs --skills "$W4/empty" --app "$W4/app4" > "$W4/old4.out" 2> "$W4/old4.err"
-old4_rc=$?
 node tools/run-js.mjs gen-file "$W4/empty" > "$W4/new4.out" 2> "$W4/new4.err"
 new4_rc=$?
 node tools/run-js.mjs gen-file "$W/root" > "$W4/new4b.out" 2> "$W4/new4b.err"
 
 f4=0
-[ "$old4_rc" = 2 ] || { echo "✗ 夹具四：旧实现退出码是 $old4_rc（应当是 2）"; f4=1; }
-grep -q 'skills/ 下没有 SKILL.md' "$W4/old4.err" ||
-  { echo "✗ 夹具四：旧实现没点名「skills/ 下没有 SKILL.md」—— 这条偏差的『旧句』就是它，基准变了"; f4=1; }
-[ ! -e "$W4/app4/content/content.generated.mbt" ] ||
-  { echo "✗ 夹具四：旧实现竟然写了产物（基准本身就不该存在）"; f4=1; }
 [ "$new4_rc" = 2 ] || { echo "✗ 夹具四：新实现退出码是 $new4_rc（应当是 2）"; f4=1; }
 [ ! -s "$W4/new4.out" ] ||
   { echo "✗ 夹具四：新实现有问题却还往 stdout 吐了产物 —— 正是旧实现刻意不做的事"; f4=1; }
@@ -292,7 +272,7 @@ grep -q 'D22' PLAN.md || {
 }
 
 if [ "$f4" = 0 ]; then
-  echo "✓ 夹具四对账通过：空内容根两边都退 2、都不吐产物；新措辞与 D22 记账的那句**逐字节一致**，且有内容的内容根不会打这句"
+  echo "✓ 夹具四对账通过：空内容根退 2、不吐产物；措辞与 D22 记账的那句**逐字节一致**，且有内容的内容根不会打这句"
 else
   echo "✗ 夹具四**未通过**"
 fi

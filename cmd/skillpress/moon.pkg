@@ -1,10 +1,15 @@
+// **js 可执行件**（CLI 的门面之一）。
+//
+// ⚠️ 这里只许放"接线"：宿主从 `engine/gates/js`（引导层 + Node fs），
+//    逻辑全在 `cli`（与 target 无关）。native 那一份在 `cmd/skillpress-native/`。
+//
+// ⚠️ 产物路径必须保持 `_build/js/debug/build/cmd/skillpress/skillpress.js` ——
+//    `tools/run-js.mjs` 与随包发的 `launcher/skillpress.mjs` 都按它找。
 import {
-  "moonbitlang/core/env" @env,
-  "XiLaiTL/skillpress/engine/highlight" @hl,
-  "XiLaiTL/skillpress/engine/content" @content,
-  "XiLaiTL/skillpress/engine/ignore" @ig,
-  "XiLaiTL/skillpress/engine/gates" @gates,
+  "XiLaiTL/skillpress/cmd/skillpress/cli" @cli,
   "XiLaiTL/skillpress/engine/gates/js" @gjs,
+  "XiLaiTL/skillpress/engine/content" @content,
+  "moonbitlang/core/env" @env,
 }
 
 supported_targets = "+js"

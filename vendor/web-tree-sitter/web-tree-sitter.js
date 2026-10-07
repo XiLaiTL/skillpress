@@ -1,108 +1,6 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// src/edit.ts
-var Edit = class {
-  static {
-    __name(this, "Edit");
-  }
-  /** The start position of the change. */
-  startPosition;
-  /** The end position of the change before the edit. */
-  oldEndPosition;
-  /** The end position of the change after the edit. */
-  newEndPosition;
-  /** The start index of the change. */
-  startIndex;
-  /** The end index of the change before the edit. */
-  oldEndIndex;
-  /** The end index of the change after the edit. */
-  newEndIndex;
-  constructor({
-    startIndex,
-    oldEndIndex,
-    newEndIndex,
-    startPosition,
-    oldEndPosition,
-    newEndPosition
-  }) {
-    this.startIndex = startIndex >>> 0;
-    this.oldEndIndex = oldEndIndex >>> 0;
-    this.newEndIndex = newEndIndex >>> 0;
-    this.startPosition = startPosition;
-    this.oldEndPosition = oldEndPosition;
-    this.newEndPosition = newEndPosition;
-  }
-  /**
-   * Edit a point and index to keep it in-sync with source code that has been edited.
-   *
-   * This function updates a single point's byte offset and row/column position
-   * based on an edit operation. This is useful for editing points without
-   * requiring a tree or node instance.
-   */
-  editPoint(point, index) {
-    let newIndex = index;
-    const newPoint = { ...point };
-    if (index >= this.oldEndIndex) {
-      newIndex = this.newEndIndex + (index - this.oldEndIndex);
-      const originalRow = point.row;
-      newPoint.row = this.newEndPosition.row + (point.row - this.oldEndPosition.row);
-      newPoint.column = originalRow === this.oldEndPosition.row ? this.newEndPosition.column + (point.column - this.oldEndPosition.column) : point.column;
-    } else if (index > this.startIndex) {
-      newIndex = this.newEndIndex;
-      newPoint.row = this.newEndPosition.row;
-      newPoint.column = this.newEndPosition.column;
-    }
-    return { point: newPoint, index: newIndex };
-  }
-  /**
-   * Edit a range to keep it in-sync with source code that has been edited.
-   *
-   * This function updates a range's start and end positions based on an edit
-   * operation. This is useful for editing ranges without requiring a tree
-   * or node instance.
-   */
-  editRange(range) {
-    const newRange = {
-      startIndex: range.startIndex,
-      startPosition: { ...range.startPosition },
-      endIndex: range.endIndex,
-      endPosition: { ...range.endPosition }
-    };
-    if (range.endIndex >= this.oldEndIndex) {
-      if (range.endIndex !== Number.MAX_SAFE_INTEGER) {
-        newRange.endIndex = this.newEndIndex + (range.endIndex - this.oldEndIndex);
-        newRange.endPosition = {
-          row: this.newEndPosition.row + (range.endPosition.row - this.oldEndPosition.row),
-          column: range.endPosition.row === this.oldEndPosition.row ? this.newEndPosition.column + (range.endPosition.column - this.oldEndPosition.column) : range.endPosition.column
-        };
-        if (newRange.endIndex < this.newEndIndex) {
-          newRange.endIndex = Number.MAX_SAFE_INTEGER;
-          newRange.endPosition = { row: Number.MAX_SAFE_INTEGER, column: Number.MAX_SAFE_INTEGER };
-        }
-      }
-    } else if (range.endIndex > this.startIndex) {
-      newRange.endIndex = this.startIndex;
-      newRange.endPosition = { ...this.startPosition };
-    }
-    if (range.startIndex >= this.oldEndIndex) {
-      newRange.startIndex = this.newEndIndex + (range.startIndex - this.oldEndIndex);
-      newRange.startPosition = {
-        row: this.newEndPosition.row + (range.startPosition.row - this.oldEndPosition.row),
-        column: range.startPosition.row === this.oldEndPosition.row ? this.newEndPosition.column + (range.startPosition.column - this.oldEndPosition.column) : range.startPosition.column
-      };
-      if (newRange.startIndex < this.newEndIndex) {
-        newRange.startIndex = Number.MAX_SAFE_INTEGER;
-        newRange.startPosition = { row: Number.MAX_SAFE_INTEGER, column: Number.MAX_SAFE_INTEGER };
-      }
-    } else if (range.startIndex > this.startIndex) {
-      newRange.startIndex = this.startIndex;
-      newRange.startPosition = { ...this.startPosition };
-    }
-    return newRange;
-  }
-};
-
 // src/constants.ts
 var SIZE_OF_SHORT = 2;
 var SIZE_OF_INT = 4;
@@ -111,7 +9,7 @@ var SIZE_OF_NODE = 5 * SIZE_OF_INT;
 var SIZE_OF_POINT = 2 * SIZE_OF_INT;
 var SIZE_OF_RANGE = 2 * SIZE_OF_INT + 2 * SIZE_OF_POINT;
 var ZERO_POINT = { row: 0, column: 0 };
-var INTERNAL = /* @__PURE__ */ Symbol("INTERNAL");
+var INTERNAL = Symbol("INTERNAL");
 function assertInternal(x) {
   if (x !== INTERNAL) throw new Error("Illegal constructor");
 }
@@ -126,21 +24,7 @@ function setModule(module2) {
 __name(setModule, "setModule");
 var C;
 
-// src/finalization_registry.ts
-function newFinalizer(handler) {
-  try {
-    return new FinalizationRegistry(handler);
-  } catch (e) {
-    console.error("Unsupported FinalizationRegistry:", e);
-    return;
-  }
-}
-__name(newFinalizer, "newFinalizer");
-
 // src/lookahead_iterator.ts
-var finalizer = newFinalizer((address) => {
-  C._ts_lookahead_iterator_delete(address);
-});
 var LookaheadIterator = class {
   static {
     __name(this, "LookaheadIterator");
@@ -151,39 +35,21 @@ var LookaheadIterator = class {
   /** @internal */
   language;
   /** @internal */
-  positioned = false;
-  /** @internal */
   constructor(internal, address, language) {
     assertInternal(internal);
     this[0] = address;
     this.language = language;
-    finalizer?.register(this, address, this);
   }
-  /**
-   * Get the current symbol of the lookahead iterator.
-   *
-   * Returns `null` if the iterator is not positioned on a symbol:
-   *
-   * - Before the first iteration step
-   * - After the iterator is exhausted
-   * - After a {@link reset} or {@link resetState} call
-   */
+  /** Get the current symbol of the lookahead iterator. */
   get currentTypeId() {
-    return this.positioned ? C._ts_lookahead_iterator_current_symbol(this[0]) : null;
+    return C._ts_lookahead_iterator_current_symbol(this[0]);
   }
-  /**
-   * Get the current symbol name of the lookahead iterator.
-   *
-   * Returns `null` if the iterator is not positioned on a symbol.
-   */
+  /** Get the current symbol name of the lookahead iterator. */
   get currentType() {
-    const id = this.currentTypeId;
-    if (id === null) return null;
-    return this.language.types[id] ?? C.UTF8ToString(C._ts_language_symbol_name(this.language[0], id));
+    return this.language.types[this.currentTypeId] || "ERROR";
   }
   /** Delete the lookahead iterator, freeing its resources. */
   delete() {
-    finalizer?.unregister(this);
     C._ts_lookahead_iterator_delete(this[0]);
     this[0] = 0;
   }
@@ -196,7 +62,6 @@ var LookaheadIterator = class {
   reset(language, stateId) {
     if (C._ts_lookahead_iterator_reset(this[0], language[0], stateId)) {
       this.language = language;
-      this.positioned = false;
       return true;
     }
     return false;
@@ -208,9 +73,7 @@ var LookaheadIterator = class {
    * `false` otherwise.
    */
   resetState(stateId) {
-    if (!C._ts_lookahead_iterator_reset_state(this[0], stateId)) return false;
-    this.positioned = false;
-    return true;
+    return Boolean(C._ts_lookahead_iterator_reset_state(this[0], stateId));
   }
   /**
    * Returns an iterator that iterates over the symbols of the lookahead iterator.
@@ -221,9 +84,10 @@ var LookaheadIterator = class {
   [Symbol.iterator]() {
     return {
       next: /* @__PURE__ */ __name(() => {
-        this.positioned = Boolean(C._ts_lookahead_iterator_next(this[0]));
-        const value = this.currentType;
-        return value === null ? { done: true, value: "" } : { done: false, value };
+        if (C._ts_lookahead_iterator_next(this[0])) {
+          return { done: false, value: this.currentType };
+        }
+        return { done: true, value: "" };
       }, "next")
     };
   }
@@ -251,9 +115,6 @@ function getText(tree, startIndex, endIndex, startPosition) {
   return result ?? "";
 }
 __name(getText, "getText");
-var finalizer2 = newFinalizer((address) => {
-  C._ts_tree_delete(address);
-});
 var Tree = class _Tree {
   static {
     __name(this, "Tree");
@@ -271,7 +132,6 @@ var Tree = class _Tree {
     this[0] = address;
     this.language = language;
     this.textCallback = textCallback;
-    finalizer2?.register(this, address, this);
   }
   /** Create a shallow copy of the syntax tree. This is very fast. */
   copy() {
@@ -280,7 +140,6 @@ var Tree = class _Tree {
   }
   /** Delete the syntax tree, freeing its resources. */
   delete() {
-    finalizer2?.unregister(this);
     C._ts_tree_delete(this[0]);
     this[0] = 0;
   }
@@ -363,9 +222,6 @@ var Tree = class _Tree {
 };
 
 // src/tree_cursor.ts
-var finalizer3 = newFinalizer((address) => {
-  C._ts_tree_cursor_delete_wasm(address);
-});
 var TreeCursor = class _TreeCursor {
   static {
     __name(this, "TreeCursor");
@@ -393,7 +249,6 @@ var TreeCursor = class _TreeCursor {
     assertInternal(internal);
     this.tree = tree;
     unmarshalTreeCursor(this);
-    finalizer3?.register(this, this.tree[0], this);
   }
   /** Creates a deep copy of the tree cursor. This allocates new memory. */
   copy() {
@@ -404,7 +259,6 @@ var TreeCursor = class _TreeCursor {
   }
   /** Delete the tree cursor, freeing its resources. */
   delete() {
-    finalizer3?.unregister(this);
     marshalTreeCursor(this);
     C._ts_tree_cursor_delete_wasm(this.tree[0]);
     this[0] = this[1] = this[2] = 0;
@@ -1505,9 +1359,8 @@ var Language = class _Language {
    * This returns `null` if state is invalid for this language.
    *
    * Iterating {@link LookaheadIterator} will yield valid symbols in the given
-   * parse state. A newly created iterator is not positioned on a symbol, so
-   * {@link LookaheadIterator#currentType} returns `null` until the first
-   * iteration step.
+   * parse state. Newly created lookahead iterators will return the `ERROR`
+   * symbol from {@link LookaheadIterator#currentType}.
    *
    * Lookahead iterators can be useful for generating suggestions and improving
    * syntax error diagnostics. To get symbols valid in an `ERROR` node, use the
@@ -1522,8 +1375,7 @@ var Language = class _Language {
   }
   /**
    * Load a language from a WebAssembly module.
-   * The module can be provided as a path to a file, a `URL` to a file, or as a
-   * buffer.
+   * The module can be provided as a path to a file or as a buffer.
    */
   static async load(input) {
     let binary2;
@@ -1550,26 +1402,15 @@ ${body2}`);
       }
     }
     const mod = await C.loadWebAssemblyModule(binary2, { loadAsync: true });
-    return _Language.loadFromWasmExports(mod, { sync: false });
-  }
-  static loadFromWasmExports(mod, { sync }) {
     const symbolNames = Object.keys(mod);
     const functionName = symbolNames.find((key) => LANGUAGE_FUNCTION_REGEX.test(key) && !key.includes("external_scanner_"));
     if (!functionName) {
       console.log(`Couldn't find language function in Wasm file. Symbols:
 ${JSON.stringify(symbolNames, null, 2)}`);
-      throw new Error(`Language.${sync ? "loadSync" : "load"} failed: no language function found in Wasm file`);
+      throw new Error("Language.load failed: no language function found in Wasm file");
     }
     const languageAddress = mod[functionName]();
     return new _Language(INTERNAL, languageAddress);
-  }
-  /**
-   * Load a language synchronously from a pre-compiled WebAssembly module.
-   * Use this when the host environment provides a `WebAssembly.Module` directly.
-   */
-  static loadSync(wasmModule) {
-    const mod = C.loadWebAssemblyModule(wasmModule, { loadAsync: false });
-    return _Language.loadFromWasmExports(mod, { sync: true });
   }
 };
 
@@ -1580,6 +1421,7 @@ async function Module2(moduleArg = {}) {
   var ENVIRONMENT_IS_WEB = typeof window == "object";
   var ENVIRONMENT_IS_WORKER = typeof WorkerGlobalScope != "undefined";
   var ENVIRONMENT_IS_NODE = typeof process == "object" && process.versions?.node && process.type != "renderer";
+  var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
   if (ENVIRONMENT_IS_NODE) {
     const { createRequire } = await import("module");
     var require = createRequire(import.meta.url);
@@ -1678,6 +1520,12 @@ async function Module2(moduleArg = {}) {
   var wasmBinary;
   var ABORT = false;
   var EXITSTATUS;
+  function assert(condition, text) {
+    if (!condition) {
+      abort(text);
+    }
+  }
+  __name(assert, "assert");
   var isFileURI = /* @__PURE__ */ __name((filename) => filename.startsWith("file://"), "isFileURI");
   var readyPromiseResolve, readyPromiseReject;
   var wasmMemory;
@@ -1750,6 +1598,25 @@ async function Module2(moduleArg = {}) {
     callRuntimeCallbacks(onPostRuns);
   }
   __name(postRun, "postRun");
+  var runDependencies = 0;
+  var dependenciesFulfilled = null;
+  function addRunDependency(id) {
+    runDependencies++;
+    Module["monitorRunDependencies"]?.(runDependencies);
+  }
+  __name(addRunDependency, "addRunDependency");
+  function removeRunDependency(id) {
+    runDependencies--;
+    Module["monitorRunDependencies"]?.(runDependencies);
+    if (runDependencies == 0) {
+      if (dependenciesFulfilled) {
+        var callback = dependenciesFulfilled;
+        dependenciesFulfilled = null;
+        callback();
+      }
+    }
+  }
+  __name(removeRunDependency, "removeRunDependency");
   function abort(what) {
     Module["onAbort"]?.(what);
     what = "Aborted(" + what + ")";
@@ -1839,9 +1706,11 @@ async function Module2(moduleArg = {}) {
       loadDylibs();
       __RELOC_FUNCS__.push(wasmExports["__wasm_apply_data_relocs"]);
       assignWasmExports(wasmExports);
+      removeRunDependency("wasm-instantiate");
       return wasmExports;
     }
     __name(receiveInstance, "receiveInstance");
+    addRunDependency("wasm-instantiate");
     function receiveInstantiationResult(result2) {
       return receiveInstance(result2["instance"], result2["module"]);
     }
@@ -1887,18 +1756,72 @@ async function Module2(moduleArg = {}) {
       return rtn;
     }
   };
+  var LE_ATOMICS_ADD = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.add(heap, offset, order(value)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_ADD");
+  var LE_ATOMICS_AND = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.and(heap, offset, order(value)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_AND");
+  var LE_ATOMICS_COMPAREEXCHANGE = /* @__PURE__ */ __name((heap, offset, expected, replacement) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.compareExchange(heap, offset, order(expected), order(replacement)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_COMPAREEXCHANGE");
+  var LE_ATOMICS_EXCHANGE = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.exchange(heap, offset, order(value)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_EXCHANGE");
+  var LE_ATOMICS_ISLOCKFREE = /* @__PURE__ */ __name((size) => Atomics.isLockFree(size), "LE_ATOMICS_ISLOCKFREE");
+  var LE_ATOMICS_LOAD = /* @__PURE__ */ __name((heap, offset) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.load(heap, offset));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_LOAD");
   var LE_ATOMICS_NATIVE_BYTE_ORDER = [];
+  var LE_ATOMICS_NOTIFY = /* @__PURE__ */ __name((heap, offset, count) => Atomics.notify(heap, offset, count), "LE_ATOMICS_NOTIFY");
+  var LE_ATOMICS_OR = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.or(heap, offset, order(value)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_OR");
+  var LE_ATOMICS_STORE = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    Atomics.store(heap, offset, order(value));
+  }, "LE_ATOMICS_STORE");
+  var LE_ATOMICS_SUB = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.sub(heap, offset, order(value)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_SUB");
+  var LE_ATOMICS_WAIT = /* @__PURE__ */ __name((heap, offset, value, timeout) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    return Atomics.wait(heap, offset, order(value), timeout);
+  }, "LE_ATOMICS_WAIT");
+  var LE_ATOMICS_WAITASYNC = /* @__PURE__ */ __name((heap, offset, value, timeout) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    return Atomics.waitAsync(heap, offset, order(value), timeout);
+  }, "LE_ATOMICS_WAITASYNC");
+  var LE_ATOMICS_XOR = /* @__PURE__ */ __name((heap, offset, value) => {
+    const order = LE_ATOMICS_NATIVE_BYTE_ORDER[heap.BYTES_PER_ELEMENT - 1];
+    const res = order(Atomics.xor(heap, offset, order(value)));
+    return heap.unsigned ? heap.unsigned(res) : res;
+  }, "LE_ATOMICS_XOR");
   var LE_HEAP_LOAD_F32 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getFloat32(byteOffset, true), "LE_HEAP_LOAD_F32");
   var LE_HEAP_LOAD_F64 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getFloat64(byteOffset, true), "LE_HEAP_LOAD_F64");
   var LE_HEAP_LOAD_I16 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getInt16(byteOffset, true), "LE_HEAP_LOAD_I16");
   var LE_HEAP_LOAD_I32 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getInt32(byteOffset, true), "LE_HEAP_LOAD_I32");
-  var LE_HEAP_LOAD_I64 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getBigInt64(byteOffset, true), "LE_HEAP_LOAD_I64");
+  var LE_HEAP_LOAD_U16 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getUint16(byteOffset, true), "LE_HEAP_LOAD_U16");
   var LE_HEAP_LOAD_U32 = /* @__PURE__ */ __name((byteOffset) => HEAP_DATA_VIEW.getUint32(byteOffset, true), "LE_HEAP_LOAD_U32");
   var LE_HEAP_STORE_F32 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setFloat32(byteOffset, value, true), "LE_HEAP_STORE_F32");
   var LE_HEAP_STORE_F64 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setFloat64(byteOffset, value, true), "LE_HEAP_STORE_F64");
   var LE_HEAP_STORE_I16 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setInt16(byteOffset, value, true), "LE_HEAP_STORE_I16");
   var LE_HEAP_STORE_I32 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setInt32(byteOffset, value, true), "LE_HEAP_STORE_I32");
-  var LE_HEAP_STORE_I64 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setBigInt64(byteOffset, value, true), "LE_HEAP_STORE_I64");
+  var LE_HEAP_STORE_U16 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setUint16(byteOffset, value, true), "LE_HEAP_STORE_U16");
   var LE_HEAP_STORE_U32 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setUint32(byteOffset, value, true), "LE_HEAP_STORE_U32");
   var callRuntimeCallbacks = /* @__PURE__ */ __name((callbacks) => {
     while (callbacks.length > 0) {
@@ -2095,7 +2018,7 @@ async function Module2(moduleArg = {}) {
       newDSO("__main__", 0, wasmImports);
     }
   };
-  var ___heap_base = 82240;
+  var ___heap_base = 78240;
   var alignMemory = /* @__PURE__ */ __name((size, alignment) => Math.ceil(size / alignment) * alignment, "alignMemory");
   var getMemory = /* @__PURE__ */ __name((size) => {
     if (runtimeInitialized) {
@@ -2323,6 +2246,7 @@ async function Module2(moduleArg = {}) {
   var UTF8ToString = /* @__PURE__ */ __name((ptr, maxBytesToRead, ignoreNul) => ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead, ignoreNul) : "", "UTF8ToString");
   var loadWebAssemblyModule = /* @__PURE__ */ __name((binary, flags, libName, localScope, handle) => {
     var metadata = getDylinkMetadata(binary);
+    currentModuleWeakSymbols = metadata.weakImports;
     function loadModule() {
       var memAlign = Math.pow(2, metadata.memoryAlign);
       var memoryBase = metadata.memorySize ? alignMemory(getMemory(metadata.memorySize + memAlign), memAlign) : 0;
@@ -2372,7 +2296,6 @@ async function Module2(moduleArg = {}) {
         }
       };
       var proxy = new Proxy({}, proxyHandler);
-      currentModuleWeakSymbols = metadata.weakImports;
       var info = {
         "GOT.mem": new Proxy({}, GOTHandler),
         "GOT.func": new Proxy({}, GOTHandler),
@@ -2589,39 +2512,21 @@ async function Module2(moduleArg = {}) {
       }
     }
   }, "reportUndefinedSymbols");
-  var runDependencies = 0;
-  var dependenciesFulfilled = null;
-  var removeRunDependency = /* @__PURE__ */ __name((id) => {
-    runDependencies--;
-    Module["monitorRunDependencies"]?.(runDependencies);
-    if (runDependencies == 0) {
-      if (dependenciesFulfilled) {
-        var callback = dependenciesFulfilled;
-        dependenciesFulfilled = null;
-        callback();
-      }
-    }
-  }, "removeRunDependency");
-  var addRunDependency = /* @__PURE__ */ __name((id) => {
-    runDependencies++;
-    Module["monitorRunDependencies"]?.(runDependencies);
-  }, "addRunDependency");
-  var loadDylibs = /* @__PURE__ */ __name(async () => {
+  var loadDylibs = /* @__PURE__ */ __name(() => {
     if (!dynamicLibraries.length) {
       reportUndefinedSymbols();
       return;
     }
     addRunDependency("loadDylibs");
-    for (var lib of dynamicLibraries) {
-      await loadDynamicLibrary(lib, {
-        loadAsync: true,
-        global: true,
-        nodelete: true,
-        allowUndefined: true
-      });
-    }
-    reportUndefinedSymbols();
-    removeRunDependency("loadDylibs");
+    dynamicLibraries.reduce((chain, lib) => chain.then(() => loadDynamicLibrary(lib, {
+      loadAsync: true,
+      global: true,
+      nodelete: true,
+      allowUndefined: true
+    })), Promise.resolve()).then(() => {
+      reportUndefinedSymbols();
+      removeRunDependency("loadDylibs");
+    });
   }, "loadDylibs");
   var noExitRuntime = true;
   function setValue(ptr, value, type = "i8") {
@@ -2660,12 +2565,12 @@ async function Module2(moduleArg = {}) {
     "value": "i32",
     "mutable": false
   }, 1024);
-  var ___stack_high = 82240;
-  var ___stack_low = 16704;
+  var ___stack_high = 78240;
+  var ___stack_low = 12704;
   var ___stack_pointer = new WebAssembly.Global({
     "value": "i32",
     "mutable": true
-  }, 82240);
+  }, 78240);
   var ___table_base = new WebAssembly.Global({
     "value": "i32",
     "mutable": false
@@ -2729,6 +2634,17 @@ async function Module2(moduleArg = {}) {
       buffer.push(curr);
     }
   }, "printChar");
+  var flush_NO_FILESYSTEM = /* @__PURE__ */ __name(() => {
+    if (printCharBuffers[1].length) printChar(1, 10);
+    if (printCharBuffers[2].length) printChar(2, 10);
+  }, "flush_NO_FILESYSTEM");
+  var SYSCALLS = {
+    varargs: void 0,
+    getStr(ptr) {
+      var ret = UTF8ToString(ptr);
+      return ret;
+    }
+  };
   var _fd_write = /* @__PURE__ */ __name((fd, iov, iovcnt, pnum) => {
     var num = 0;
     for (var i2 = 0; i2 < iovcnt; i2++) {
@@ -2882,6 +2798,7 @@ async function Module2(moduleArg = {}) {
     LE_HEAP_STORE_I16((outPtr >> 1) * 2, 0);
     return outPtr - startPtr;
   }, "stringToUTF16");
+  var LE_HEAP_STORE_I64 = /* @__PURE__ */ __name((byteOffset, value) => HEAP_DATA_VIEW.setBigInt64(byteOffset, value, true), "LE_HEAP_STORE_I64");
   LE_ATOMICS_NATIVE_BYTE_ORDER = new Int8Array(new Int16Array([1]).buffer)[0] === 1 ? [
     /* little endian */
     ((x) => x),
@@ -2909,12 +2826,6 @@ async function Module2(moduleArg = {}) {
     if (Module["wasmBinary"]) wasmBinary = Module["wasmBinary"];
     if (Module["arguments"]) arguments_ = Module["arguments"];
     if (Module["thisProgram"]) thisProgram = Module["thisProgram"];
-    if (Module["preInit"]) {
-      if (typeof Module["preInit"] == "function") Module["preInit"] = [Module["preInit"]];
-      while (Module["preInit"].length > 0) {
-        Module["preInit"].shift()();
-      }
-    }
   }
   Module["setValue"] = setValue;
   Module["getValue"] = getValue;
@@ -2926,13 +2837,12 @@ async function Module2(moduleArg = {}) {
   Module["loadWebAssemblyModule"] = loadWebAssemblyModule;
   Module["LE_HEAP_STORE_I64"] = LE_HEAP_STORE_I64;
   var ASM_CONSTS = {};
-  var _malloc, _calloc, _realloc, _free, _ts_range_edit, _memcmp, _ts_language_symbol_count, _ts_language_state_count, _ts_language_abi_version, _ts_language_name, _ts_language_field_count, _ts_language_next_state, _ts_language_symbol_name, _ts_language_symbol_for_name, _strncmp, _ts_language_symbol_type, _ts_language_field_name_for_id, _ts_lookahead_iterator_new, _ts_lookahead_iterator_delete, _ts_lookahead_iterator_reset_state, _ts_lookahead_iterator_reset, _ts_lookahead_iterator_next, _ts_lookahead_iterator_current_symbol, _ts_point_edit, _ts_parser_delete, _ts_parser_reset, _ts_parser_set_language, _ts_parser_set_included_ranges, _ts_query_new, _ts_query_delete, _iswspace, _iswalnum, _ts_query_copy, _ts_query_pattern_count, _ts_query_capture_count, _ts_query_string_count, _ts_query_capture_name_for_id, _ts_query_capture_quantifier_for_id, _ts_query_string_value_for_id, _ts_query_predicates_for_pattern, _ts_query_start_byte_for_pattern, _ts_query_end_byte_for_pattern, _ts_query_is_pattern_rooted, _ts_query_is_pattern_non_local, _ts_query_is_pattern_guaranteed_at_step, _ts_query_disable_capture, _ts_query_disable_pattern, _ts_tree_copy, _ts_tree_delete, _ts_init, _ts_parser_new_wasm, _ts_parser_enable_logger_wasm, _ts_parser_parse_wasm, _ts_parser_included_ranges_wasm, _ts_language_type_is_named_wasm, _ts_language_type_is_visible_wasm, _ts_language_metadata_wasm, _ts_language_supertypes_wasm, _ts_language_subtypes_wasm, _ts_tree_root_node_wasm, _ts_tree_root_node_with_offset_wasm, _ts_tree_edit_wasm, _ts_tree_included_ranges_wasm, _ts_tree_get_changed_ranges_wasm, _ts_tree_cursor_new_wasm, _ts_tree_cursor_copy_wasm, _ts_tree_cursor_delete_wasm, _ts_tree_cursor_reset_wasm, _ts_tree_cursor_reset_to_wasm, _ts_tree_cursor_goto_first_child_wasm, _ts_tree_cursor_goto_last_child_wasm, _ts_tree_cursor_goto_first_child_for_index_wasm, _ts_tree_cursor_goto_first_child_for_position_wasm, _ts_tree_cursor_goto_next_sibling_wasm, _ts_tree_cursor_goto_previous_sibling_wasm, _ts_tree_cursor_goto_descendant_wasm, _ts_tree_cursor_goto_parent_wasm, _ts_tree_cursor_current_node_type_id_wasm, _ts_tree_cursor_current_node_state_id_wasm, _ts_tree_cursor_current_node_is_named_wasm, _ts_tree_cursor_current_node_is_missing_wasm, _ts_tree_cursor_current_node_id_wasm, _ts_tree_cursor_start_position_wasm, _ts_tree_cursor_end_position_wasm, _ts_tree_cursor_start_index_wasm, _ts_tree_cursor_end_index_wasm, _ts_tree_cursor_current_field_id_wasm, _ts_tree_cursor_current_depth_wasm, _ts_tree_cursor_current_descendant_index_wasm, _ts_tree_cursor_current_node_wasm, _ts_node_symbol_wasm, _ts_node_field_name_for_child_wasm, _ts_node_field_name_for_named_child_wasm, _ts_node_children_by_field_id_wasm, _ts_node_first_child_for_byte_wasm, _ts_node_first_named_child_for_byte_wasm, _ts_node_grammar_symbol_wasm, _ts_node_child_count_wasm, _ts_node_named_child_count_wasm, _ts_node_child_wasm, _ts_node_named_child_wasm, _ts_node_child_by_field_id_wasm, _ts_node_next_sibling_wasm, _ts_node_prev_sibling_wasm, _ts_node_next_named_sibling_wasm, _ts_node_prev_named_sibling_wasm, _ts_node_descendant_count_wasm, _ts_node_parent_wasm, _ts_node_child_with_descendant_wasm, _ts_node_descendant_for_index_wasm, _ts_node_named_descendant_for_index_wasm, _ts_node_descendant_for_position_wasm, _ts_node_named_descendant_for_position_wasm, _ts_node_start_point_wasm, _ts_node_end_point_wasm, _ts_node_start_index_wasm, _ts_node_end_index_wasm, _ts_node_to_string_wasm, _ts_node_children_wasm, _ts_node_named_children_wasm, _ts_node_descendants_of_type_wasm, _ts_node_is_named_wasm, _ts_node_has_changes_wasm, _ts_node_has_error_wasm, _ts_node_is_error_wasm, _ts_node_is_missing_wasm, _ts_node_is_extra_wasm, _ts_node_parse_state_wasm, _ts_node_next_parse_state_wasm, _ts_query_matches_wasm, _ts_query_captures_wasm, _memset, _memcpy, _memmove, _iswalpha, _iswblank, _iswdigit, _iswlower, _iswpunct, _iswupper, _iswxdigit, _memchr, _strlen, _strcmp, _strncat, _strncpy, _towlower, _towupper, _setThrew, __emscripten_stack_restore, __emscripten_stack_alloc, _emscripten_stack_get_current, ___wasm_apply_data_relocs;
+  var _malloc, _calloc, _realloc, _free, _memcmp, _ts_language_symbol_count, _ts_language_state_count, _ts_language_abi_version, _ts_language_name, _ts_language_field_count, _ts_language_next_state, _ts_language_symbol_name, _ts_language_symbol_for_name, _strncmp, _ts_language_symbol_type, _ts_language_field_name_for_id, _ts_lookahead_iterator_new, _ts_lookahead_iterator_delete, _ts_lookahead_iterator_reset_state, _ts_lookahead_iterator_reset, _ts_lookahead_iterator_next, _ts_lookahead_iterator_current_symbol, _ts_parser_delete, _ts_parser_reset, _ts_parser_set_language, _ts_parser_set_included_ranges, _ts_query_new, _ts_query_delete, _iswspace, _iswalnum, _ts_query_pattern_count, _ts_query_capture_count, _ts_query_string_count, _ts_query_capture_name_for_id, _ts_query_capture_quantifier_for_id, _ts_query_string_value_for_id, _ts_query_predicates_for_pattern, _ts_query_start_byte_for_pattern, _ts_query_end_byte_for_pattern, _ts_query_is_pattern_rooted, _ts_query_is_pattern_non_local, _ts_query_is_pattern_guaranteed_at_step, _ts_query_disable_capture, _ts_query_disable_pattern, _ts_tree_copy, _ts_tree_delete, _ts_init, _ts_parser_new_wasm, _ts_parser_enable_logger_wasm, _ts_parser_parse_wasm, _ts_parser_included_ranges_wasm, _ts_language_type_is_named_wasm, _ts_language_type_is_visible_wasm, _ts_language_metadata_wasm, _ts_language_supertypes_wasm, _ts_language_subtypes_wasm, _ts_tree_root_node_wasm, _ts_tree_root_node_with_offset_wasm, _ts_tree_edit_wasm, _ts_tree_included_ranges_wasm, _ts_tree_get_changed_ranges_wasm, _ts_tree_cursor_new_wasm, _ts_tree_cursor_copy_wasm, _ts_tree_cursor_delete_wasm, _ts_tree_cursor_reset_wasm, _ts_tree_cursor_reset_to_wasm, _ts_tree_cursor_goto_first_child_wasm, _ts_tree_cursor_goto_last_child_wasm, _ts_tree_cursor_goto_first_child_for_index_wasm, _ts_tree_cursor_goto_first_child_for_position_wasm, _ts_tree_cursor_goto_next_sibling_wasm, _ts_tree_cursor_goto_previous_sibling_wasm, _ts_tree_cursor_goto_descendant_wasm, _ts_tree_cursor_goto_parent_wasm, _ts_tree_cursor_current_node_type_id_wasm, _ts_tree_cursor_current_node_state_id_wasm, _ts_tree_cursor_current_node_is_named_wasm, _ts_tree_cursor_current_node_is_missing_wasm, _ts_tree_cursor_current_node_id_wasm, _ts_tree_cursor_start_position_wasm, _ts_tree_cursor_end_position_wasm, _ts_tree_cursor_start_index_wasm, _ts_tree_cursor_end_index_wasm, _ts_tree_cursor_current_field_id_wasm, _ts_tree_cursor_current_depth_wasm, _ts_tree_cursor_current_descendant_index_wasm, _ts_tree_cursor_current_node_wasm, _ts_node_symbol_wasm, _ts_node_field_name_for_child_wasm, _ts_node_field_name_for_named_child_wasm, _ts_node_children_by_field_id_wasm, _ts_node_first_child_for_byte_wasm, _ts_node_first_named_child_for_byte_wasm, _ts_node_grammar_symbol_wasm, _ts_node_child_count_wasm, _ts_node_named_child_count_wasm, _ts_node_child_wasm, _ts_node_named_child_wasm, _ts_node_child_by_field_id_wasm, _ts_node_next_sibling_wasm, _ts_node_prev_sibling_wasm, _ts_node_next_named_sibling_wasm, _ts_node_prev_named_sibling_wasm, _ts_node_descendant_count_wasm, _ts_node_parent_wasm, _ts_node_child_with_descendant_wasm, _ts_node_descendant_for_index_wasm, _ts_node_named_descendant_for_index_wasm, _ts_node_descendant_for_position_wasm, _ts_node_named_descendant_for_position_wasm, _ts_node_start_point_wasm, _ts_node_end_point_wasm, _ts_node_start_index_wasm, _ts_node_end_index_wasm, _ts_node_to_string_wasm, _ts_node_children_wasm, _ts_node_named_children_wasm, _ts_node_descendants_of_type_wasm, _ts_node_is_named_wasm, _ts_node_has_changes_wasm, _ts_node_has_error_wasm, _ts_node_is_error_wasm, _ts_node_is_missing_wasm, _ts_node_is_extra_wasm, _ts_node_parse_state_wasm, _ts_node_next_parse_state_wasm, _ts_query_matches_wasm, _ts_query_captures_wasm, _memset, _memcpy, _memmove, _iswalpha, _iswblank, _iswdigit, _iswlower, _iswupper, _iswxdigit, _memchr, _strlen, _strcmp, _strncat, _strncpy, _towlower, _towupper, _setThrew, __emscripten_stack_restore, __emscripten_stack_alloc, _emscripten_stack_get_current, ___wasm_apply_data_relocs;
   function assignWasmExports(wasmExports2) {
     Module["_malloc"] = _malloc = wasmExports2["malloc"];
     Module["_calloc"] = _calloc = wasmExports2["calloc"];
     Module["_realloc"] = _realloc = wasmExports2["realloc"];
     Module["_free"] = _free = wasmExports2["free"];
-    Module["_ts_range_edit"] = _ts_range_edit = wasmExports2["ts_range_edit"];
     Module["_memcmp"] = _memcmp = wasmExports2["memcmp"];
     Module["_ts_language_symbol_count"] = _ts_language_symbol_count = wasmExports2["ts_language_symbol_count"];
     Module["_ts_language_state_count"] = _ts_language_state_count = wasmExports2["ts_language_state_count"];
@@ -2951,7 +2861,6 @@ async function Module2(moduleArg = {}) {
     Module["_ts_lookahead_iterator_reset"] = _ts_lookahead_iterator_reset = wasmExports2["ts_lookahead_iterator_reset"];
     Module["_ts_lookahead_iterator_next"] = _ts_lookahead_iterator_next = wasmExports2["ts_lookahead_iterator_next"];
     Module["_ts_lookahead_iterator_current_symbol"] = _ts_lookahead_iterator_current_symbol = wasmExports2["ts_lookahead_iterator_current_symbol"];
-    Module["_ts_point_edit"] = _ts_point_edit = wasmExports2["ts_point_edit"];
     Module["_ts_parser_delete"] = _ts_parser_delete = wasmExports2["ts_parser_delete"];
     Module["_ts_parser_reset"] = _ts_parser_reset = wasmExports2["ts_parser_reset"];
     Module["_ts_parser_set_language"] = _ts_parser_set_language = wasmExports2["ts_parser_set_language"];
@@ -2960,7 +2869,6 @@ async function Module2(moduleArg = {}) {
     Module["_ts_query_delete"] = _ts_query_delete = wasmExports2["ts_query_delete"];
     Module["_iswspace"] = _iswspace = wasmExports2["iswspace"];
     Module["_iswalnum"] = _iswalnum = wasmExports2["iswalnum"];
-    Module["_ts_query_copy"] = _ts_query_copy = wasmExports2["ts_query_copy"];
     Module["_ts_query_pattern_count"] = _ts_query_pattern_count = wasmExports2["ts_query_pattern_count"];
     Module["_ts_query_capture_count"] = _ts_query_capture_count = wasmExports2["ts_query_capture_count"];
     Module["_ts_query_string_count"] = _ts_query_string_count = wasmExports2["ts_query_string_count"];
@@ -3066,7 +2974,6 @@ async function Module2(moduleArg = {}) {
     Module["_iswblank"] = _iswblank = wasmExports2["iswblank"];
     Module["_iswdigit"] = _iswdigit = wasmExports2["iswdigit"];
     Module["_iswlower"] = _iswlower = wasmExports2["iswlower"];
-    Module["_iswpunct"] = _iswpunct = wasmExports2["iswpunct"];
     Module["_iswupper"] = _iswupper = wasmExports2["iswupper"];
     Module["_iswxdigit"] = _iswxdigit = wasmExports2["iswxdigit"];
     Module["_memchr"] = _memchr = wasmExports2["memchr"];
@@ -3119,6 +3026,7 @@ async function Module2(moduleArg = {}) {
     /** @export */
     tree_sitter_query_progress_callback: _tree_sitter_query_progress_callback
   };
+  var wasmExports = await createWasm();
   function callMain(args2 = []) {
     var entryFunction = resolveGlobalSymbol("main").sym;
     if (!entryFunction) return;
@@ -3177,8 +3085,16 @@ async function Module2(moduleArg = {}) {
     }
   }
   __name(run, "run");
-  var wasmExports;
-  wasmExports = await createWasm();
+  function preInit() {
+    if (Module["preInit"]) {
+      if (typeof Module["preInit"] == "function") Module["preInit"] = [Module["preInit"]];
+      while (Module["preInit"].length > 0) {
+        Module["preInit"].shift()();
+      }
+    }
+  }
+  __name(preInit, "preInit");
+  preInit();
   run();
   if (runtimeInitialized) {
     moduleRtn = Module;
@@ -3208,10 +3124,6 @@ __name(checkModule, "checkModule");
 var TRANSFER_BUFFER;
 var LANGUAGE_VERSION;
 var MIN_COMPATIBLE_VERSION;
-var finalizer4 = newFinalizer((addresses) => {
-  C._ts_parser_delete(addresses[0]);
-  C._free(addresses[1]);
-});
 var Parser = class {
   static {
     __name(this, "Parser");
@@ -3243,7 +3155,6 @@ var Parser = class {
    */
   constructor() {
     this.initialize();
-    finalizer4?.register(this, [this[0], this[1]], this);
   }
   /** @internal */
   initialize() {
@@ -3256,7 +3167,6 @@ var Parser = class {
   }
   /** Delete the parser, freeing its resources. */
   delete() {
-    finalizer4?.unregister(this);
     C._ts_parser_delete(this[0]);
     C._free(this[1]);
     this[0] = 0;
@@ -3434,10 +3344,6 @@ var QueryError = class _QueryError extends Error {
     this.length = length;
     this.name = "QueryError";
   }
-  kind;
-  info;
-  index;
-  length;
   static {
     __name(this, "QueryError");
   }
@@ -3633,9 +3539,6 @@ function parsePattern(index, stepType, stepValueId, captureNames, stringValues, 
   }
 }
 __name(parsePattern, "parsePattern");
-var finalizer5 = newFinalizer((address) => {
-  C._ts_query_delete(address);
-});
 var Query = class {
   static {
     __name(this, "Query");
@@ -3790,11 +3693,9 @@ var Query = class {
     this.assertedProperties = assertedProperties;
     this.refutedProperties = refutedProperties;
     this.exceededMatchLimit = false;
-    finalizer5?.register(this, address, this);
   }
   /** Delete the query, freeing its resources. */
   delete() {
-    finalizer5?.unregister(this);
     C._ts_query_delete(this[0]);
     this[0] = 0;
   }
@@ -3815,10 +3716,6 @@ var Query = class {
     const endPosition = options.endPosition ?? ZERO_POINT;
     const startIndex = options.startIndex ?? 0;
     const endIndex = options.endIndex ?? 0;
-    const startContainingPosition = options.startContainingPosition ?? ZERO_POINT;
-    const endContainingPosition = options.endContainingPosition ?? ZERO_POINT;
-    const startContainingIndex = options.startContainingIndex ?? 0;
-    const endContainingIndex = options.endContainingIndex ?? 0;
     const matchLimit = options.matchLimit ?? 4294967295;
     const maxStartDepth = options.maxStartDepth ?? 4294967295;
     const progressCallback = options.progressCallback;
@@ -3831,12 +3728,6 @@ var Query = class {
     }
     if (endPosition !== ZERO_POINT && (startPosition.row > endPosition.row || startPosition.row === endPosition.row && startPosition.column > endPosition.column)) {
       throw new Error("`startPosition` cannot be greater than `endPosition`");
-    }
-    if (endContainingIndex !== 0 && startContainingIndex > endContainingIndex) {
-      throw new Error("`startContainingIndex` cannot be greater than `endContainingIndex`");
-    }
-    if (endContainingPosition !== ZERO_POINT && (startContainingPosition.row > endContainingPosition.row || startContainingPosition.row === endContainingPosition.row && startContainingPosition.column > endContainingPosition.column)) {
-      throw new Error("`startContainingPosition` cannot be greater than `endContainingPosition`");
     }
     if (progressCallback) {
       C.currentQueryProgressCallback = progressCallback;
@@ -3851,12 +3742,6 @@ var Query = class {
       endPosition.column,
       startIndex,
       endIndex,
-      startContainingPosition.row,
-      startContainingPosition.column,
-      endContainingPosition.row,
-      endContainingPosition.column,
-      startContainingIndex,
-      endContainingIndex,
       matchLimit,
       maxStartDepth
     );
@@ -3906,10 +3791,6 @@ var Query = class {
     const endPosition = options.endPosition ?? ZERO_POINT;
     const startIndex = options.startIndex ?? 0;
     const endIndex = options.endIndex ?? 0;
-    const startContainingPosition = options.startContainingPosition ?? ZERO_POINT;
-    const endContainingPosition = options.endContainingPosition ?? ZERO_POINT;
-    const startContainingIndex = options.startContainingIndex ?? 0;
-    const endContainingIndex = options.endContainingIndex ?? 0;
     const matchLimit = options.matchLimit ?? 4294967295;
     const maxStartDepth = options.maxStartDepth ?? 4294967295;
     const progressCallback = options.progressCallback;
@@ -3922,12 +3803,6 @@ var Query = class {
     }
     if (endPosition !== ZERO_POINT && (startPosition.row > endPosition.row || startPosition.row === endPosition.row && startPosition.column > endPosition.column)) {
       throw new Error("`startPosition` cannot be greater than `endPosition`");
-    }
-    if (endContainingIndex !== 0 && startContainingIndex > endContainingIndex) {
-      throw new Error("`startContainingIndex` cannot be greater than `endContainingIndex`");
-    }
-    if (endContainingPosition !== ZERO_POINT && (startContainingPosition.row > endContainingPosition.row || startContainingPosition.row === endContainingPosition.row && startContainingPosition.column > endContainingPosition.column)) {
-      throw new Error("`startContainingPosition` cannot be greater than `endContainingPosition`");
     }
     if (progressCallback) {
       C.currentQueryProgressCallback = progressCallback;
@@ -3942,12 +3817,6 @@ var Query = class {
       endPosition.column,
       startIndex,
       endIndex,
-      startContainingPosition.row,
-      startContainingPosition.column,
-      endContainingPosition.row,
-      endContainingPosition.column,
-      startContainingIndex,
-      endContainingIndex,
       matchLimit,
       maxStartDepth
     );
@@ -4067,7 +3936,6 @@ var Query = class {
 };
 export {
   CaptureQuantifier,
-  Edit,
   LANGUAGE_VERSION,
   Language,
   LookaheadIterator,

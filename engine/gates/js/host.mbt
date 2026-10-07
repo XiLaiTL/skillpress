@@ -43,6 +43,28 @@ extern "js" fn proc_cwd() -> String =
   #|() => process.cwd()
 
 ///|
+/// 递归建目录。**已经存在也算成功**（`attach` 跑第二遍不该红）；真失败（没权限）也吞掉 ——
+/// 吞掉不会造成"悄悄写错地方"：紧接着的 `write` 会抛，而那个错会当场冒出来。
+extern "js" fn fs_mkdir_p(p : String) -> Unit =
+  #|(p) => { try { require("node:fs").mkdirSync(p, { recursive: true }); } catch (e) {} }
+
+///|
+extern "js" fn proc_is_tty() -> Bool =
+  #|() => { try { return Boolean(process.stdin.isTTY); } catch (e) { return false; } }
+
+///|
+/// 问一句、读一行（提问写 stderr，别污染 stdout 那份产物）。
+///
+/// **两条路，同一套"按行"语义**：
+///   · `stdin` 是终端 ⇒ `readSync` 逐字节读到换行（真交互）；
+///   · 不是终端（管道 / 判据喂答案）⇒ 把 stdin **整个读一次**再按行切，之后逐次弹出。
+///     这条路存在的理由很实在：`printf '1\n理由\n' | skillpress attach --interactive`
+///     才能被写成判据 —— 只认终端的话，交互逻辑**永远测不到**。
+/// 读不到 / 出错一律给空串（调用方把它当"用默认值"，并打印出来）。
+extern "js" fn stdin_read_line(prompt : String) -> String =
+  #|(prompt) => { const fs = require("node:fs"); try { fs.writeSync(2, prompt); } catch (e) {} const g = globalThis; try { if (g.__sp_tty === undefined) { if (process.stdin.isTTY) { g.__sp_tty = true; } else { g.__sp_tty = false; g.__sp_lines = String(fs.readFileSync(0, "utf8")).split("\n"); g.__sp_i = 0; } } if (g.__sp_tty) { let out = ""; const b = Buffer.alloc(1); for (;;) { const n = fs.readSync(0, b, 0, 1, null); if (n === 0) break; const c = b.toString("utf8"); if (c === "\n") break; if (c !== "\r") out += c; } return out; } if (g.__sp_i >= g.__sp_lines.length) return ""; return String(g.__sp_lines[g.__sp_i++]).replace(/\r$/, ""); } catch (e) { return ""; } }
+
+///|
 /// 把上面几个拼成宿主。
 pub fn js_host() -> @gates.Host {
   @gates.Host::new(
@@ -59,5 +81,8 @@ pub fn js_host() -> @gates.Host {
     path_resolve,
     fs_write,
     proc_cwd,
+    fs_mkdir_p,
+    proc_is_tty,
+    stdin_read_line,
   )
 }

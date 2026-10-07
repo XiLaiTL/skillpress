@@ -1,0 +1,264 @@
+///|
+/// **shell-traps.mbtx** —— **脚本自己会安静咬人的坑**（判据脚本也是代码，也会说谎）。
+///
+///   moon run --target js tools/shell-traps.mbtx              # 站岗
+///   moon run --target js tools/shell-traps.mbtx --selftest   # 诱饵：塞一行真反引号 ⇒ 必须点名
+///
+/// ## 坑①：**双引号里的反引号 = 命令替换**（这条不是为了风格统一，它真的执行过东西）
+///
+/// 2026-10-06 我写了一句提示：
+///     echo "还没发布这一版（那就先 `moon publish`）"
+/// 于是这条**判据在跑的时候真的执行了一次 `moon publish`**。它失败纯属侥幸 —— 那个临时探针工程的
+/// `moon.mod` 缺 `license` 字段，服务端 400 拒了；**如果它有 license，就会朝 registry 发一个包**。
+/// 前科不止一次：`acceptance.sh` 里「（`moon add` 装已发布的版本）」那句也在读数里留下过一个空档
+/// （反引号被吃掉 ⇒ 消息少了一截）。
+///
+/// 所以规矩是：**要打反引号就写转义的那个**，或者把那段用「」括起来。
+///
+/// ## 为什么是状态机，不是 grep
+///
+/// 第一版写成 `grep -E 'echo "[^"]*`'` ⇒ **四种误报**全来了：转义过的、注释里的、
+/// 单引号里的（那是数据）、以及判据自己造诱饵的那几行。**一个会误报的门会逼人删消息**，
+/// 那是反效果。引号与转义得用状态机看，正则干不了这活。
+///
+/// ## 为什么从 `.mjs` 换成 `.mbtx`（2026-10-07，② 的第二件）
+///
+/// 判据是 moobile `docs/design/SCAFFOLD.md` §4.2 那根轴：**判据是进程边界，不是仓库内外**。
+/// 这个工具是**纯文件扫描**（读 `tools/*.sh`、一个字符一个字符看）—— 零子进程、不碰 JS 生态，
+/// 正是 `.mbtx` 的甜区。（跨进程那些 —— `press.mjs` / `dom-dump.mjs` / `run-js.mjs` —— 留在 `.mjs`。）
+import {
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
+}
+
+///|
+/// 反引号 / 反斜杠：**用码位拼，不写字面量**。
+///
+/// ⚠️ 理由照抄旧实现（它踩过）：这个仓库的工具链/编辑器会把源码里连着写的两个反斜杠**收成一个** ——
+///    那样"转义过的反引号"那条用例其实塞的是**裸**反引号，判据（正确地）报命中，
+///    而错的是**用例自己**。用码位拼，任何转义层都动不了它。
+fn ch_bt() -> Char {
+  Char::from_int(96)
+}
+
+///|
+fn ch_bs() -> Char {
+  Char::from_int(92)
+}
+
+///|
+/// 一行里找出"双引号字符串中未转义的反引号"。返回 `None` 或该行的说明。
+///
+/// ⚠️ 状态机的三条细节（少一条就变成误报门）：
+///   · **行首是 `#` 的注释不算** —— 那是散文；
+///   · **单引号里的一切都是数据**（bash 单引号内不做任何替换），连反斜杠也不转义；
+///   · 双引号里 `\` 会**吃掉下一个字符**（所以 `\`` 不算命中）。
+fn scan_line(line : String) -> String? {
+  let c = line.to_array()
+  let mut i = 0
+  // trimStart：跳过行首空白
+  while i < c.length() && (c[i] == ' ' || c[i] == '\t') {
+    i = i + 1
+  }
+  if i < c.length() && c[i] == '#' {
+    return None
+  }
+  i = 0
+  let mut in_single = false
+  let mut in_double = false
+  while i < c.length() {
+    let ch = c[i]
+    if ch == ch_bs() && !in_single {
+      i = i + 2 // 转义掉下一个字符（含转义过的反引号）
+      continue
+    }
+    if in_single {
+      if ch == '\'' {
+        in_single = false
+      }
+      i = i + 1
+      continue
+    }
+    if ch == '\'' {
+      in_single = true
+      i = i + 1
+      continue
+    }
+    if in_double {
+      if ch == '"' {
+        in_double = false
+      } else if ch == ch_bt() {
+        return Some("双引号里的反引号（会被当命令替换执行）")
+      }
+      i = i + 1
+      continue
+    }
+    if ch == '"' {
+      in_double = true
+    }
+    i = i + 1
+  }
+  None
+}
+
+///|
+/// 按码元序比大小（文件名都是 ASCII；D27：**不许**用 `Array::sort()` 排字符串 —— 它不是字典序）。
+fn cmp_plain(a : String, b : String) -> Int {
+  let ua = a.to_array()
+  let ub = b.to_array()
+  let mut i = 0
+  while i < ua.length() && i < ub.length() {
+    if ua[i] != ub[i] {
+      return if ua[i].to_int() < ub[i].to_int() { -1 } else { 1 }
+    }
+    i = i + 1
+  }
+  if ua.length() == ub.length() {
+    0
+  } else if ua.length() < ub.length() {
+    -1
+  } else {
+    1
+  }
+}
+
+///|
+/// 插入排序（数组很小，而且顺序口径写在明处）。
+fn sort_plain(arr : Array[String]) -> Unit {
+  let mut i = 1
+  while i < arr.length() {
+    let v = arr[i]
+    let mut j = i
+    while j > 0 && cmp_plain(arr[j - 1], v) > 0 {
+      arr[j] = arr[j - 1]
+      j = j - 1
+    }
+    arr[j] = v
+    i = i + 1
+  }
+}
+
+///|
+/// 一处命中。
+struct Hit {
+  file : String
+  line : Int
+  text : String
+}
+
+///|
+fn scan_files(files : Array[String]) -> Array[Hit] raise {
+  let hits : Array[Hit] = []
+  for f in files {
+    let text = @fs.read_file_to_string(f)
+    let mut n = 0
+    for line in text.split("\n") {
+      n = n + 1
+      match scan_line(line.to_owned()) {
+        Some(_) => hits.push({ file: f, line: n, text: trim_str(line.to_owned()) })
+        None => ()
+      }
+    }
+  }
+  hits
+}
+
+///|
+fn trim_str(s : String) -> String {
+  let c = s.to_array()
+  let mut a = 0
+  let mut b = c.length()
+  while a < b && (c[a] == ' ' || c[a] == '\t' || c[a] == '\r') {
+    a = a + 1
+  }
+  while b > a && (c[b - 1] == ' ' || c[b - 1] == '\t' || c[b - 1] == '\r') {
+    b = b - 1
+  }
+  let mut out = ""
+  let mut i = a
+  while i < b {
+    out = out + c[i].to_string()
+    i = i + 1
+  }
+  out
+}
+
+///|
+fn has_flag(args : Array[String], flag : String) -> Bool {
+  for a in args {
+    if a == flag {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn main raise {
+  let names : Array[String] = []
+  for n in @fs.read_dir("tools") {
+    if n.has_suffix(".sh") {
+      names.push("tools/" + n)
+    }
+  }
+  sort_plain(names)
+
+  // 空集合守卫：一条脚本都没扫到时"没问题"是**假绿**
+  if names.length() < 10 {
+    println(
+      "✗ 只扫到 " + names.length().to_string() +
+      " 个脚本（实测应有 20+）—— 路径写坏了？（不允许在空集合上通过）",
+    )
+    @sys.exit(1)
+  }
+
+  let hits = scan_files(names)
+
+  if has_flag(@env.args(), "--selftest") {
+    // 四向诱饵：真反引号必须点名；转义 / 单引号 / 注释三种都不许误报。
+    let bt = ch_bt().to_string()
+    let bs = ch_bs().to_string()
+    let cases : Array[(String, Bool, String)] = [
+      ("echo \"先跑 " + bt + "moon publish" + bt + " 吧\"", true, "真反引号"),
+      ("echo \"先跑 " + bs + bt + "moon publish" + bs + bt + " 吧\"", false, "转义过的反引号"),
+      ("echo '先跑 " + bt + "moon publish" + bt + " 吧'", false, "单引号里的（那是数据）"),
+      ("# echo \"先跑 " + bt + "moon publish" + bt + " 吧\"", false, "注释里的"),
+    ]
+    let mut ok = true
+    for c in cases {
+      let (line, want, name) = c
+      let got = scan_line(line) is Some(_)
+      if got != want {
+        ok = false
+        println(
+          "✗ 诱饵「" + name + "」：期望" + (if want { "命中" } else { "不命中" }) + "，实得" +
+          (if got { "命中" } else { "不命中" }),
+        )
+      } else {
+        println("✓ 诱饵「" + name + "」：" + (if want { "被点名" } else { "不误报" }))
+      }
+    }
+    if ok && hits.length() == 0 {
+      println("✓ 诱饵生效：真的反引号被点名，转义 / 单引号 / 注释三种都不误报（四向都活着）")
+      @sys.exit(0)
+    }
+    println("✗ 诱饵没生效（或仓库里本来就有命中）—— 这条判据不可信")
+    @sys.exit(1)
+  }
+
+  if hits.length() > 0 {
+    println(
+      "✗ " + hits.length().to_string() +
+      " 处把反引号写进了**双引号**字符串里 —— bash 会把它当命令替换（**会真的执行**）：",
+    )
+    for h in hits {
+      println("      " + h.file + ":" + h.line.to_string() + "  " + h.text)
+    }
+    println("    改法：写成 " + ch_bt().to_string() + "转义过的那个" + ch_bt().to_string() + "，或者把那段用「」括起来。")
+    @sys.exit(1)
+  }
+  println(
+    "✓ shell 坑位检查通过：扫了 " + names.length().to_string() +
+    " 个脚本，双引号字符串里没有未转义的反引号",
+  )
+}

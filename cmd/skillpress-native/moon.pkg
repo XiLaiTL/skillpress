@@ -1,0 +1,23 @@
+// **native 可执行件**（CLI 的门面之二）—— `moon install` 装的就是它。
+//
+// ⚠️ 这里只许放"接线"：宿主从 `engine/gates/native`（`moonbitlang/x` + 一小段 C），
+//    逻辑全在 `cli`（与 target 无关）。js 那一份在 `cmd/skillpress/`。
+//
+// ⚠️ 为什么必须有两个可执行件：moon 今天**没有条件 import**（实测，见 P10 第 ⑦ 条）⇒
+//    "js 用 JS 宿主、native 用本机宿主"这件事没法在同一个包里分叉，只能在**可执行件**这一层分。
+import {
+  "XiLaiTL/skillpress/cmd/skillpress/cli" @cli,
+  "XiLaiTL/skillpress/engine/gates/native" @gnative,
+  "XiLaiTL/skillpress/engine/content" @content,
+  "XiLaiTL/skillpress/engine/site" @site,
+  "moonbitlang/x/sys" @sys,
+  "moonbitlang/core/env" @env,
+  // ⚠️ `async fn main` 要求**可执行件自己** import `moonbitlang/async`（实测报
+  //    "Cannot use `async fn main`: package moonbitlang/async is not imported"）——
+  //    哪怕 @site 已经间接依赖它。
+  "moonbitlang/async",
+}
+
+supported_targets = "+native"
+
+pkgtype(kind: "executable")

@@ -52,15 +52,13 @@ run() {
     red="$red $name"
   fi
 }
-run file-parity bash tools/file-parity.sh
-run blocks-parity bash tools/blocks-parity.sh
-run highlight-parity bash tools/highlight-parity.sh
+run engine-fixtures bash tools/engine-fixtures.sh
 run blocks-fixtures bash tools/blocks-fixtures.sh
 run line-budget bash tools/line-budget.sh
 run diagnostics-ledger bash tools/diagnostics-ledger.sh
 run mbt-traps bash tools/mbt-traps.sh
 run site-source bash tools/site-source.sh
-run shell-traps node tools/shell-traps.mjs
+run shell-traps bash tools/shell-traps.sh
 # 包内容也在干净克隆里复核：这里**没有未跟踪文件**，所以清单反映的就是版本库的真实内容
 run package-check bash tools/package-check.sh
 echo

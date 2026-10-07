@@ -1,5 +1,5 @@
 ///|
-/// tree-sitter 的**薄垫片**（js target 专用）。
+/// tree-sitter 的**薄垫片（js target 专用）**。
 ///
 /// ## 为什么不直接用上游那层绑定
 ///
@@ -18,6 +18,8 @@
 ///   · 色号、优先级、包装挑选、片段拼装**全在 MoonBit**（`hl.mbt` / `wrap.mbt`）。
 ///
 /// ⚠️ 语言句柄由引导层按 wasm 基名预装（`moonbit` / `bash` / `json` / `javascript` / `toml`）。
+/// ⚠️ **native 那一侧是另一份文件**（`ts_shim.native.mbt`）：它没有引导层，query 是编进二进制的
+/// （`queries.generated.mbt`）。两份垫片必须给出**同样的三列文本** —— 那是 P10 的判据。
 
 ///|
 /// 引导层装好了吗？（没装好就**明说**，不要静默给一份"全不上色"的结果）
@@ -32,51 +34,10 @@ pub fn languages() -> String {
 }
 
 ///|
-/// 跑一次解析：对给定的**整段文本**（可能是包装过的）取 capture。
-/// 认不出语言 / query 报错 ⇒ **抛**，由调用方明说（不许静默降级）。
-pub fn captures_raw(lang_name : String, source : String) -> String raise {
-  let out = ts_captures(lang_name, source)
-  if out.has_prefix("ERR:") {
-    raise Failure(out)
-  }
-  out
-}
-
-///|
-/// 把三列文本解析成 `Capture`（**色号优先级在这里就填好**）。
-pub fn parse_captures(text : String) -> Array[Capture] {
-  let out : Array[Capture] = []
-  for line in text.split("\n") {
-    if line == "" {
-      continue
-    }
-    let parts = line.split("\t").collect()
-    if parts.length() == 3 {
-      let start = to_int_or(parts[1], -1)
-      let end = to_int_or(parts[2], -1)
-      if start >= 0 && end > start {
-        out.push(with_palette({ name: parts[0].to_owned(), start, end, prio: 0 }))
-      }
-    }
-  }
-  out
-}
-
-///|
-/// 给 `wrap.mbt` 的 `caps_of` 用：绑定语言，拿到"文本 → capture 表"。
-pub fn caps_of(lang_name : String) -> (String) -> Array[Capture] raise {
-  fn(source) raise { parse_captures(captures_raw(lang_name, source)) }
-}
-
-///|
-/// 解析失败给 `fallback`（坏行会被 `start >= 0 && end > start` 筛掉，不静默降级：
-/// 筛掉多少，`captures_raw` 那一侧是数得出来的）。
-fn to_int_or(text : StringView, fallback : Int) -> Int {
-  try {
-    @string.parse_int(text)
-  } catch {
-    _ => fallback
-  }
+/// 原生那一侧的同名函数在 `ts_shim.native.mbt`：这里取引导层装好的语言与 query，
+/// 把 capture 压成三列文本（认不出 / query 报错都写成 `ERR:` 前缀，由 `captures.mbt` 抛出去）。
+pub fn captures_text(lang_name : String, source : String) -> String {
+  ts_captures(lang_name, source)
 }
 
 ///|

@@ -1,0 +1,16 @@
+// **CLI 的公共实现**（与 target 无关）：`check` / `attach` / `gen-file` / `dump-blocks` / `hl` / `batch`。
+//
+// ⚠️ 这个包**不 import** `engine/gates/js` 也不 import `engine/gates/native`：
+//    moon 没有条件 import（实测），所以"哪个 target 用哪份宿主"只能在**可执行件**那一层分叉。
+//    宿主与"程序根提示"由 `run(host, hint)` 注入，见 `args.mbt` 的文件头。
+import {
+  "moonbitlang/core/env" @env,
+  "XiLaiTL/skillpress/engine/highlight" @hl,
+  "XiLaiTL/skillpress/engine/content" @content,
+  "XiLaiTL/skillpress/engine/ignore" @ig,
+  "XiLaiTL/skillpress/engine/gates" @gates,
+  "XiLaiTL/skillpress/engine/scaffold" @sc,
+  "moonbitlang/x/sys" @sys,
+}
+
+supported_targets = "+js +native"

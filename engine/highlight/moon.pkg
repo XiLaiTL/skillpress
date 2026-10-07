@@ -1,11 +1,36 @@
+// 高亮链：**纯逻辑 + 两份垫片（js / native）**。
+//
+// 目标无关的部分：`hl.mbt`（调色板 / 刷色 / 运行段）、`wrap.mbt`（包装候选 / 拼接）、
+// `captures.mbt`（三列文本 → Capture）、`queries.generated.mbt`（内嵌 query，native 用）。
+//
+// 两份垫片按 target 选文件：两边都提供 `ready` / `languages` / `captures_text` 三个函数。
+//
+// ⚠️ **为什么不能"按 target 换依赖"**：moon 今天没有条件 import（实测报错原文
+//    「Conditional imports are not yet supported by the build system.」）⇒ 这个包的 import
+//    必须是两个目标都能用的。所以 native 需要的 C（tree-sitter 库 + 五门语法）**全部 vendor 进仓**、
+//    在这里以 `native-stub` 声明（native-stub 只在 native 目标上编），而不是依赖 registry 上那些
+//    `+native` 专有的语法包 —— 那样会让 **js 目标编不过**，而 js 那条路撑着全部判据与 `press`，
+//    且 P10 的对账判据要求两边都在。
 import {
   "moonbitlang/core/string" @string,
+  "moonbitlang/core/encoding/utf8" @utf8,
 }
 
-supported_targets = "+js"
+supported_targets = "+js +native"
 
 options(
   targets: {
     "ts_shim.mbt": [ "js" ],
+    "ts_shim.native.mbt": [ "native" ],
   },
+  // native 那条链的 C（出处与 sha256 见 `vendor/tree-sitter/PROVENANCE.md` 与
+  // `vendor/tree-sitter-grammars/PROVENANCE.md`）。文件名必须唯一 —— 见那边的第 2 条坑。
+  "native-stub": [
+    "ts.c",
+    "gram-bash.c",
+    "gram-javascript.c",
+    "gram-json.c",
+    "gram-moonbit.c",
+    "gram-toml.c",
+  ],
 )

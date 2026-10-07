@@ -17,6 +17,16 @@
 set -u
 cd "$(dirname "$0")/.."
 
+# ⚠️ 脚手架那几条为什么该含：**模板必须随包发** —— attach 跑在**使用者的机器**上，
+#    它第一件事就是读「程序根/template/instance/**」（读不到就退 2 并明说）。
+#    实测踩到过：模板目录名以点开头时，moon package **整个跳过它** —— 包看着内容齐全，
+#    而生成器一到使用者手里就说"找不到模板目录"。
+# ⚠️ 还有几条为什么该含（native CLI 的上色链）：js 那条路走 `web-tree-sitter` 的 wasm，
+#    native 那条路要走**我们自己 vendor 的 tree-sitter C 库 + 五门语法的 C**（见 `vendor/*/PROVENANCE.md`）。
+#    少了它们 native 编不出来，而 **js 那边照样绿** ⇒ 又是一条"静默缺件"，所以钉进发布契约。
+# ⚠️ 另外两条 FORBIDDEN 为什么不能只靠根锚定：实例住在 skills/** 里面，而 skills/** 是**要发**的
+#    ⇒ 依赖与产物必须"不管住在哪儿"都不进包。
+#
 # ── 该含的（文件；`<目录>/:<最少文件数>` 表示目录至少要有几个文件）────────────────
 REQUIRED="
 moon.mod
@@ -33,7 +43,7 @@ engine/content/moon.pkg
 engine/highlight/moon.pkg
 engine/gates/moon.pkg
 shell/moon.pkg
-cmd/skillpress/main.mbt
+cmd/skillpress/cli/cli.mbt
 cmd/skillpress/moon.pkg
 grammars/moonbit.wasm
 grammars/PROVENANCE.md
@@ -42,6 +52,33 @@ vendor/web-tree-sitter/web-tree-sitter.wasm
 vendor/web-tree-sitter/PROVENANCE.md
 skills/skillpress-dev/SKILL.md
 skills/skillpress-user/SKILL.md
+cmd/skillpress/cli/attach.mbt
+engine/scaffold/moon.pkg
+engine/scaffold/plan.mbt
+template/README.md
+template/instance/moon.mod
+template/instance/moon.work
+template/instance/gitignore
+template/instance/verify.mjs
+template/instance/:14
+vendor/tree-sitter/PROVENANCE.md
+vendor/tree-sitter/lib/src/lib.c
+vendor/tree-sitter/lib/include/tree_sitter/api.h
+vendor/tree-sitter-grammars/PROVENANCE.md
+vendor/tree-sitter-grammars/json/parser.c
+vendor/tree-sitter-grammars/bash/parser.c
+vendor/tree-sitter-grammars/bash/scanner.c
+vendor/tree-sitter-grammars/javascript/parser.c
+vendor/tree-sitter-grammars/moonbit/parser.c
+vendor/tree-sitter-grammars/toml/parser.c
+vendor/tree-sitter-grammars/moonbit/tree_sitter/parser.h
+engine/highlight/ts_shim.native.mbt
+engine/highlight/queries.generated.mbt
+engine/highlight/ts.c
+engine/highlight/gram-moonbit.c
+engine/highlight/gram-bash.c
+vendor/tree-sitter-grammars/:20
+vendor/tree-sitter/:45
 engine/gates/:8
 shell/:8
 skills/:6
@@ -58,6 +95,10 @@ FORBIDDEN="
 ^package-lock\.json$
 ^skills\.lock\.json$
 ^_scratch/
+node_modules/
+/built/
+moobile\.js$
+content\.generated\.mbt$
 "
 
 # 检查一份清单：打印问题，return 不合格数
@@ -118,6 +159,11 @@ if [ "${1:-}" = "--selftest" ]; then
     for i in 1 2 3 4 5 6 7 8 9 10; do echo "shell/s$i.mbt"; done
     for i in 1 2 3 4 5 6 7 8; do echo "skills/skillpress-dev/references/r$i.md"; done
     for i in 1 2 3 4 5 6 7 8; do echo "engine/content/c$i.mbt"; done
+    # ⚠️ 每一档 `<目录>/:<下限>` 都要在这儿**凑够**：合成清单凑不够时，诱饵(绿)会红着说
+    #    "判据不可信" —— 而真因是**诱饵自己**没跟上新加的那条。加下限就要加这一条。
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do echo "template/instance/t$i.mbt"; done
+    for i in $(seq 1 60); do echo "vendor/tree-sitter/f$i.c"; done
+    for i in $(seq 1 20); do echo "vendor/tree-sitter-grammars/g$i.c"; done
   } > "$W/base.txt"
   cp "$W/base.txt" "$W/extra.txt";  echo "lib/gen-content.mjs" >> "$W/extra.txt"
   grep -v '^shell/moon.pkg$' "$W/base.txt" > "$W/missing.txt"

@@ -1,10 +1,15 @@
 ///|
-/// **宿主能力**：门要看的只有四件事 —— 存不存在、是不是目录、读文件、列目录项。
+/// **宿主能力**：门要看的四件事（存不存在、是不是目录、读文件、列目录项），
+/// 加上写侧与被问侧的三件事（建目录、问人、读一行答案）—— 后三件是**脚手架 `attach`** 要的。
 ///
 /// 为什么做成注入的：门的判据是纯逻辑（哪条 token 算路径、命令里引用了哪个脚本…），
 /// 而"磁盘上有没有"是运行时的事。分开之后：
 ///   · 纯逻辑可以在 `moon test` 里用**假宿主**喂夹具（不需要真文件）；
-///   · 真宿主只有 js 一份（`dev/host_js.mbt`），将来换 target 只换那一份。
+///   · 真宿主只有 js 一份（`engine/gates/js/host.mbt`），将来换 target 只换那一份。
+///
+/// ⚠️ 加 `mkdir_p` / `is_tty` / `read_line` 时**没有另起一个"脚手架宿主"**：那样磁盘与终端
+///    就有两套抽象，而"同一个目录存不存在"两个答案的那天，没人知道该信哪个。
+///    代价照实说：这一包从此不只有"门要读的东西"，注释也跟着改了（原先写的是"只有四件事"）。
 pub struct Host {
   /// 路径存不存在（文件或目录都算）。
   exists : (String) -> Bool
@@ -23,10 +28,19 @@ pub struct Host {
   write : (String, String) -> Unit
   /// 当前工作目录（`display_path` 的最后兜底要用）。
   cwd : () -> String
+  /// **递归建目录**（脚手架要写 `skills/skillpress/scripts/.skillpress/…` 这种多层新路径）。
+  /// 已经存在就当成功（幂等：`attach` 跑第二遍不该因为"目录已经在了"而红）。
+  mkdir_p : (String) -> Unit
+  /// stdin 是不是**终端**。脚手架的交互式提问只在这条为真时默认开启 ——
+  /// 在管道/CI 里默认问人等于**卡死**，而"卡住不返回"比"用默认值并打印一句"难查得多。
+  is_tty : () -> Bool
+  /// 问一句、读**一行**答案（提问走 stderr；EOF/读不到给空串，由调用方判"空 = 用默认值"）。
+  /// ⚠️ 真宿主在**非终端**上把 stdin 整个读进来再按行切 —— 于是"管道喂答案"这条路可以写判据。
+  read_line : (String) -> String
 }
 
 ///|
-/// 组装一个宿主（7 个注入点，顺序与字段声明一致）。
+/// 组装一个宿主（10 个注入点，顺序与字段声明一致）。
 /// 有它是因为**跨包不能直接写字面量**，而且"注入点有哪几个"应该只有一处答案。
 pub fn Host::new(
   exists : (String) -> Bool,
@@ -36,8 +50,11 @@ pub fn Host::new(
   resolve : (String) -> String,
   write : (String, String) -> Unit,
   cwd : () -> String,
+  mkdir_p : (String) -> Unit,
+  is_tty : () -> Bool,
+  read_line : (String) -> String,
 ) -> Host {
-  { exists, is_dir, read, read_dir, resolve, write, cwd }
+  { exists, is_dir, read, read_dir, resolve, write, cwd, mkdir_p, is_tty, read_line }
 }
 
 ///|
@@ -76,6 +93,21 @@ pub fn Host::write(self : Host, p : String, text : String) -> Unit {
 ///|
 pub fn Host::cwd(self : Host) -> String {
   (self.cwd)()
+}
+
+///|
+pub fn Host::mkdir_p(self : Host, p : String) -> Unit {
+  (self.mkdir_p)(p)
+}
+
+///|
+pub fn Host::is_tty(self : Host) -> Bool {
+  (self.is_tty)()
+}
+
+///|
+pub fn Host::read_line(self : Host, prompt : String) -> String {
+  (self.read_line)(prompt)
 }
 
 ///|

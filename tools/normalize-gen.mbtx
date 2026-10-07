@@ -1,0 +1,356 @@
+///|
+/// **normalize-gen.mbtx** —— 把生成物的**两种形状**化到同一条基准线上（`file-parity.sh` 的判据用）。
+///
+///   moon run --target js tools/normalize-gen.mbtx <生成物文件>   # 归一化后打到 stdout
+///   moon run --target js tools/normalize-gen.mbtx --selftest     # 自证：边界还在
+///   （壳子：`bash tools/normalize-gen.sh <文件>`）
+///
+/// ## 为什么需要它
+///
+/// P6 把 `Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home` 这 7 个类型
+/// 从**生成物**搬进了包 `shell` —— 于是同一个内容源印出来的文件换了"形状"：
+///
+/// | | 旧形状（旧引擎现印的产物） | 新形状（`cmd/skillpress gen-file`） |
+/// |---|---|---|
+/// | 文件头 | 一段 `//` 注释 | 一段 `//` 注释（说实话：类型在包里） |
+/// | 类型声明 | 7 个类型都在文件里 | **没有**（唯一声明处是 `shell/types.mbt`） |
+/// | 值 | 裸构造器 `Txt("x")` / `Hr` | 带包前缀 `@shell.Txt("x")` / `@shell.Hr` |
+/// | 签名 | `pub fn home() -> Home` | `pub fn home() -> @shell.Home` |
+///
+/// 所以对账是"**归一化后**逐字节一致"，归一化只抹这三种**形状差**。
+///
+/// ## 边界（这是刻意的，也是本文件存在的风险所在）
+///
+/// 只抹**形状**，不抹**内容**：值、顺序、缩进、转义、高亮 runs、正文里的空行位置，全都还在判据里。
+/// 判据弱一点可以，弱到"看不出内容变了"就不行 —— `--selftest` 就是钉这条边界的：
+/// 它证明"值改一个字节"会被抓到、"形状差"不会被误判。
+///
+/// ## 为什么从 `.mjs` 换成 `.mbtx`（2026-10-07，② 的第三件）
+///
+/// 判据是 moobile `docs/design/SCAFFOLD.md` §4.2 那根轴：**判据是进程边界**。
+/// 这个工具是**纯文本变换**（读一个文件、三条规定、打到 stdout）—— 零子进程，`.mbtx` 的甜区。
+import {
+  "moonbitlang/x/fs",
+  "moonbitlang/x/sys",
+}
+
+///|
+/// 形状差里唯一"值"那一侧的东西：包前缀。
+const REC : String = "@shell."
+
+///|
+/// 打一行到 stderr（用法那种话不该混进 stdout 的产物里）。
+extern "js" fn eprint(msg : String) -> Unit =
+  #|(m) => { process.stderr.write(m + "\n"); }
+
+///|
+/// `^//(?!/)` —— 是 `//` 起头的**普通注释**（`///|` / `///` 是文档注释，属于正文，不动）。
+fn is_plain_comment(l : String) -> Bool {
+  let c = l.to_array()
+  c.length() >= 2 && c[0] == '/' && c[1] == '/' && !(c.length() >= 3 && c[2] == '/')
+}
+
+///|
+/// 从 `n` 开始取到末尾（JS 的 `slice(n)`；越界给空数组）。
+fn drop_first(arr : Array[String], n : Int) -> Array[String] {
+  let out : Array[String] = []
+  let mut i = n
+  while i < arr.length() {
+    out.push(arr[i])
+    i = i + 1
+  }
+  out
+}
+
+///|
+/// 第一个以 `prefix` 开头的行的下标（没有给 -1）。
+fn idx_starts(arr : Array[String], prefix : String) -> Int {
+  let mut i = 0
+  while i < arr.length() {
+    if arr[i].has_prefix(prefix) {
+      return i
+    }
+    i = i + 1
+  }
+  -1
+}
+
+///|
+/// 这一行是不是"空行"（JS 的 `l.trim() === ""`）。
+fn is_blank(l : String) -> Bool {
+  for ch in l {
+    if ch != ' ' && ch != '\t' && ch != '\r' && ch != '\u{0b}' && ch != '\u{0c}' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// 只换**第一处**（JS 的 `String.replace(str, str)`）。
+fn replace_first(s : String, from : String, to : String) -> String {
+  match s.find(from) {
+    Some(i) => s[:i].to_owned() + to + s[i + from.length():].to_owned()
+    None => s
+  }
+}
+
+///|
+/// **归一化：生成物文本 → 基准形状。**
+///
+/// 三条规则（两边都跑；都幂等）：
+///   ① 去掉**开头**那段 `//` 注释块（`///|` 文档注释不算 —— 它是正文的一部分）；
+///   ② 去掉**类型声明块**：从 `pub fn ` 前最近的那条 `///|` 起，往上全砍；
+///   ③ 去掉包前缀 `@shell.`。
+/// 然后把连续空行压成一个、去掉首尾空行 —— ①②会把"块旁边的空行"吃掉，需要对齐。
+pub fn normalize(text : String) -> String {
+  let mut lines : Array[String] = text.split("\n").map(fn(l) { l.to_owned() }).collect()
+  // ①
+  let mut i = 0
+  while i < lines.length() && is_plain_comment(lines[i]) {
+    i = i + 1
+  }
+  lines = drop_first(lines, i)
+  // ②
+  let fn_at = idx_starts(lines, "pub fn ")
+  if fn_at >= 0 {
+    let mut keep_from = fn_at
+    let mut k = fn_at - 1
+    while k >= 0 {
+      if lines[k].has_prefix("///|") {
+        keep_from = k
+        break
+      }
+      k = k - 1
+    }
+    lines = drop_first(lines, keep_from)
+  }
+  // ③
+  let stripped = lines.join("\n").replace_all(old=REC, new="")
+  // 空行：压成一个、去首尾（正文里的空行仍然保留一个）
+  let kept : Array[String] = []
+  for l in stripped.split("\n") {
+    let s = l.to_owned()
+    if is_blank(s) {
+      if kept.length() > 0 && kept[kept.length() - 1] != "" {
+        kept.push("")
+      }
+    } else {
+      kept.push(s)
+    }
+  }
+  while kept.length() > 0 && kept[kept.length() - 1] == "" {
+    let _ = kept.pop()
+  }
+  kept.join("\n") + "\n"
+}
+
+///|
+/// 自证用的夹具（**逐字节**从旧实现 `tools/normalize-gen.mjs` 抽出来 —— 手抄会错）。
+///
+/// ⚠️ `#|` 多行字符串**不给最后一行补换行** ⇒ 夹具末尾那个换行靠最后一条空的 `#|` 撑着。
+fn old_fixture_body() -> String {
+  let body =
+    #|// 由 `tools/gen-content.mjs` 生成 —— **别手改**（跑 `--check` 会红）。
+    #|//
+    #|// 内容源：`skills/skillpress/SKILL.md`。
+    #|
+    #|///| 一段行内内容。
+    #|pub enum Span {
+    #|  Txt(String)
+    #|}
+    #|
+    #|///| 正文里的一个块。
+    #|pub enum Block {
+    #|  Hr
+    #|  P(Array[Span])
+    #|}
+    #|
+    #|///| 首页。
+    #|pub struct Home {
+    #|  title : String
+    #|  lede : Array[Block]
+    #|}
+    #|
+    #|///| 首页（来自 `skills/skillpress/SKILL.md`）。
+    #|pub fn home() -> Home {
+    #|  {
+    #|    title: "skillpress",
+    #|    lede: [
+    #|      P([Txt("a"), Code("b")]),
+    #|      Hr,
+    #|    ],
+    #|  }
+    #|}
+    #|
+    #|///| 全部 skill。
+    #|pub fn skills() -> Array[Doc] {
+    #|  [
+    #|    {
+    #|      slug: "s",
+    #|      blocks: [P(([] : Array[Span]))],
+    #|    },
+    #|  ]
+    #|}
+    #|
+  body
+}
+
+///|
+/// 自证用的夹具（**逐字节**从旧实现 `tools/normalize-gen.mjs` 抽出来 —— 手抄会错）。
+///
+/// ⚠️ `#|` 多行字符串**不给最后一行补换行** ⇒ 夹具末尾那个换行靠最后一条空的 `#|` 撑着。
+fn new_fixture_body() -> String {
+  let body =
+    #|// 由 `skillpress` 生成（P6 起是 MoonBit 引擎：`cmd/skillpress gen-file`）—— **别手改**。
+    #|//
+    #|// 类型**不在这里**：它们在包 `XiLaiTL/skillpress/shell`。
+    #|
+    #|///| 首页（来自 `skills/skillpress/SKILL.md`）。
+    #|pub fn home() -> @shell.Home {
+    #|  {
+    #|    title: "skillpress",
+    #|    lede: [
+    #|      @shell.P([@shell.Txt("a"), @shell.Code("b")]),
+    #|      @shell.Hr,
+    #|    ],
+    #|  }
+    #|}
+    #|
+    #|///| 全部 skill。
+    #|pub fn skills() -> Array[@shell.Doc] {
+    #|  [
+    #|    {
+    #|      slug: "s",
+    #|      blocks: [@shell.P(([] : Array[@shell.Span]))],
+    #|    },
+    #|  ]
+    #|}
+    #|
+  body
+}
+
+///|
+/// 自证用：一小段"旧形状"的生成物。
+fn old_fixture() -> String {
+  old_fixture_body()
+}
+
+///|
+/// 自证用：同一份内容的"新形状"（类型不在文件里、值和签名带前缀）。
+fn new_fixture() -> String {
+  new_fixture_body()
+}
+
+///|
+/// 自证：**边界还在**（形状差被抹掉、内容差一个字节都跑不掉）。
+fn selftest() -> Unit {
+  let names : Array[String] = []
+  let oks : Array[Bool] = []
+  let whys : Array[String] = []
+  let eq = (name : String, a : String, b : String) => {
+    names.push(name)
+    oks.push(a == b)
+    whys.push(if a == b { "" } else { "两边不相等" })
+  }
+  let ne = (name : String, a : String, b : String) => {
+    names.push(name)
+    oks.push(a != b)
+    whys.push(if a != b { "" } else { "两边**居然**相等（判据看不出区别）" })
+  }
+
+  let base = normalize(old_fixture())
+  eq("旧形状 ↔ 新形状：归一化后相同（形状差被抹掉）", base, normalize(new_fixture()))
+  // 边界 ①：值改一个字节必须被抓到
+  ne(
+    "值改一个字符（\"a\" → \"b\"）必须看出来",
+    base,
+    normalize(replace_first(new_fixture(), "@shell.Txt(\"a\")", "@shell.Txt(\"b\")")),
+  )
+  // 边界 ②：块的顺序换了必须被抓到
+  ne(
+    "块顺序换了必须看出来",
+    base,
+    normalize(
+      replace_first(
+        new_fixture(),
+        "      @shell.P([@shell.Txt(\"a\"), @shell.Code(\"b\")]),\n      @shell.Hr,",
+        "      @shell.Hr,\n      @shell.P([@shell.Txt(\"a\"), @shell.Code(\"b\")]),",
+      ),
+    ),
+  )
+  // 边界 ③：正文里的空行（渲染无关，但**是产物的形状**）必须被抓到
+  ne("正文里的空行多一行必须看出来", base, normalize(replace_first(new_fixture(), "  {\n    title:", "  {\n\n    title:")))
+  // 边界 ④：缩进变了必须被抓到
+  ne("缩进变了必须看出来", base, normalize(replace_first(new_fixture(), "      @shell.Hr,", "        @shell.Hr,")))
+  // 边界 ⑤：只去掉前缀不算差异（证明"前缀"是唯一被规则③吃掉的东西）
+  eq("只去掉前缀：仍然相同（规则③就是干这个的）", base, normalize(new_fixture().replace_all(old=REC, new="")))
+
+  let mut bad = 0
+  let mut i = 0
+  while i < names.length() {
+    if oks[i] {
+      println("✓ " + names[i])
+    } else {
+      bad = bad + 1
+      println("✗ " + names[i] + " —— " + whys[i])
+    }
+    i = i + 1
+  }
+  if bad == 0 {
+    println("\n归一化自证通过（" + names.length().to_string() + " 条）")
+    @sys.exit(0)
+  }
+  println("\n归一化自证**失败**（" + bad.to_string() + "/" + names.length().to_string() + " 条）")
+  @sys.exit(1)
+}
+
+///|
+/// **用户参数**：剥掉"解释器 + 脚本"那一段前缀。
+///
+/// ⚠️ 这段前缀的**长度随 target 变**（实测，`moon run` 两种后端各看一次）：
+///   · `--target js`：`[node.exe, <…>/_build/…/single.js, …用户参数]`
+///   · 默认（wasm） ：`[<…>/_build/…/single.wasm, …用户参数]` —— **没有**额外的解释器
+/// 所以**不能认固定下标**。踩过的坑很具体：第一版按 `args[1]` 取输入文件 ——
+/// 而在 js 上 `args[1]` 其实是**脚本自己的路径** ⇒ `--selftest` 被当成"输入文件"，
+/// 程序把自己的产物读出来打了一屏（1273 行 JS，看着像编译器抽风，其实是自己在读自己）。
+///
+/// 判"这一项是不是脚本路径"的口径：以 `.js` 结尾**且在 `_build` 下**（moon 的产物落在那儿；
+/// 用户传进来的生成物不可能长这样）。
+fn user_args() -> Array[String] {
+  let a = @env.args()
+  let out : Array[String] = []
+  let mut i = 1
+  if i < a.length() && a[i].has_suffix(".js") && a[i].contains("_build") {
+    i = i + 1
+  }
+  while i < a.length() {
+    out.push(a[i])
+    i = i + 1
+  }
+  out
+}
+
+///|
+fn main raise {
+  let args = user_args()
+  let mut selftest_flag = false
+  for a in args {
+    if a == "--selftest" {
+      selftest_flag = true
+    }
+  }
+  if selftest_flag {
+    selftest()
+    return
+  }
+  if args.length() < 1 {
+    eprint("用法：bash tools/normalize-gen.sh <生成物文件> ｜ --selftest")
+    @sys.exit(2)
+  }
+  let text = @fs.read_file_to_string(args[0])
+  // ⚠️ `normalize` 的约定是**末尾带一个换行** ⇒ 这里切掉它再 `println`，字节数正好对上
+  //    （MoonBit 没有"无换行输出"）。
+  let out = normalize(text)
+  println(out[:out.length() - 1].to_owned())
+}

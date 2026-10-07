@@ -3,24 +3,10 @@
 #
 #   SKILLPRESS_CORPUS=<真内容根> bash tools/mk-parity-corpus.sh
 #
-# ── 为什么需要它（R2 之后的对账前提）──────────────────────────────────────────
-# R2 起，内容仓会有 `skillpress/WEBSITE.md`（新首页源）与 `skillpress.ignore.md`（忽略清单）。
-# 而**冻结的旧实现不认识这两样**：它照旧拿 `skillpress/SKILL.md` 当首页、也不跳过任何 skill。
-# 于是在真语料上"旧 vs 新"**必然**分叉 —— 那不是 bug，是设计（新引擎实现了 R2/R4）。
-#
-# 干瞪眼没用，也不能把判据删掉（那等于放弃"逐字节"这条最强的防线）。做法是：
-# **把真语料的 skill 原样拷进副本，但把"新功能会改变读法"的两个东西拿掉**——
-#   ① 去掉 `skillpress/WEBSITE.md` ⇒ 两边都读 `SKILL.md` 当首页；
-#   ② 副本的**上一级**不放 `skillpress.ignore.md`（清单住内容仓根）⇒ 两边都不跳过任何一份。
-# 两个引擎读的是同一份内容 ⇒ 仍然可以**整份文件逐字节**比，而且内容的**广度一点没丢**
-# （真语料里的链接、表格、代码块、子页顺序都还在）。
-#
-# ⚠️ 只拷引擎**真的会读**的东西（`.md` + `scripts/` 下的非 md）：`skills/skillpress/scripts/.skillpress/`
-#    里有 `node_modules/`、`_build/`、`.mooncakes/`，整个 `cp -r` 会把几百兆拖进来，而且毫无意义。
-set -u
-cd "$(dirname "$0")/.."
-: "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<真内容根> 指定语料（例：../moobile/skills）}"
-[ -d "$SKILLPRESS_CORPUS" ] || { echo "✗ 语料根不存在：$SKILLPRESS_CORPUS"; exit 1; }
+# ── 为什么需要它（“干净副本”）─────────────────────────────
+# R2 起，内容仓有 `skillpress/WEBSITE.md`（首页源）与 `skillpress.ignore.md`（忽略清单），而 `tools/site-source.sh` 的 C10
+# 场景要的是**一份没有这两样的副本**（回到 R2/R4 之前的形状）。
+# ⚠️ 2026-10-07（D43）：它原来还服务于“旧实现 vs 新引擎”那几条对账，而那些已随 `lib/` 退役；#    现在它只剩 C10 这一个用途。
 
 # 目录名必须是 `skills`：旧实现的标签把 `skills/` 前缀**写死**在产物与点名里（见 PLAN 的 DG-首页标签）。
 OUT=./_build/parity-corpus
@@ -68,6 +54,12 @@ rm -f "$OUT/skills/skillpress/WEBSITE.md"
 rm -f "$OUT/skillpress.ignore.md"
 
 # ── 副本的**前提**必须自己验一遍（不然"两边读法相同"这句话就是空的）────────────────
+# ⚠️ 下面那两条守卫是**兜底**：摘除动作在上面两行 `rm -f` 里，正常情况它们**永远不触发**
+#    （实测 2026-10-07：有人写了一条"往语料里放 WEBSITE.md ⇒ 应当被拒绝"的诱饵，
+#    结果它红着说"没被拦住" —— 因为这里**自己会摘掉**，诱饵测的是一条结构上不可能发生的路径）。
+#    它们真正防的是"那两行 `rm -f` 哪天被改坏/删掉"。
+#    而"这条前提**要紧**"这件事，由 `tools/file-parity.sh --selftest` 的 ⑤ 现证一遍：
+#    前提一旦被破（副本里留着 WEBSITE.md），两个引擎的产物**真的会分叉**。
 fail=0
 if [ -e "$OUT/skills/skillpress/WEBSITE.md" ]; then
   echo "✗ 副本里还有 WEBSITE.md —— 旧实现不认识它，两边读法就不同了（这条前提破了）"; fail=1
