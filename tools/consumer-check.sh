@@ -120,12 +120,36 @@ node "$PKG/launcher/skillpress.mjs" check --repo "$BASE/proj" --skills "$FIX" > 
 r5=$?
 [ "$r5" = 1 ] && grep -q 'G3 路径不存在：docs/没有这份文档.md' "$BASE/check2.txt" &&
   ok "死路径被门点名、退出码 1" || bad "坏内容没被门抓住（退出码 $r5）"
-printf -- '---\nname: alpha\ndescription: 夹具\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n![图](x.png)\n' > "$FIX/alpha/SKILL.md"
+
+# ⚠️ **认不出的构造**：这里原来用的是 `![图](x.png)`（整行图片），而**图片 2026-10-07 起是支持的**
+#    （对标表 #10）⇒ 那条断言在新引擎上**必然红**（它要的"退 2 + 点名『不支持的构造（图片）』"
+#    已经不该发生）。换成**今天真的还不支持**的构造：行首原始 HTML。
+#    ⚠️ 但"图片现在支持"这件事也得有读数 —— 见下面那条**正向**断言（同一次运行里两半都要在）。
+printf -- '---\nname: alpha\ndescription: 夹具\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n<div>行首原始 HTML</div>\n' > "$FIX/alpha/SKILL.md"
 node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen2.txt" 2> "$BASE/gen2.err"
 r6=$?
-[ "$r6" = 2 ] && [ ! -s "$BASE/gen2.txt" ] && grep -q '不支持的构造（图片）' "$BASE/gen2.err" &&
+[ "$r6" = 2 ] && [ ! -s "$BASE/gen2.txt" ] && grep -q '不支持的构造（原始 HTML）' "$BASE/gen2.err" &&
   ok "认不出的构造：退 2 + 点名 + 不吐产物（不许把坏产物落盘）" ||
   { bad "坏内容时表现不对（退出码 $r6）"; head -3 "$BASE/gen2.err" | sed 's/^/      /'; }
+
+# ⑧′ **图片现在支持了**（对标表 #10）：整行一条 ⇒ 收成 `Image` 块、`src` 折成站点地址。
+#     ⚠️ 夹具图**真的放在内容根里**（`alpha/../assets/x.png` → `assets/x.png`）：引擎只折路径不看盘，
+#     但"内容根里没有这张图"该由 `press` 抓（`tools/press.mjs`），这里测的是**引擎**这一层。
+mkdir -p "$FIX/assets"
+printf 'x' > "$FIX/assets/x.png"
+printf -- '---\nname: alpha\ndescription: 夹具\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n![图](../assets/x.png)\n' > "$FIX/alpha/SKILL.md"
+node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen3.txt" 2> "$BASE/gen3.err"
+r7=$?
+[ "$r7" = 0 ] && grep -q '@shell.Image("图", "img/assets/x.png")' "$BASE/gen3.txt" &&
+  ok "整行图片现在**收下了**：退 0 + 收成 Image 块 + src 折成站点地址" ||
+  { bad "图片那条表现不对（退出码 $r7）"; head -3 "$BASE/gen3.err" | sed 's/^/      /'; }
+# 站外图片原样留着（那是别人家的服务器）
+printf -- '---\nname: alpha\ndescription: 夹具\nwhenToUse: 测试\n---\n\n# alpha\n\n## 一栏\n\n![外图](https://example.com/a.png)\n' > "$FIX/alpha/SKILL.md"
+node "$PKG/launcher/skillpress.mjs" gen-file "$FIX" > "$BASE/gen4.txt" 2> "$BASE/gen4.err"
+r8=$?
+[ "$r8" = 0 ] && grep -q '@shell.Image("外图", "https://example.com/a.png")' "$BASE/gen4.txt" &&
+  ok "站外图片**原样**留着（不折成站点地址、也不报错）" ||
+  { bad "站外图片表现不对（退出码 $r8）"; head -3 "$BASE/gen4.err" | sed 's/^/      /'; }
 
 echo
 if [ "$fail" = 0 ]; then
