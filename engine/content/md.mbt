@@ -15,11 +15,16 @@
 ///   · 列表项的 `indent` 是"原始行前导空白 ≥2 个字符 ⇒ 1"，`num` **无论 `.` 还是 `)` 都写成 `. `**。
 
 ///|
-/// 行内片段。三种，与站点侧的 `Span` 一一对应。
+/// 行内片段。与站点侧的 `Span` 一一对应。
 pub enum Span {
   Txt(String)
   Code(String)
   Bold(String)
+  /// **链接**：`(标签, 目标, 标签看起来是不是个路径)`。
+  ///
+  /// 第三个字段是**引擎判的**（`wordy`：全是 `[A-Za-z0-9_./-]` ⇒ 标签本身就是个路径）——
+  /// 站点照着把它排成 mono 就行，**别在站点再判一次**（两处口径迟早分叉，本仓栽过）。
+  Link(String, String, Bool)
 }
 
 ///|
@@ -290,10 +295,14 @@ pub fn inline_with_links(s : String) -> (Array[Span], Array[String]) {
       let label = drop_backticks(slice(c, h.a, h.b))
       let target = trim(slice(c, h.a2, h.b2))
       links.push(target)
+      // ⚠️ 标签一律是 `Link`（可点）—— 之前这里是 `Txt` / `Code`，也就是**链接被拍平成文字**：
+      //    正文里的链接看着像链接、点下去什么都不发生（对标表 #9 那一格）。
+      //    目标仍按老规矩跟在后面（`Code(target)`）：那是"这条链接指向哪儿"的**读者可见**线索，
+      //    只有"标签就是目标"或"外部链接"时才省略 —— 这一段是**原有行为，没有动**。
       if label == target || external_link(target) {
-        emit(if wordy(label) { Code(label) } else { Txt(label) })
+        emit(Link(label, target, wordy(label)))
       } else {
-        emit(Txt(label))
+        emit(Link(label, target, wordy(label)))
         emit(Code(target))
       }
     }

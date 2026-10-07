@@ -18,6 +18,9 @@ pub(all) enum Span {
   Txt(String)
   Code(String)
   Bold(String)
+  /// **链接**：`(标签, 目标, 标签看起来是不是个路径)` —— 第三个字段由**引擎**判（`wordy`），
+  /// 站点照着排（路径标签用 mono），**别在站点再判一次**。
+  Link(String, String, Bool)
 }
 
 ///| 正文里的一个块。

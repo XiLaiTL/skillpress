@@ -89,6 +89,8 @@ pub fn plain_of(spans : Array[Span]) -> String {
   spans.map(fn(s) {
     match s {
       Txt(v) | Code(v) | Bold(v) => v
+      // 链接的**可读文本是标签**（目标另有 `Code(target)` 那一段，不在这里重复算）
+      Link(label, _, _) => label
     }
   }).fold(init="", fn(acc, s) { acc + s })
 }

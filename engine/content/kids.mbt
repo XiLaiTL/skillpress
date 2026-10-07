@@ -97,6 +97,7 @@ pub fn read_kids(
   script_kids : (String) -> Array[String],
   report : (String) -> Unit,
   home_rel : String,
+  index : Map[String, String],
 ) -> Array[Kid] {
   let kids : Array[Kid] = []
   let slug = slug_of(skill_dir)
@@ -121,7 +122,11 @@ pub fn read_kids(
       name,
       title,
       desc,
-      blocks: parse_blocks(body, "skills/" + slug + "/" + rel, report),
+      blocks: resolve_block_links(
+        parse_blocks(body, "skills/" + slug + "/" + rel, report),
+        "skills/" + slug + "/" + rel,
+        index,
+      ),
     })
   }
   for rel in script_kids(skill_dir) {

@@ -123,6 +123,8 @@ fn table_view(
   theme : Theme,
   header : Array[Array[Span]],
   rows : Array[Array[Array[Span]]],
+  ctx : Ctx,
+  emit : @cmd.Emit[Msg],
 ) -> @html.Html {
   let p = theme.palette
   let cell = fn(align : @style.Align) {
@@ -144,8 +146,7 @@ fn table_view(
           .font_size(fs_meta)
           .line_height_em(lh_tight)
           .color(p.fg2)
-          .font_weight(@style.FontWeight::W600),
-        ),
+          .font_weight(@style.FontWeight::W600), ctx, emit),
       ],
     )
   )
@@ -165,8 +166,7 @@ fn table_view(
             inline_text(
               theme,
               c,
-              @style.Style::new().font_size(fs_sm).line_height_em(lh_aux).color(p.fg1),
-            ),
+              @style.Style::new().font_size(fs_sm).line_height_em(lh_aux).color(p.fg1), ctx, emit),
           ],
         )
       ),
@@ -209,6 +209,8 @@ fn heading(
   top : Double,
   bottom : Double,
   anchor : String?,
+  ctx : Ctx,
+  emit : @cmd.Emit[Msg],
 ) -> @html.Html {
   let p = theme.palette
   // 锚点（`id`）挂在**外层那个 div** 上：滚到它 = 滚到这一节的开头（含上边距），
@@ -230,8 +232,7 @@ fn heading(
         .line_height_em(if size >= fs_h2 { 1.3 } else { lh_tight })
         .letter_spacing_em(if size >= fs_h2 { -0.01 } else { 0.0 })
         .color(p.fg1)
-        .font_weight(weight),
-      ),
+        .font_weight(weight), ctx, emit),
     ],
   )
 }
@@ -240,7 +241,12 @@ fn heading(
 /// 一条列表项：前面一个记号（有序用序号、无序用 `·` / `–`），后面是内容。
 ///
 /// 记号色用 `--fg-3`：它是**装饰**（不承载信息）—— 正是 §3.2 给 `fg-3` 留的那一格。
-fn bullet_view(theme : Theme, item : (Int, String, Array[Span])) -> @html.Html {
+fn bullet_view(
+  theme : Theme,
+  item : (Int, String, Array[Span]),
+  ctx : Ctx,
+  emit : @cmd.Emit[Msg],
+) -> @html.Html {
   let p = theme.palette
   let (indent, num, sp) = item
   let ordered = num != ""
@@ -269,8 +275,7 @@ fn bullet_view(theme : Theme, item : (Int, String, Array[Span])) -> @html.Html {
           inline_text(
             theme,
             sp,
-            @style.Style::new().font_size(fs_base).line_height_em(lh_base).color(p.fg1),
-          ),
+            @style.Style::new().font_size(fs_base).line_height_em(lh_base).color(p.fg1), ctx, emit),
         ],
       ),
     ],
@@ -289,6 +294,7 @@ pub fn block_view(
   anchor : String?,
   code_idx : Int,
   copied : Bool,
+  ctx : Ctx,
   emit : @cmd.Emit[Msg],
 ) -> @html.Html {
   let p = theme.palette
@@ -305,14 +311,14 @@ pub fn block_view(
         ([] : Array[@html.Html]),
       )
     // 标题层级 3 档（DESIGN §1 A2）：h2 48/16、h3 32/12、h4 24/8
-    H2(sp) => heading(theme, sp, fs_h2, @style.FontWeight::W700, sp7, sp4, anchor)
-    H3(sp) => heading(theme, sp, fs_h3, @style.FontWeight::W600, sp6, sp3, anchor)
+    H2(sp) => heading(theme, sp, fs_h2, @style.FontWeight::W700, sp7, sp4, anchor, ctx, emit)
+    H3(sp) => heading(theme, sp, fs_h3, @style.FontWeight::W600, sp6, sp3, anchor, ctx, emit)
     // h4 不进目录 ⇒ 没有锚点（口径与 `toc_of` 一致：只数 h2/h3）
-    H4(sp) => heading(theme, sp, fs_base, @style.FontWeight::W600, sp5, sp2, None)
+    H4(sp) => heading(theme, sp, fs_base, @style.FontWeight::W600, sp5, sp2, None, ctx, emit)
     P(sp) =>
       @html.div(
         attrs=attrs(@style.Style::new().margin_bottom(@style.px(sp4))),
-        [inline_text(theme, sp, body_text(theme))],
+        [inline_text(theme, sp, body_text(theme), ctx, emit)],
       )
     Quote(sp) =>
       @html.div(
@@ -327,17 +333,16 @@ pub fn block_view(
           inline_text(
             theme,
             sp,
-            @style.Style::new().font_size(fs_base).line_height_em(lh_base).color(p.fg2),
-          ),
+            @style.Style::new().font_size(fs_base).line_height_em(lh_base).color(p.fg2), ctx, emit),
         ],
       )
     Code(lang, text, runs) => code_block(theme, lang, text, runs, code_idx, copied, emit)
     Ul(items) =>
       @html.div(
         attrs=attrs(@style.Style::new().margin_bottom(@style.px(sp4))),
-        items.map(fn(it) { bullet_view(theme, it) }),
+        items.map(fn(it) { bullet_view(theme, it, ctx, emit) }),
       )
-    Table(header, rows) => table_view(theme, header, rows)
+    Table(header, rows) => table_view(theme, header, rows, ctx, emit)
   }
 }
 
@@ -347,6 +352,7 @@ pub fn blocks_view(
   theme : Theme,
   blocks : Array[Block],
   copied_at : Int,
+  ctx : Ctx,
   emit : @cmd.Emit[Msg],
 ) -> @html.Html {
   // ⚠️ 锚点编号**只数 h2/h3**（h4 不进目录）—— 与 `toc.mbt` 的 `toc_of` 同一口径。
@@ -377,7 +383,7 @@ pub fn blocks_view(
     if is_code {
       code_idx = code_idx + 1
     }
-    kids.push(block_view(theme, b, anchor, ci, is_code && ci == copied_at, emit))
+    kids.push(block_view(theme, b, anchor, ci, is_code && ci == copied_at, ctx, emit))
   }
   @html.div(
     attrs=attrs(@style.Style::new().flex_direction(@style.FlexDirection::Column)),

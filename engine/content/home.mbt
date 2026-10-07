@@ -356,7 +356,16 @@ pub fn read_home(
   }
   let title = summarize(first_h1(body), 200)
   {
-    home: Some({ title: if title == "" { "首页" } else { title }, lede, sections }),
+    // ⚠️ 首页的**正文块**（首屏 + 每一栏）也过一遍折键：链接目标在正文里是**文件路径**，
+    //    站点认的是**页面键**（见 `links.mbt` 的文件头）。栏名那条 `link` 早就折过了（上面那段），
+    //    这里补的是**块里面**的行内链接。
+    home: Some({
+      title: if title == "" { "首页" } else { title },
+      lede: resolve_block_links(lede, pick.label, index),
+      sections: sections.map(fn(s) {
+        { title: s.title, link: s.link, nav: s.nav, blocks: resolve_block_links(s.blocks, pick.label, index) }
+      }),
+    }),
     source: pick.label,
     problems,
   }

@@ -146,6 +146,9 @@ pub enum Msg {
   /// 点了某个代码块的「复制」：`(第几个, 正文)` —— 正文直接跟着载荷走，
   /// 免得"复制的内容"要去 DOM 里再捞一次（那样就得跟渲染形状绑死）。
   CopyCode(Int, String)
+  /// 点了正文里一条**外部**链接（站内链接走 `Go`，见 `inline.mbt` 的判法）：
+  /// 交给 `url` 能力的动作通道开新窗口（`@sub.open_url`）。
+  LinkOut(String)
   /// **点目录某一条**：滚到正文里那一节的锚点（下标 = 目录里的第几条，从 0 数）。
   /// 动作由 `@sub.scroll_to_node` 发 —— 见 `shell/toc.mbt` 的账。
   TocTo(Int)
@@ -307,6 +310,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
       }
     CloseSheet => ({ ..model, sheet: -1, peek: 0 }, @cmd.none)
     CopyCode(idx, text) => ({ ..model, copied_at: idx }, @sub.copy_text(text))
+    LinkOut(url) => (model, @sub.open_url(url))
     SearchOpen => ({ ..model, search_open: true }, @cmd.none)
     SearchClose => ({ ..model, search_open: false }, @cmd.none)
     SearchInput(q) => ({ ..model, query: q }, @cmd.none)

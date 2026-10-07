@@ -892,6 +892,7 @@ js 那条路的行为**没变**（`press --check` ×2 + 门 + 29 条 wbtest 全�
 | **代码块工具条**（#5：语言标签 + 复制） | `_scratch/code-toolbar-check.mjs`（真鼠标，剪贴板换成记录器）：3 个块都有**非空**语言标签（bash / moonbit / bash）、点一下**剪贴板被调用 1 次**且载荷与那一块正文**长度相同、开头逐字符相同**、按钮变「已复制」而**别的块不受影响**、0 条 JS 错误 |
 | **本地搜索**（#12） | `_scratch/search-check.mjs`：17 条全过（含"点小节命中 ⇒ 目标节**顶到上沿差 0px**"） |
 | **目录可点 + 跟读高亮**（⑤） | `_scratch/toc-click.mjs`：点最后一行 ⇒ sec-7 差 0px、点第一行 ⇒ sec-0；装载后**恰好一条**高亮在第 0 条、滚到第 4 节 ⇒ 高亮换到第 4 条 |
+| **正文链接**（#9） | `_scratch/link-check.mjs`：正文里那条链接是**下划线 + 品牌色**、点一下 ⇒ **地址栏变**（`#/s/moobile-pitfalls/` → `#/s/moobile-app-development/`）、**页面没重新加载**（点前盖的戳还在）、落地页大标题**正是那条链接的标签**；0 条 JS 错误 |
 | **prod 产物档**（#14） | `npm run build` ⇒ **829 KB**（dev 档 2939 KB，3.5 倍）；`dist/artifact.json` 的 `mode: "prod"`；三档回归 `ui-probe` 全过 |
 | 站点三档回归 | `node tools/ui-probe.mjs` ⇒ **全部通过（3 个视口）** |
 

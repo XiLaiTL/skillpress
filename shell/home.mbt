@@ -45,7 +45,7 @@ fn home_page(theme : Theme, ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> 
   // 一句定位 + 首屏正文：都来自首页源（`WEBSITE.md` 的 H1 之后、第一个 `##` 之前那一段）
   let lede = @html.div(
     attrs=attrs(@style.Style::new().margin_top(@style.px(sp5))),
-    [blocks_view(theme, ctx.home.lede, model.copied_at, emit)],
+    [blocks_view(theme, ctx.home.lede, model.copied_at, ctx, emit)],
   )
   // 统计行（§6：让读者一眼知道这个站有多大）
   let stats = @html.div(

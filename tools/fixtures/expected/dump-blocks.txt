@@ -1,7 +1,7 @@
 ### alpha-skill
         @shell.P([@shell.Txt("这一份用来验"), @shell.Bold("子页发现"), @shell.Txt("："), @shell.Code("references/"), @shell.Txt(" 下的 md、以及 "), @shell.Code("references/deep/"), @shell.Txt(" 里更深一层的 md 都应当被收进来，顺序按 UTF-16 码元序。")]),
         @shell.H2([@shell.Txt("一段正文")]),
-        @shell.P([@shell.Txt("普通段落里可以有 "), @shell.Bold("加粗"), @shell.Txt("、"), @shell.Code("行内代码"), @shell.Txt("、以及 指向另一个 skill 的链接"), @shell.Code("../beta-skill/SKILL.md"), @shell.Txt("。 段落要够长，这样探针句子才有得挑 —— 不然对账时\"挑哪一句\"会变成一件碰运气的事。")]),
+        @shell.P([@shell.Txt("普通段落里可以有 "), @shell.Bold("加粗"), @shell.Txt("、"), @shell.Code("行内代码"), @shell.Txt("、以及 "), @shell.Link("指向另一个 skill 的链接", "../beta-skill/SKILL.md", false), @shell.Code("../beta-skill/SKILL.md"), @shell.Txt("。 段落要够长，这样探针句子才有得挑 —— 不然对账时\"挑哪一句\"会变成一件碰运气的事。")]),
         @shell.H2([@shell.Txt("代码")]),
         @shell.Code("bash", "# 一段 bash：验上色与\"围栏切分\"\nset -euo pipefail\necho \"hello from the fixture\"", [("# 一段 bash：验上色与\"围栏切分\"", 3), ("\n", 0), ("set", 6), (" ", 0), ("-euo", 4), (" pipefail\n", 0), ("echo", 6), (" ", 0), ("\"hello from the fixture\"", 2)]),
         @shell.H2([@shell.Txt("列表")]),
@@ -25,7 +25,7 @@
 ### gamma-skill
         @shell.P([@shell.Txt("这一份用来验"), @shell.Bold("链接解析"), @shell.Txt("："), @shell.Code("[alpha](../alpha-skill/SKILL.md)"), @shell.Txt(" 是"), @shell.Bold("相对本文件所在目录"), @shell.Txt("的一跳， 而 "), @shell.Code("[alpha 的细则](alpha-skill/references/notes.md)"), @shell.Txt(" 是"), @shell.Bold("相对内容根"), @shell.Txt("的一跳 —— 两条都要能解开。")]),
         @shell.H2([@shell.Txt("行内标记")]),
-        @shell.P([@shell.Txt("一段话里可以有 "), @shell.Bold("加粗"), @shell.Txt("、"), @shell.Code("行内代码"), @shell.Txt("、*斜体*、以及 一个链到别处的链接"), @shell.Code("../alpha-skill/references/notes.md"), @shell.Txt("。 行内标记剥掉之后应当与页面上 "), @shell.Code("innerText"), @shell.Txt(" 对得上。")]),
+        @shell.P([@shell.Txt("一段话里可以有 "), @shell.Bold("加粗"), @shell.Txt("、"), @shell.Code("行内代码"), @shell.Txt("、*斜体*、以及 "), @shell.Link("一个链到别处的链接", "../alpha-skill/references/notes.md", false), @shell.Code("../alpha-skill/references/notes.md"), @shell.Txt("。 行内标记剥掉之后应当与页面上 "), @shell.Code("innerText"), @shell.Txt(" 对得上。")]),
         @shell.H2([@shell.Txt("收尾")]),
         @shell.P([@shell.Txt("最后一段也是正文，用来验\"文件末尾的块与空行\"。")]),
 
@@ -34,10 +34,10 @@
         @shell.H2([@shell.Txt("一、这份语料里有什么")]),
         @shell.Ul([(0, "", [@shell.Code("alpha-skill"), @shell.Txt("：有子页（含一层更深的子目录）、有 "), @shell.Code("scripts/")]), (0, "", [@shell.Code("beta-skill"), @shell.Txt("：有表格，以及多种语言的代码块")]), (0, "", [@shell.Code("gamma-skill"), @shell.Txt("：有跨 skill 的链接与行内标记")])]),
         @shell.H2([@shell.Txt("二、从哪一份开始")]),
-        @shell.P([@shell.Txt("intro"), @shell.Code("references/intro.md")]),
+        @shell.P([@shell.Link("intro", "references/intro.md", true), @shell.Code("references/intro.md")]),
         @shell.H2([@shell.Txt("三、一段带行内标记的正文")]),
         @shell.P([@shell.Txt("读的时候先看 "), @shell.Bold("加粗的那个结论"), @shell.Txt("，再回头看 "), @shell.Code("行内代码"), @shell.Txt(" 里的参数 —— 它们描述的是同一件事， 只是一个是结论、一个是证据。这一段刻意够长，好让\"探针句子\"有东西可选。")]),
         @shell.H2([@shell.Txt("四、去哪看")]),
-        @shell.Table([[@shell.Txt("想做什么")], [@shell.Txt("去哪")]], [[[@shell.Txt("建一个应用")], [@shell.Txt("alpha"), @shell.Code("alpha-skill/references/notes.md")]], [[@shell.Txt("看多种语言的例子")], [@shell.Code("beta-skill")]]]),
+        @shell.Table([[@shell.Txt("想做什么")], [@shell.Txt("去哪")]], [[[@shell.Txt("建一个应用")], [@shell.Link("alpha", "alpha-skill/references/notes.md", true), @shell.Code("alpha-skill/references/notes.md")]], [[@shell.Txt("看多种语言的例子")], [@shell.Code("beta-skill")]]]),
 
 ### end

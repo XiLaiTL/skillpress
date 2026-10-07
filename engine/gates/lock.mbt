@@ -196,7 +196,7 @@ pub fn check_lock(
     None =>
       return (
         [
-          "G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
+          "G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/tools/run-js.mjs check --update-lock`",
         ],
         [],
       )
@@ -243,7 +243,7 @@ pub fn check_lock(
                 d +
                 "（" +
                 detail.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + "；" + s } }) +
-                "）—— 复核这次体量变化，然后 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
+                "）—— 复核这次体量变化，然后 `node ../skillpress/tools/run-js.mjs check --update-lock`",
               )
             }
           }
@@ -286,7 +286,7 @@ pub fn check_lock(
                   home_key +
                   "（" +
                   detail.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + "；" + s } }) +
-                  "）—— 复核这次体量变化，然后 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
+                  "）—— 复核这次体量变化，然后 `node ../skillpress/tools/run-js.mjs check --update-lock`",
                 )
               }
             }
@@ -316,7 +316,7 @@ pub fn check_lock(
 ///|
 /// 落锁用的 note 原文（旧实现里那一句，逐字符照抄）。
 pub fn lock_note() -> String {
-  "由 `node ../skillpress/bin/skillpress.mjs check --update-lock [名字]` 生成。改动 skill 后必须重跑并复核（SPEC §6 G8）。"
+  "由 `node ../skillpress/tools/run-js.mjs check --update-lock [名字]` 生成。改动 skill 后必须重跑并复核（SPEC §6 G8）。"
 }
 
 ///|

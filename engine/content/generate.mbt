@@ -67,7 +67,11 @@ pub fn gen_content_full(
       desc: summarize(field(data, "description"), 60),
       full_desc: field(data, "description"),
       when: field(data, "whenToUse"),
-      blocks: parse_blocks(body, "skills/" + d + "/SKILL.md", fn(p) { problems.push(p) }),
+      blocks: resolve_block_links(
+        parse_blocks(body, "skills/" + d + "/SKILL.md", fn(p) { problems.push(p) }),
+        "skills/" + d + "/SKILL.md",
+        index,
+      ),
       kids: read_kids(
         root + "/" + d,
         read,
@@ -75,6 +79,7 @@ pub fn gen_content_full(
         script_kids,
         fn(p) { problems.push(p) },
         pick.label,
+        index,
       ),
     })
   }

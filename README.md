@@ -223,8 +223,10 @@ moobile/tools/skillpress-gates.mjs --gate facts   # 事实来源对账（按 D18
    两种粒度、点一下**切页并跳到那一节**；索引**渲染期现算**（只在浮层打开时算），浮层复用"根不滚 +
    绝对定位"（**不必 portal**）。读数：`_scratch/search-check.mjs`（真鼠标 + 真按键）。
    ✅ **目录可点 + 跟读高亮也已落地**（`_scratch/toc-click.mjs`）。
+   ✅ **正文链接也可点了**（#9，`_scratch/link-check.mjs`）：`Span::Link` + 引擎把目标**折成页面键**，
+   站内**路由跳页**（不刷新）、站外走 `@sub.open_url`；代码块工具条（#5）与 prod 产物档（#14）也已落地。
    ⬜ 还差的：**页面内 `#section` 深链**（目录能跳，但"地址栏里带某一节"还没有）、
-   以及 `PLAN-ui.md` 对标表里的 #5 代码块工具条 / #9 正文链接 / #10 图片 / #14 prod 产物档。
+   以及对标表里的 **#10 图片**（引擎点名拒绝 + 标签表排除 `img` —— 下一刀）。
    ✅ 已经还掉的两笔旧账：**窄屏入口**（三个贴边按钮 + 两级交互 + 遮罩互斥，`shell/mobile.mbt`）；
    **URL 路由**（hash ⇄ 状态双向 + 后退 + 深链 + 404 有到达路径，`shell/route.mbt`）。
 6. ✅ **产物默认就是 prod 档**（2026-10-07 起）：`npm run build` 走 `NODE_ENV=production` + `minify`

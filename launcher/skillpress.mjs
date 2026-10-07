@@ -38,15 +38,51 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** 编好的 js 产物路径（`moon build cmd/skillpress --target js` 的输出）。 */
+/**
+ * 编好的 js 产物路径（`moon build cmd/skillpress --target js` 的输出）。
+ *
+ * ## ⚠️ 为什么是"**找**"而不是写死一条路径（2026-10-07 实测踩到，症状极隐蔽）
+ *
+ * moon 的 js 产物路径**取决于模块在构建根里的身份**（moobile 的 `AGENTS.md` 早写过这条）：
+ *   · 独立模块（直接 `moon build`）：`_build/js/debug/build/cmd/skillpress/skillpress.js`
+ *   · **工作区成员**：多一层"作者/模块"前缀 ⇒ `_build/js/debug/build/<作者>/<模块>/cmd/skillpress/skillpress.js`
+ *
+ * 本仓给程序根加了 `moon.work`（要吃本地 moobile 源码）之后，产物就跑到带前缀那条路上去了，
+ * 而这里**原来写死的是不带前缀的那条** ⇒ 它读到的是**上一次留下的旧产物**，一声不吭继续跑。
+ * 实测后果：引擎源码改了（`Span::Link`）、`moon build` 也报"编过了"，但**判据读的是旧引擎** ——
+ * 表现是"改了没生效"，而且 `moon build` 还会说 "no work to do"（它按**新**路径判新鲜度）。
+ * ⇒ 修法：**两处都找**、取**最新**的那份；一条都没有就报错并给出怎么编。
+ */
 function builtCli() {
-  const p = join(ROOT, "_build", "js", "debug", "build", "cmd", "skillpress", "skillpress.js");
-  if (!existsSync(p)) {
+  const candidates = [
+    join(ROOT, "_build", "js", "debug", "build", "cmd", "skillpress", "skillpress.js"),
+  ];
+  const base = join(ROOT, "_build", "js", "debug", "build");
+  if (existsSync(base)) {
+    // 带模块前缀的那条：`_build/js/debug/build/<作者>/<模块>/cmd/skillpress/skillpress.js`
+    for (const a of readdirSync(base)) {
+      const mid = join(base, a);
+      if (!statSync(mid).isDirectory()) continue;
+      for (const m of readdirSync(mid)) {
+        candidates.push(join(mid, m, "cmd", "skillpress", "skillpress.js"));
+      }
+    }
+  }
+  const found = candidates.filter((c) => existsSync(c));
+  // **取最新的那份**（而不是随便挑一条）—— 这正是"改了没生效"的解药
+  found.sort((x, y) => statSync(y).mtimeMs - statSync(x).mtimeMs);
+  const p = found[0];
+  if (!p) {
     // ⚠️ 这句提示是**给拿到包的人**看的 ⇒ 给一条能直接粘的命令（`moon -C <包目录> …`）：
     //    包的目录不在你项目的构造根里，`cd` 过去编再 cd 回来是没必要的绕路。
     console.error(
-      `✗ 这份包还没编出 CLI：${p}\n  先跑：moon -C "${ROOT}" build cmd/skillpress --target js`,
+      `✗ 这份包还没编出 CLI：${candidates[0]}
+  先跑：moon -C "${ROOT}" build cmd/skillpress --target js`,
     );
     process.exit(2);
+  }
+  if (found.length > 1 && process.env.SKILLPRESS_CLI_DEBUG) {
+    console.error(`· 有多份 js 产物，用最新的那份：${p}`);
   }
   return p;
 }

@@ -49,6 +49,15 @@ pub fn span_list(list : Array[Span]) -> String {
       Txt(v) => REC + "Txt(\"" + esc(v) + "\")"
       Code(v) => REC + "Code(\"" + esc(v) + "\")"
       Bold(v) => REC + "Bold(\"" + esc(v) + "\")"
+      Link(a, b, mono) =>
+        REC +
+        "Link(\"" +
+        esc(a) +
+        "\", \"" +
+        esc(b) +
+        "\", " +
+        (if mono { "true" } else { "false" }) +
+        ")"
     })
   }
   "[" + parts.fold(init="", fn(acc, s) { if acc == "" { s } else { acc + ", " + s } }) + "]"
