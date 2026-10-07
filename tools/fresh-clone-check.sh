@@ -69,6 +69,8 @@ run diagnostics-ledger bash tools/diagnostics-ledger.sh
 run mbt-traps bash tools/mbt-traps.sh
 run site-source bash tools/site-source.sh
 run shell-traps bash tools/shell-traps.sh
+# 文档链接：仓内的要指得到、跨仓的才算断（README 同时是 mooncakes 上的门面）
+run check-links python3 tools/check-links.py
 # 包内容也在干净克隆里复核：这里**没有未跟踪文件**，所以清单反映的就是版本库的真实内容
 run package-check bash tools/package-check.sh
 echo

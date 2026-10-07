@@ -75,6 +75,12 @@ pub async fn find_center(cdp : Cdp, selector : String, label : String, trim : Bo
     " const els = [...document.querySelectorAll(" + js_lit(selector) + ")].filter(e => " + cmp + ");" +
     " const el = els[els.length - 1];" +
     " if (!el) return null;" +
+    // ⚠️ **先滚进视口再取中心点**（2026-10-07 加）：CDP 的真鼠标事件按**视口坐标**打，
+    //    元素在视口外时那个坐标打在别的东西上（或者什么都没打），症状是"点了没反应" ——
+    //    而真因是**页面变长了**。实测：把首页源写长之后（多了一段列表 + 一个代码块），
+    //    "点首页那张『从哪开始』卡片"这条判据当场红，而卡片本身完全正常（位置在折叠线以下）。
+    //    ⇒ 一律先 `scrollIntoView({block:'center'})` 再量中心点；顺带把滚动容器也照顾到。
+    " el.scrollIntoView({ block: 'center', inline: 'center' });" +
     " const r = el.getBoundingClientRect();" +
     " return { x: r.x + r.width / 2, y: r.y + r.height / 2 };" +
     " })()"

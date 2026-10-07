@@ -44,7 +44,10 @@ SELFTEST=0
 #    （实测 2026-10-07：三条 `ok` 全红）。搬家不是欠账，改的应该是这一行。
 # ⚠️ `tools/*.mbtx` 也要扫（2026-10-07，D40）：② 把两个纯文本变换的工具从 `.mjs` 换成了 `.mbtx`，
 #    少了这一项，那两份文件里的话就**不在账本的视野里** —— 与 R9 那次同一个形状的漏。
-NEW_SRC=$(ls engine/*/*.mbt engine/*/*/*.mbt cmd/*/*.mbt cmd/*/*/*.mbt tools/*.mjs tools/*.mbtx 2>/dev/null)
+# ⚠️ **`launcher/**` 也算"新源码"**（2026-10-07 加）：`press` 的真源从 `tools/` 搬到了
+#    `launcher/`（因为 `/tools/` 不进发布包 ⇒ 用户那边没有它）—— 不把它扫进来的话，
+#    账本里 `✓ 一致：` 那条锚点会"找不到对应物"而**假红**（判据自己没跟上搬家）。
+NEW_SRC=$(ls engine/*/*.mbt engine/*/*/*.mbt cmd/*/*.mbt cmd/*/*/*.mbt tools/*.mjs tools/*.mbtx launcher/*.mjs 2>/dev/null)
 
 # ── 账本：老位置|老关键句|档|新锚（ok/dev 要钉的句子；ow 留 `-`）|dev 列：PLAN 里的编号|覆盖它的判据
 #
@@ -69,7 +72,7 @@ lib/gen-content.mjs:463|：分栏「|ow|-|DG-丢前缀|无
 lib/gen-content.mjs:463|（当菜单的话它就不会渲染在正文里了）|ow|-|DG-丢前缀|无
 lib/gen-content.mjs:670|skills/ 下没有 SKILL.md|dev|内容根下没有带 SKILL.md 的目录|D22|blocks-fixtures 夹具四
 lib/gen-content.mjs:676|个代码块没配语法或为空，按原文渲染|ow|-|DG-20|无（**今天就在触发**）
-lib/gen-content.mjs:800-814|gen-content --check：一致|dev|✓ 一致：|DG-check|tools/press.mjs --check（口径不同：只报"一致/不一致 + 第几行"）
+lib/gen-content.mjs:800-814|gen-content --check：一致|dev|✓ 一致：|DG-check|launcher/press.mjs --check（口径不同：只报"一致/不一致 + 第几行"；2026-10-07 从 tools/ 搬来）
 lib/highlight.mjs:135|见程序根 grammars/PROVENANCE.md 的取法|ow|-|DG-高亮指路|无
 lib/highlight.mjs:199|拼回来与原文不一致|ok|拼回来与原文不一致|-|无（参数格式与旧版不同，见审计）
 lib/highlight.mjs:263|一个代码块都没数到|ok|一个代码块都没数到|-|cmd/skillpress/cli/audit.mbt（两边读数逐项相同）
@@ -103,9 +106,9 @@ lib/docfacts.mjs:564|根目录不存在：|ow|-|DG-facts|无（按 D18 搬去内
 lib/verify-site.mjs:325|没有 site/dist/bundle.js|ok|没有 site/dist/bundle.js|-|site-parity（22 行逐行一致）+ site-corpus-parity
 lib/verify-site.mjs:329|这条判据要真浏览器（RNW 的行为在 jsdom 里不可信）|ok|这条判据要真浏览器（RNW 在 jsdom 里不可信）|-|site-parity
 lib/verify-site.mjs:769|条不过|ok|条不过|-|site-parity
-bin/skillpress.mjs:67|不认识的子命令：|ow|-|DG-CLI|无（**新实现 rc=0**）
-bin/skillpress.mjs:73|还没做：${spec.todo}|ow|-|DG-CLI|无
-bin/skillpress.mjs:38|公共参数：--repo|ow|-|DG-CLI|无（新用法缺这三条）
+bin/skillpress.mjs:67|不认识的子命令：|ok|✗ 认不出的子命令：|-|**已还**（2026-10-07）：点名 + 退 2；判据 = 手工跑 `node tools/run-js.mjs 拼错了` ⇒ rc=2
+bin/skillpress.mjs:73|还没做：${spec.todo}|ok|还没做（便携目录打包）|-|**已还**（2026-10-07）：`pack` 明说没做 + 退 2（`node tools/run-js.mjs pack` ⇒ rc=2）
+bin/skillpress.mjs:38|公共参数：--repo|ok|公共参数：--repo <仓根> · --skills <内容根> · --program <程序根>|-|**已还**（2026-10-07）：用法里补上这三条
 ROWS
 )
 

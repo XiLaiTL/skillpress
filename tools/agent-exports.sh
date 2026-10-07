@@ -12,12 +12,20 @@
 set -u
 cd "$(dirname "$0")/.."
 APP="${SKILLPRESS_APP:-skills/skillpress/scripts/.skillpress}"
+# ⚠️ **语料必须显式给**（别用 `press` 的默认值）：本仓这份实例是**自举**的 ——
+#    `template` 生成的实例在 `package.json` 里写死 `--skills <实例 → 内容根>`，
+#    也就是本仓的 `skills/`。不给就会拿"程序旁边的 `moobile/skills`"去对这份实例：
+#    两边**都看着正常**，读数却是红的（2026-10-08 实测：产物里缺 26 处 + 原文产物多 33 处）。
+#    内容根按 SPEC 的实例布局（`<内容根>/skillpress/scripts/.skillpress`）从 APP 反推，
+#    可用 `SKILLPRESS_SKILLS` 覆盖；底下**打印**用的是哪一份（不猜、也不静默）。
+SKILLS="${SKILLPRESS_SKILLS:-$(cd "$APP/../../.." && pwd)}"
+echo "内容根：$SKILLS ｜ 实例：$APP"
 fail=0
 ok() { echo "  ✓ $1"; }
 bad() { echo "  ✗ $1"; fail=1; }
 
 echo "① 生成物与内容源一致（\`press --check\` 覆盖三件产物）"
-if node tools/press.mjs --check --app "$APP" > /tmp/agent-exports.log 2>&1; then
+if node tools/press.mjs --check --app "$APP" --skills "$SKILLS" > /tmp/agent-exports.log 2>&1; then
   ok "$(grep -c '✓ 一致' /tmp/agent-exports.log) 处一致（内容包 / llms.txt / md 原文）"
 else
   bad "press --check 有红的"; tail -3 /tmp/agent-exports.log | sed 's/^/      /'

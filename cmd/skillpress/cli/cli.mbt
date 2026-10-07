@@ -298,20 +298,7 @@ pub fn run(host : @gates.Host, hint : String) -> Unit {
     return
   }
   if k >= args.length() {
-    println("用法：node tools/run-js.mjs hl <markdown 文件> <语言>")
-    println("      SKILLPRESS_CORPUS=<根> node tools/run-js.mjs batch")
-    println("      node tools/run-js.mjs audit [<内容根>]            # 上色的回归闸门（召回率 / 未上色比例）")
-    println("      node tools/run-js.mjs dump-blocks <内容根>")
-    println("      node tools/run-js.mjs gen-file <内容根>      # 整份 content.generated.mbt → stdout")
-    println("      node tools/run-js.mjs gen-file <内容根> --llms   # 同一份解析产出的 llms.txt → stdout")
-    println("      node tools/run-js.mjs check [--repo <根>] [--skills <内容根>] [--update-lock [名字]]")
-    println("      node tools/run-js.mjs gen-queries [--check]   # 把 grammars/*.scm 嵌进 engine/highlight/queries.generated.mbt")
-    println("      node tools/run-js.mjs attach [--repo <根>] [--skills <内容根>] [--ignore <名字>=<理由>] [--force]")
-    println("                             # 给一份 skills/ 直接生成站点（首页源来自 <仓根>/README.md）")
-    println("      skillpress-native verify [--skills <内容根>] [--app <站点实例>] [--shot <png>]")
-    println("                             # 站点判据（真 Chrome + CDP，22 条）—— **只有 native 那份有**；")
-    println("                             # js 那条路上 moonbitlang/async 没有 http server / websocket / process")
-    println("垫片装的语法：\{@hl.languages()}")
+    no_command(args)
     return
   }
   for j = k + 1; j < args.length(); j = j + 1 {
