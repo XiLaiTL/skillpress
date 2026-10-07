@@ -49,6 +49,10 @@ pub struct Inputs {
   program : String
   /// 实例目录 → 程序根 的相对路径（占位符 `{{ENGINE_REL}}`）。
   engine_rel : String
+  /// 实例目录 → **内容根** 的相对路径（占位符 `{{SKILLS_REL}}`）—— 站点工程的
+  /// `npm run press` 要靠它显式指内容根（不带的话会走到"程序根旁边的 moobile/skills"那个
+  /// **开发机默认值**上，在用户那边会印错内容，见 `names.mbt` 里 `tok_skills_rel` 的记录）。
+  skills_rel : String
   mod_name : String
   host_dep : String
   /// 首页来源的文本（空串 = 没有 README ⇒ 走生成的模板首页）。
@@ -68,6 +72,7 @@ pub fn Inputs::new(
   corpus_rel : String,
   program : String,
   engine_rel : String,
+  skills_rel : String,
   mod_name : String,
   host_dep : String,
   home_text : String,
@@ -75,7 +80,7 @@ pub fn Inputs::new(
   fallback_name : String,
   entries : Array[IgEntry],
 ) -> Inputs {
-  { repo, skills, corpus_rel, program, engine_rel, mod_name, host_dep, home_text, home_from, fallback_name, entries }
+  { repo, skills, corpus_rel, program, engine_rel, skills_rel, mod_name, host_dep, home_text, home_from, fallback_name, entries }
 }
 
 ///|
@@ -251,6 +256,7 @@ pub fn static_plan(
   let subs : Map[String, String] = Map([])
   subs.set(tok_module, inp.mod_name)
   subs.set(tok_engine_rel, inp.engine_rel)
+  subs.set(tok_skills_rel, inp.skills_rel)
   subs.set(tok_host_dep, inp.host_dep)
   subs.set(tok_site_title, home_result.site_name)
   // 程序自己的版本：从**程序根的 moon.mod** 读 —— 写死一个版本号，程序一升级生成物就编不过。

@@ -18,6 +18,17 @@ pub let tok_host_dep : String = "{{HOST_DEP}}"
 pub let tok_site_title : String = "{{SITE_TITLE}}"
 
 ///|
+/// 实例目录 → **内容根** 的相对路径（`{{SKILLS_REL}}`）。
+///
+/// 为什么要它（2026-10-07 实测的用户路径 bug）：站点工程里那条 `npm run press` 原来**不带 `--skills`**，
+/// 于是走 `press` 的默认值"程序根旁边的 `moobile/skills`"—— 那是**开发机上的布局**。
+/// 在用户那边（程序装在 `<项目>/.mooncakes/XiLaiTL/skillpress`）默认值会指向
+/// **装的 moobile 包里那份 skills**（因为它也是依赖），于是 `press` **印的是别人的内容**：
+/// 实测在探针仓里跑 `npm run press`，写出来的是 moobile 那 6 份 skill / 34 份原文，
+/// 而探针仓自己那份 skill 一个字都没进去。⇒ 生成时就把它算好写进 `package.json`。
+pub let tok_skills_rel : String = "{{SKILLS_REL}}"
+
+///|
 pub let tok_skillpress_version : String = "{{SKILLPRESS_VERSION}}"
 
 ///|
@@ -28,6 +39,7 @@ pub fn all_tokens() -> Array[String] {
     tok_engine_rel,
     tok_host_dep,
     tok_site_title,
+    tok_skills_rel,
     tok_skillpress_version,
   ]
 }

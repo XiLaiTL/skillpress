@@ -197,6 +197,8 @@ fn attach_cmd(rest : Array[String]) -> Unit {
     @sc.rel_path(repo, skills),
     program,
     @sc.rel_path(app_dir, program),
+    // 实例目录 → **内容根**（站点工程的 `npm run press` 靠它，见 `tok_skills_rel` 的说明）
+    @sc.rel_path(app_dir, skills),
     @sc.module_name_for(@sc.base_name(repo)),
     host_dep,
     home_text,

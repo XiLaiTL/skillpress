@@ -32,6 +32,7 @@ REQUIRED="
 moon.mod
 LICENSE
 launcher/skillpress.mjs
+launcher/press.mjs
 README.md
 SPEC.md
 SKILLS.md

@@ -1,242 +1,234 @@
-# skillpress —— 把一堆 skill 印成一个站点
+# skillpress
 
-**一份内容源 → 多个投影**：同一批 skill（给 AI 用）被印成一个站点（给人看）。
-站点的**首页就是其中一份 skill** —— 它自己也是这个集合里的一员。
+> **写给 AI 看的 skill，印成给人看的站点。**
 
-这里是**程序本身**（将来发 npm 包 / moonbit 包）：内容管线、构建期上色、三道门、站点判据。
-它是**自己的一个 git 仓库**，与内容仓**平级**（兄弟）：内容仓 = 旁边的 `../moobile/`。
-**内容不在这里**（内容住 `<内容仓>/skills/`，站点实例住那份 skill 的 `scripts/` 里）。
+skill 是一种给 AI 读的文档集合（[Anthropic 的 Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills) 那个意思）：
+一个目录一份 `SKILL.md`，深水区放 `references/*.md`。
+问题是它**只考虑机器读者** —— 几十个目录、没有导航、没有搜索，人要通读一遍很痛苦。
 
-## 三个根（先认清再动手）
+skillpress 不改内容、不发明语法：它把**同一份 markdown** 印成**一个站点**，
+顺手再出两份给 agent 用的产物（整站索引 + 每页原文）。
+一份内容源，一次解析，三个投影 —— 站点只是它的一种排法。
 
-| 根 | 在哪 | 是什么 |
-|---|---|---|
-| **程序** | 本仓库根（`interest/skillpress`） | 引擎 + 门 + 语法资产（能拿走、能发布的那份） |
-| **内容** | `../moobile/skills/`（**旁边的兄弟**，不是本仓库） | 7 份 skill（`SKILL.md` + `references/`）。harness 也扫这个根 |
-| **实例** | `<内容>/skillpress/scripts/.skillpress/` | 一个"**用**程序"的 MoonBit 工程（它的 `content/` 是生成物） |
+| | |
+|---|---|
+| **MoonBit 包** | `moon add XiLaiTL/skillpress@0.1.1` |
+| **宿主（JS）** | `npm install moobile-host`（站点界面是个 moobile 应用，构建时用 esbuild 打包） |
+| **已实测** | 自举站点 ✅（程序自己的 `skills/` 印成站）｜内容仓 ✅（6 份 skill / 34 页原文，站点判据 23 条全绿）｜从 registry 装下来按 README 走一遍 ✅ |
+| **产物形态** | 纯静态（`dist/`：HTML + 一个 bundle + 图片），扔进任何静态服务器就能跑；hash 路由 |
+| **站点判据** | 23 条（起真 Chrome 无头 + 自起服务，走 CDP 真鼠标）—— ⚠️ 只能跑 native，要一次 C 工具链 |
+| **许可** | Apache-2.0（内含 vendor 的 tree-sitter 运行时与五门语法资产，见 [`THIRD-PARTY-NOTICE.md`](THIRD-PARTY-NOTICE.md)） |
 
-三个根怎么定位（`--repo` / `--skills` / `--app` 与对应环境变量）见
-[`../moobile/skills/skillpress/references/layout.md`](../moobile/skills/skillpress/references/layout.md)。
+> ⚠️ **它今天最明显的短板**：整站**客户端渲染**，`#root` 里是空壳 —— 无 JS 打不开，
+> 搜索引擎看不到正文。预渲染还没做（`PLAN.md` 里记着）。另外行内图片（不独占一行的
+> `![alt](x.png)`）会被当成一条链接，整行一条才收成图片。
 
-## 三条命令（在**程序根**跑）
+---
+
+## 1. 我们自己的理念
+
+**① 内容源就是标准 markdown，一个字节都不改。**
+不发明 frontmatter 扩展、不发明 `:::` 容器、不要求你在正文里写站点才懂的东西。
+换来的好处很实在：同一份 md 在 GitHub 上、在编辑器里、在 agent 手里都还是它自己；
+站点上每条都留着「看原文」那条出口（`md/**` 就是逐字节拷贝）。
+
+**② 一次解析，三个投影 —— 一个事实只允许有一个副本。**
+站点内容包、`llms.txt`、每页原文出自**同一次解析**；书架树、右栏目录、搜索索引都在构建期
+从同一批内容算出来。所以"站点上看到的"和"agent 读到的"结构上不可能对不上；
+改了内容源只跑一条 `press`。
+
+**③ 判据要能自己变红。**
+这套东西的产物是**文字** —— 少一个空格、链接指到 404、图片静默不显示、导航少一条，
+编译器不报、控制台不报。所以每条"应该成立的事"都写成一条能变红的判据，
+而且尽量让判据**自己也被验过**（造一个必须红的诱饵，看它红不红）。仓库里判据比功能代码还多，
+是刻意的。
+
+**④ 不画点了没反应的东西。**
+首页、上一页/下一页、书架每一行 —— 每一格都真的能到某处；算不出目标就**不画那一格**
+（画一个灰箭头等于骗读者）。同理，认不出的内容构造**点名报错**，不静默吞掉。
+
+**⑤ 界面住在包里，站点工程只接线。**
+生成出来的工程 `app.mbt` 只有 19 行（把内容包交给 `@shell.site`）。
+于是升级 skillpress = **所有站点一起升级**，而不是每个站点各自抄一份界面。
+
+---
+
+## 2. 快速上手
+
+三段：**生成站点工程** → **装依赖并印内容** → **看**。
+
+### 2.1 一个 `skills/` 文件夹（最常见）
 
 ```bash
-npm run press          # 内容源 → 实例的内容包（**P6 起走新引擎**：tools/press.mjs → cmd/skillpress gen-file）
-npm run press:check    # 门：实例里那份生成物与**新引擎现跑**一致吗
-npm run check          # 门：skill 自己（G1–G8）—— 走新 CLI（tools/run-js.mjs check → cmd/skillpress）
-npm run verify         # 站点判据：真 Chrome 无头，自起服务 —— `cmd/skillpress-native verify`（见下）
-npm run audit          # 上色的回归闸门（召回率 / 未上色比例）—— `tools/run-js.mjs audit`
-npm run check:selftest # 门自己的证伪：22 条 wbtest（`moon test engine/gates`），造诱饵必须全被点名
-```
+# ① 在你的工程里加上 skillpress，并编一次 CLI（包里不带构建产物，所以要编这一次）
+moon add XiLaiTL/skillpress
+moon -C .mooncakes/XiLaiTL/skillpress build cmd/skillpress --target js
 
-> ⚠️ **四条 `npm run` 入口都已经换成新引擎**（`press` P6、`check`/`audit` 2026-10-07、`verify` P8.3 收口）。
-> `lib/` 与 `bin/` 已**整体退役**（PLAN 的 D43，2026-10-07）：迁移期那五条"拿冻结旧实现现场跑基准"的
-> 对账脚本（`file-parity` / `blocks-parity` / `highlight-parity` / `site-parity` / `site-corpus-parity`）
-> **同批删掉了**，参照物的职责改由**入库 golden**（`tools/fixtures/expected/`）接管。
-> ⇒ 仓库里再见到 `lib/xxx.mjs` / `bin/skillpress.mjs`，读作**历史坐标**（迁移记录里的出处），不是活文件。
-> ⚠️ **`verify` 那条路只能 native**：站点判据要 async 的 http server / websocket / process，
-> 而它们在 `moonbitlang/async` 的 js 目标上**没有实现** ⇒ 要一次 C 工具链；js 那份 CLI 遇到
-> `verify` 会**明说"只有 native 有"并退 2**。
-> 在**内容仓根**（`moobile/`）跑同一份程序就多一层：`node ../skillpress/tools/run-js.mjs check`。
-> 内容仓不在兄弟位置时用 `--repo <仓库根>` 或 `SKILLPRESS_REPO` 指定 —— **它不猜**
-> （猜错的表现是"站点没更新"，最难查的一类症状）。
-脚手架那条 `attach` **已落地**（见下节）；`pack` **还没做**（命令存在，但会明说"还没做"并以非零退出）。
-⚠️ `facts`（查 docs 有没有撒谎）按 **D18 已搬去内容仓自己**：`moobile/tools/skillpress-gates.mjs --gate facts`
-（连同 G5 / G6 两道"只对 moobile 有意义"的门与台账 `done-claims.txt`）。
-`npm run package-check` = 发布包内容复核（见下节 ⑧）。
+# ② 生成站点工程（写进 <内容根>/skillpress/scripts/.skillpress/）
+node .mooncakes/XiLaiTL/skillpress/launcher/skillpress.mjs attach --repo . --skills ./skills
 
-看一眼站点（站点实例在**内容仓**里）：
-
-```bash
-cd ../moobile/skills/skillpress/scripts/.skillpress
+# ③ 装依赖、印内容、打包、起服务
+cd skills/skillpress/scripts/.skillpress
 npm install && npm run press && npm run build && npm run serve   # → http://127.0.0.1:8123/
 ```
 
-## 脚手架：给一份 `skills/` 直接生成一个站点
+要求：Node ≥ 20、[MoonBit 工具链](https://www.moonbitlang.com/download/)（`moon`）。
+`attach` 是**幂等**的：第二次跑不覆盖你手改过的文件（要覆盖加 `--force`）；
+它还会扫内容根、把"不上书架"的那几份写成 `skillpress.ignore.md`（**每条都要理由**，没理由就红）。
 
-```bash
-node tools/run-js.mjs attach --repo . --skills skills     # 本仓自己就是一份语料（自举）
-node tools/run-js.mjs attach --skills <别人的内容根> --ignore "某份=它的理由"
+### 2.2 只有一份 skill（最小语料）
+
+内容根长这样就够了 —— 一份 `SKILL.md`：
+
+```markdown
+<!-- skills/alpha/SKILL.md -->
+---
+name: alpha
+description: 一句话说清这份 skill 干什么（会出现在书架上那一行）
+whenToUse: 什么时候该用它
+---
+
+# alpha
+
+正文。标题、列表、表格、引用、围栏代码块都认；
+`![图](x.png)` 要**独占一行**才会被收成图片。
 ```
 
-它扫内容根 → 问（或按 `--ignore` 收）哪几份**不上书架**（每条都要**理由**，没理由就红）→
-首页源取目标仓的 `README.md`（**复制 + 改写**：能对上账的链接改成站点口径，对不上的**降级并打印**）
-→ 写整套 `skills/skillpress/{SKILL.md, WEBSITE.md, scripts/.skillpress/**}` 与仓根的 `skillpress.ignore.md`。
+想让它同时当**站点首页**，再加一份首页源（没有就拿仓里的 `README.md` 改写一份；
+两个都没有就用生成出来的模板首页 —— 每一步都会打印用了哪个）：
 
-⚠️ 三条要记住的：**幂等**（连跑两遍产物逐字节不变）、**不覆盖人写的东西**（要覆盖加 `--force`）、
-**算不出来就一个字节都不写**（退 2 + 逐条点名 —— 写的是别人的仓库，半成品最坏）。
-模板真源是 `template/instance/**`（带占位符）—— **别在别处再摆一份实例文件**。
-判据：`bash tools/attach-check.sh`（①–⑨ + 诱饵）。
+```markdown
+<!-- skills/skillpress/WEBSITE.md —— 站点首页的源：H1 = 站名，第一个 ## 之前 = 首屏 -->
+# 我的站
 
-## 目录
+一句话说明这堆 skill 是干什么的。
+
+## [从哪一份开始](../alpha/SKILL.md)
+
+点这一栏会**直接渲染**目标那一页（纯链接节）。
+```
+
+### 2.3 看一眼站点 + 日常改内容
+
+```bash
+npm run serve            # http://127.0.0.1:8123/
+npm run press:check      # 门：产物与现跑逐字节一致吗（改了内容忘了 press，它会红并指出第一处差异）
+npm run build            # 默认 **prod 档**（minify）；开发用 `npm run build:dev`
+node verify.mjs          # 站点判据：真 Chrome 无头 + 自起服务，23 条（要一次 native 编译）
+```
+
+---
+
+## 3. 项目实例
+
+| 实例 | 在哪 | 是什么 |
+|---|---|---|
+| **内容仓的站点** | [`../moobile/skills/skillpress/scripts/.skillpress/`](../moobile/skills/skillpress/scripts/.skillpress/) | 拿真语料（6 份 skill / 34 页原文）印的站；`verify.sh` 的 23 条判据就在它上面跑 |
+| **自举站点** | [`skills/skillpress/scripts/.skillpress/`](skills/skillpress/scripts/.skillpress/) | 用**程序自己的** `skills/`（讲怎么写 skill、怎么跑门）当内容根 |
+| **夹具站点** | 由判据**现搭**（`_scratch/image-check.mjs`） | 拿 `tools/fixtures/corpus/` 那份冻结语料印一遍，只为量"图片到底显示出来了没有" |
+
+三个实例都走同一条路（`attach` → `press` → `build`），差别只有"内容源是哪一份" ——
+这条比"再多写一个 demo"有用：**它证明内容换一份、代码一行不用改**。
+
+---
+
+## 4. 基本原理
+
+```
+   你的内容源（普通 markdown）       skills/<name>/SKILL.md + references/*.md
+        │                            + 可选的首页源 skillpress/WEBSITE.md
+        │  press：一次解析
+        ▼
+   三件产物   content/content.generated.mbt（站点的内容值）
+        │     llms.txt（给 agent 的整站索引）
+        │     md/**（每页原文，逐字节拷贝）+ img/**（内容里的图）
+        │
+        │  构建期：语法高亮（tree-sitter）已经算好，色号跟着一起进内容包
+        ▼
+   站点（一个 moobile 应用：TEA 的 Model/Msg/update/view）
+        │  顶栏 / 书架树 / 文档页 / 右栏目录 / 搜索浮层 / 主题 / hash 路由
+        ▼
+   React 元素（react-native-web）──► 浏览器 DOM ──► dist/（静态站点）
+```
+
+**三个根**（改东西之前先认清，各自有自己的定位参数）：
+
+| 根 | 是什么 | 在哪儿 |
+|---|---|---|
+| **程序** | 引擎 + 站点界面 + 语法资产（能发布的那份） | 本仓库根；用户那边是 `.mooncakes/XiLaiTL/skillpress` |
+| **内容** | 那批 skill（`SKILL.md` + `references/`） | `--skills` 指定；生成出来的实例里**已经写死**在 `npm run press` 里 |
+| **实例** | 一个「用程序」的 MoonBit 工程，`content/` 是生成物 | `<内容根>/skillpress/scripts/.skillpress/` |
+
+**站点是怎么长出来的**：书架树 = 内容根的目录结构；右栏目录 = 每条 `##`/`###`（构建期给锚点，
+滚动位置靠 moobile 的节点寻址订阅）；搜索 = 渲染期现算的索引（只在浮层打开时算一张分数表）；
+上下页 = 内容里的**页序**。**没有一个地方需要你手工维护导航。**
+
+**五条设计取舍**（决定了上面那张图）：
+
+1. **只做投影，不做 CMS** —— 内容源是唯一真源，站点是产物，删了能重印。
+2. **构建期能算的就不放到运行期** —— 高亮、目录锚点、页序、搜索词表都在 `press`/`build` 里算完。
+3. **一个事实一个副本** —— 三件产物同源；同一件事要是有两份实现，迟早分叉（本仓为此删过不少"顺手再来一遍"）。
+4. **判据是进程边界，不是仓库内外** —— 纯文本变换写成 `.mbtx`，碰进程的（起服务、开 Chrome）留 `.mjs`。
+5. **不静默** —— 认不出的构造点名、产物不一致指出第一处差异、找不到程序根直接报错不猜。
+
+---
+
+## 5. 能力边界与诚实清单
+
+| 项 | 现状 |
+|---|---|
+| 认的内容构造 | 标题（h2/h3/h4）/ 段落 / 列表（有序·无序·缩进）/ 表格 / 引用 / 围栏代码块（五门语言构建期上色）/ 分隔线 / 链接（站内折成页面键、站外开新窗口）/ **整行图片** |
+| **不认**的构造 | 行首原始 HTML、表格缺分隔行、围栏没闭合 → **点名 + 退 2 + 不吐产物**（不落坏产物） |
+| 行内标记 | 加粗 / 行内代码 / 链接 / 斜体按字面显示（`*斜体*` 不特殊处理） |
+| 搜索 | `⌘K` / `Ctrl+K`；索引**渲染期现算**（内容大时会变慢，构建期索引还没做） |
+| 主题 | 深/浅/跟随系统三态；配色与字号只在 `shell/theme.mbt` / `tokens.mbt` 一处 |
+| 未做 | **预渲染**（首屏空壳）｜`#section` 深链｜行内图片｜`pack` 子命令（命令在，会明说"还没做"并退 2）｜原生 RN 上图片要自己给尺寸 |
+| 站点判据 | 只能 native（`moonbitlang/async` 的 websocket / http-server / process 在 js 上没有实现）；js 那份 CLI 遇到 `verify` 会明说"只有 native 有"并退 2 |
+
+判据清单（发版前一条都不能少跑）：`acceptance.sh`、`verify.sh`、`engine-fixtures.sh`、`blocks-fixtures.sh`、
+`site-source.sh`、`attach-check.sh`、`native-parity.sh`、`package-check.sh`、`consumer-check.sh`、
+`published-check.sh`、`fresh-clone-check.sh`、`line-budget.sh`、`shell-traps.sh`、`mbt-traps.sh`、
+`queries-check.sh`、`diagnostics-ledger.sh`、`theme-check.sh`、`agent-exports.sh`。
+
+---
+
+## 6. 例子、文档与贡献
+
+| 想做什么 | 去哪 |
+|---|---|
+| 看一个真站怎么长出来的 | [内容仓的实例](../moobile/skills/skillpress/scripts/.skillpress/) ｜ 自举实例 [`skills/skillpress/scripts/.skillpress/`](skills/skillpress/scripts/.skillpress/) |
+| 用 skillpress 写内容（首页怎么写、忽略清单、目录规矩） | [`skills/skillpress/references/`](skills/skillpress/references/)（站点上也印出来了） |
+| 改站点界面 / 版式 / 交互 | [`DESIGN-site.md`](DESIGN-site.md)、[`PLAN-ui.md`](PLAN-ui.md) |
+| 门与内容规范（写 skill 的规矩） | [`SPEC.md`](SPEC.md)、[`SKILLS.md`](SKILLS.md) |
+| 做到哪儿了 / 为什么这么做 | [`PLAN.md`](PLAN.md)（决定表 D1–D46，每条带当天读数） |
+| CLI 与启动器（随包发的那两份） | [`launcher/skillpress.mjs`](launcher/skillpress.mjs)、`cmd/skillpress/` |
+| 仓库里有什么（每个目录干什么） | 下面这张表 ⬇️ |
 
 | 路径 | 是什么 |
 |---|---|
-| ~~`lib/`~~ ~~`bin/`~~ | **已整体退役**（2026-10-07，PLAN 的 D43）：它们是迁移期的**冻结旧实现**（真相参照物），现役实现全在 `engine/**` + `cmd/**`。参照物的职责由 `tools/fixtures/expected/` 里的**入库 golden** 接管。⚠️ 仓库里凡是提 `lib/xxx.mjs` / `bin/skillpress.mjs` 的地方，现在都是**历史坐标**（对账与迁移记录里的出处），不是活文件 |
-| `skills/` | **程序自己的 skill**（见下节）—— `skills` 是"给别人看的内容"，不是这里 |
-| `engine/site/` | **站点判据的本体**（P8.3）：进程内静态服务 + 起无头 Chrome + 走 CDP 跑 **23 条断言**（语料侧读数 / 页面侧读数 / 断言编排 / 报告）。⚠️ **native-only**：要 async 的 http server / websocket / process，而它们在 `moonbitlang/async` 的 js 目标上**没有实现** ⇒ 这条路上要一次 native 编译 |
-| `grammars/` | vendor 的语法资产（wasm + `highlights.scm`），出处与 sha256 见它的 `PROVENANCE.md` |
-| `vendor/web-tree-sitter/` | vendor 的 tree-sitter **运行时**（MIT：一个 ESM 入口 + 一个 wasm）—— 与 `grammars/` 一起**随包发** ⇒ 拿到包的人**一个 npm 依赖都不用装**（见它的 `PROVENANCE.md`） |
-| `launcher/skillpress.mjs` | 随包发的**启动器**（**js 那条路**的）**，也是引导层的唯一实现**：`Parser.init()` 是 Promise 而 js 产物是 CJS ⇒ 需要一个能 await 的 Node 启动器（`check` 那条路上连 tree-sitter 都不 import）。开发期的 `tools/run-js.mjs` 转发到它（D35）。**native 那条路不需要它** —— 见 `cmd/skillpress-native/` |
-| `cmd/skillpress-native/` | **native CLI**（P10）：与 js 那份**同一套 CLI 逻辑**（`cmd/skillpress/cli/`），只是宿主换成 `engine/gates/native` ⇒ `moon install ./cmd/skillpress-native` 装出来的是**本机可执行件，使用者零 Node**。两个 target 的产物**逐字节一致**由 `bash tools/native-parity.sh` 钉着 |
-| `SPEC.md` / `SKILLS.md` / `DRIFT.md` | 投影规范 / 集合划分 / 漂移政策（跟着程序走 = 对外契约） |
-| `PLAN.md` | **计划**（会变）：还没做的、已定的决定（D1–D26）、要探的未知 |
-| `claims.txt` / `skills.lock.json` | 禁语表（G7 用，**随包发**）/ 体量指纹锁（每条指纹记着**属于哪个内容根**；锁**不随包发**）。⚠️ 已落地台账 `done-claims.txt` 与 `facts` 那道门按 D18 **搬去内容仓自己**了（`moobile/tools/skillpress-gates.mjs`） |
-| `tools/*.sh` | **判据**（见下节）：对账 / 夹具 / R9 / 诊断账本 / 干净克隆 / 包内容 |
-| `engine/highlight/` | **MoonBit 版引擎的第一块**（P8.1）：调色板 / 包装候选 + **两份薄垫片**（`ts_shim.mbt` 走 js 引导层，`ts_shim.native.mbt` 走我们 vendor 的 tree-sitter C + 内嵌 query）—— 见下节「对账」 |
-| `cmd/skillpress/cli/gen_queries.mbt` | **`gen-queries` 子命令**：把 `grammars/*.scm` **嵌进** `engine/highlight/queries.generated.mbt`（native 没有引导层读盘）；`--check` 是门，判据 `tools/queries-check.sh`。⚠️ 2026-10-07 从 `tools/gen-queries.mjs` 换成这个（② 的第一件） |
-| `engine/content/` + `cmd/skillpress/` | 内容管线与 CLI 的 MoonBit 版（P6/P8）：生成物由 `cmd/skillpress` 的 `gen-file` 吐到 stdout |
-| `shell/` | **站点界面包**（P6）：顶栏 / 分栏下拉 / 侧栏树 / 正文渲染 + 公开契约（那 7 个类型）—— 实例只依赖它 |
-| `engine/scaffold/` + `cmd/skillpress/cli/attach.mbt` | **脚手架**（P9）：扫语料 / 把 README 改写成首页 / 拼忽略清单 / 替换模板占位符 —— 纯逻辑在 `engine/scaffold/`（可单测），碰磁盘那半在 CLI 里 |
-| `template/instance/` | **站点实例模板的真源**（带 `{{占位符}}`）：`attach` 生成的就是它逐文件替换出来的 |
-| `tools/press.mjs` | 内容源 → 实例的 `content/`（**新引擎**那条日常路径；`--check` 是门）。先写临时文件成功才替换：引擎有问题时**不吐产物**，别让一次失败顺手毁掉上一份 |
-| `tools/baseline/` | 只剩一件事：**P6 搬界面前的 DOM 取证**（历史证据，不参与判据）。旧的"对账基线"已退役 —— 见它的 `README.md` 与 PLAN 的 D29 |
-| `tools/normalize-gen.mbtx`（壳子 `tools/normalize-gen.sh`） | 把"旧形状 / 新形状"化到同一条基准线（三条规则），带 `--selftest` 钉住"值改一个字符必须红"的边界。⚠️ 2026-10-07 从 `.mjs` 换成 `.mbtx`（② 的第三件）：纯文本变换 = `.mbtx` 的甜区 |
-| `tools/shell-traps.mbtx`（壳子 `tools/shell-traps.sh`） | 双引号里的反引号 = **会真的执行**；`--selftest` 四向诱饵。⚠️ 同上，从 `.mjs` 换成 `.mbtx`（② 的第二件） |
-| `tools/dom-dump.mjs` | 真 Chrome 抓**渲染后的 DOM**（P6 搬界面的对账仪器）：`--repeat 2` 先自证仪器稳定，再比搬前搬后 |
-| `tools/run-js.mjs` | js 那条图的**引导层**，开发期入口 —— **只有一行转发**（实现在随包发的 `launcher/skillpress.mjs`：`/tools/` 不进包 ⇒ 一份实现只能落在 `launcher/`。见 D35） |
-| `tools/fixtures/` | **冻结夹具语料 + 入库 golden**：引擎的语料级回归网（判据 `tools/engine-fixtures.sh`）。设计与边角见它的 `README.md` |
-| `tools/spike/` | P8.0 探针 + 对账的**基准生成器**（不进发布包，`.moonignore` 已排掉） |
+| `engine/` | 引擎：markdown → 内容包、内容门（G1–G8）、构建期上色、忽略清单、脚手架 |
+| `shell/` | 站点界面：顶栏 / 侧栏树 / 正文渲染 / 目录 / 搜索 / 主题 / 路由 |
+| `cmd/` | CLI（`cmd/skillpress` 跑 js；`cmd/skillpress-native` 多一条 `verify`） |
+| `launcher/` | **随包发**的启动器与 `press`（`tools/` 不进包 ⇒ 一份实现只能落在这儿） |
+| `skills/` | **程序自己的 skill**（随包发）：怎么写一份 skill、怎么跑这几道门 |
+| `template/instance/` | 站点工程的模板（`attach` 就是把它按占位符渲染出来） |
+| `tools/` `_scratch/` | 判据与开发脚本（**不进发布包**） |
 
-## 对账与验收（判据都写在明处）
+> 仓库里若见到 `lib/xxx.mjs` / `bin/skillpress.mjs`，那是**历史坐标**（迁移记录里的出处），
+> 活实现已在 `engine/**` / `cmd/**`；迁移的完整账在 `PLAN.md` 的 D40–D46。
 
-引擎已经搬完了（Node → MoonBit，`PLAN.md` 的 P8）。搬的过程**只认一条**：
-新实现的输出要与旧实现的产物**逐字节一致** —— 「看着差不多」不算数。
-⚠️ 旧实现（`lib/` + `bin/`）**已整体退役**（D43）：参照物换成了 `tools/fixtures/expected/` 里的入库 golden。
-⚠️ P6 起这句话有个限定：生成物的**形状**换了（类型搬进包 `shell`、值带 `@shell.` 前缀），
-所以 ① 的口径是"**归一化后**逐字节一致"—— 归一化只抹**形状差**（三条规则，见 D26），
-映射差一个字节都不许有；基线自己被旧形状判据 + sha256 钉子 + 旧引擎现场重印三重钉住。
+---
 
-```bash
-export SKILLPRESS_CORPUS=../moobile/skills     # 下面的命令都按这个内容根跑
-# ① ② ③（迁移期的三条对账判据：整份生成物 / 上色 / 文档块）**已随 `lib/` 退役**（D43）——
-#    它们的职责现在由 ⑫ 承担（参照物从「现场跑的旧实现」换成了入库 golden）。
-bash tools/blocks-fixtures.sh     # ④ 夹具：残缺的围栏 / 缺分隔行的表格 / 原始 HTML / 空内容根 —— 与入库 golden 逐字节比
-                                  #    （`--capture` 重采；整行图片**已支持** ⇒ 夹具三里它是"不许再被点名"的反向控制）
-bash tools/line-budget.sh         # ⑤ R9：每个源文件 ≤400 行（默认全覆盖 + 显式豁免；--selftest 造 401 行的诱饵证明它会红）
-bash tools/diagnostics-ledger.sh  # ⑥ 诊断口径账本：旧实现 76 条诊断逐条"有对应物"或"记了账"（--selftest 改坏锚点即红）
-bash tools/fresh-clone-check.sh   # ⑦ 干净克隆自查：把 HEAD 克隆到临时目录（只有 tracked 文件）、现装现编，再跑上面几条 + R9 + 账本
-bash tools/package-check.sh       # ⑧ 发布包内容复核：该含的缺一个也红、不该含的多一个也红（--selftest 三向诱饵）
-bash tools/mbt-traps.sh           # ⑨ MoonBit 坑位（第一条：`Array::sort()` 排字符串**不是字典序**；--selftest 两向诱饵）
-bash tools/site-source.sh         # ⑩ 首页源（R2：WEBSITE.md 优先 / 回退 SKILL.md / --home）+ 忽略清单（R4：站点与门都跳过）
-bash tools/shell-traps.sh         # ⑪ shell 坑位（双引号里的反引号 = **会真的执行**；--selftest 四向诱饵）
-bash tools/published-check.sh     # ⑫ 发布后（§7 第 7 条）：从 registry 装下来、在别的工程里编过（没发布时会明说）
-bash tools/attach-check.sh        # ⑬ 脚手架：产物齐全 / 幂等 / 不覆盖手写 / 坏输入不落盘 / 首页改写（+ 诱饵）
-bash tools/queries-check.sh       # ⑭ 内嵌 query（native 用）与 grammars/*.scm 逐字节同源（+ 诱饵）
-                                  #    加 `--build` 再加一档：生成出来的实例**真的能编**（要拷依赖，慢）
-bash tools/native-parity.sh       # ⑮ 两个 target：同一份语料上 native 与 js 的产物**逐字节一致**
-                                  #    （gen-file 921 行 / dump-blocks 224 行 / batch 读数）；前提守卫：两份
-                                  #    runtime 必须同版本、PROVENANCE 记的 sha256 必须对得上盘上文件
-bash tools/engine-fixtures.sh     # ⑱ 引擎在**冻结夹具语料**上的读数 == 入库 golden（迁移期那三条的永久替代品：
-                                  #    语料与期望都冻结 ⇒ 不会像 D29 那次那样"基线自己腐掉"）
-bash tools/acceptance.sh          # ⑪ 验收：按 PLAN §6 的 A1/A2/A3 逐条查（红在哪 = 还差什么）
-```
+## 7. 许可证与第三方
 
-**P6 补的两台自证过的仪器**（判据不只看"产物对不对"，还看"判据自己会不会红"）：
+**Apache License 2.0**，见 [`LICENSE`](LICENSE)。随包分发与编译期依赖的第三方清单在
+[`THIRD-PARTY-NOTICE.md`](THIRD-PARTY-NOTICE.md)，语法资产的出处与 sha256 在
+[`grammars/PROVENANCE.md`](grammars/PROVENANCE.md)。
 
-```bash
-bash tools/normalize-gen.sh --selftest                       # 归一化只抹形状：值 / 顺序 / 缩进 / 正文空行改一处都必须红
-node tools/dom-dump.mjs --app <实例> --out a.html --repeat 2  # 真 Chrome 抓 DOM：先自证仪器（两次逐字节相同），再比搬前/搬后
-node tools/press.mjs --check                                 # 实例里的生成物与**新引擎现跑**逐字节一致（= 旧 `press --check` 的位置）
-node _scratch/image-check.mjs                                # 「图片」那条通道（对标表 #10）：现搭一份夹具站点，
-                                                             #   真 Chrome 量"真 <img> / 解码尺寸 / alt / 占版面 / 按 URL 取字节"
-                                                             #   （`--drop-asset` 是它的证伪开关 ⇒ 必须红 3 条）
-```
-
-前几条会把两边的原始输出与 diff 落在 `_build/parity/`（产物目录，不进仓）。
-
-**为什么 ⑥ 与 ⑦ 是后来才长出来的**（两笔老账，写在明处）：
-
-- **⑦ 干净克隆**：本机绿**不算数** —— 本机有 `_build/`、`node_modules/`、各种缓存，克隆里都没有。
-  实测两笔：① 四条对账判据要"编出来的 js"，而 `_build/` 不进版本库 ⇒ 克隆里**全红**、本机一直绿；
-  ② 更狠：已提交的引擎里**根本没有**「图片 / 原始 HTML / 表格缺分隔行 / 围栏没闭合」这四条点名规矩
-  （`parse_blocks` 的签名里没有 problems 参数，移植时按注释把它摘了）⇒ 认不出的构造被**咽下去**、
-  照吐一份坏产物、退出码还是 0。**本机之所以没看出来，是因为本机编的是工作区，不是 HEAD。**
-- **⑥ 诊断账本**：四种对账判据盯的都是**产物**，而"诊断"是另一条线 —— 一句话没了、退出码反了、
-  该走 stderr 的走了 stdout，产物照样逐字节一致、判据全绿。76 条里实测逮到：未知子命令新实现
-  `rc=0`（旧 `rc=2` 且点名）、「（N/M 个代码块没配语法或为空）」今天就在触发却已静默丢、
-  首页两条问题丢了定位前缀。账本是**自销账**的：欠账补上了那一行就红，逼着改成"钉住新句子"。
-
-⚠️ `acceptance.sh` 的 A1 那几条、以及 ⑤⑥⑦⑧ 里吃 `moon` 的判据，都要**编译本模块** ⇒
-它们的读数只在"本模块没人在改"时可信（有别的进程/子代理正在改时，你会看到"20 个错误"这种**别人的半成品**读数）。
-
-## 程序自己的 skill（`skills/`）
-
-按**身份**拆成两份 —— 一份给"用这套工具的人"，一份给"改这套程序的人"：
-
-| skill | 读者 | 管什么 |
-|---|---|---|
-| `skillpress-user` | 用它做站点的人 | 一份 / 多份 skill → 站点、主页怎么写、配色与字号改哪儿、加一块新构造、验收 |
-| `skillpress-dev` | 改这套程序的人 | 四个根、改什么跑哪条门、怎么加判据与诱饵、落锁、会安静咬人的坑 |
-
-为什么是 `skills/` 而不是 `skills/`：后者是**内容** —— 会被印成站点、给别人看的那份
-（由内容仓持有）；而这个 `skills/` 是**给用这个仓库的人**看的那份（用它的、改它的）。
-
-⚠️ 顺带一件好事：`skills/` 的形状和内容根**一模一样**（`skills/<名字>/SKILL.md`）——
-所以将来"自举"（把程序自己的 skill 也印成站点）时，它天然就是那个内容根。
-
-跑门要**显式指这个根**（默认那个根是内容仓的）：
-
-```bash
-node tools/run-js.mjs check --skills skills
-node tools/run-js.mjs check --skills skills --update-lock   # 复核体量后落锁
-```
-
-✅ **已经自举**（2026-10-06）：程序仓的 `skills/` 自己就是一份语料，实例在
-`skills/skillpress/scripts/.skillpress/` —— 它由脚手架生成：
-`node tools/run-js.mjs attach --repo . --skills skills`（`--repo` 要显式给：默认那个根是旁边的 `moobile/`）。
-
-## 门与判据（现状，2026-10-06 复核；**这些会漂 —— 要准数就跑一遍**）
-
-```bash
-node tools/run-js.mjs check            # 门：skill 自己（G1–G8）
-moon test engine/gates                 # 门自己的证伪：22 条 wbtest（诱饵全被点名）
-node tools/run-js.mjs audit            # 上色的回归闸门（召回率 / 未上色比例）
-bash tools/verify.sh                   # 站点判据：**23 条**（真 Chrome 无头；**要一次 native 编译**）
-moobile/tools/skillpress-gates.mjs --gate facts   # 事实来源对账（按 D18 住在**内容仓**）
-```
-
-> ⚠️ 上面那几行是**入口**，不是读数；要准数就跑一遍（判据会自己打读数）。
-
-## 诚实清单
-
-1. **还没发布**：现在靠**源码路径**调用（`node tools/run-js.mjs …` / `bash tools/verify.sh`）。
-   ⚠️ 发布形态已改（`PLAN.md` 的 D15）：**不单独发 npm 引擎包** —— 引擎从这 3404 行 `.mjs`
-   迁到 MoonBit（P8.0–P8.2 **已落地**：`engine/content` / `engine/gates` / `engine/highlight` + `cmd/skillpress`），
-   最后由**一个月亮包**装下引擎 + 站点界面 + skills，CLI 用 `moon install` 装。
-   ✅ **站点判据也搬完了**（P8.3，2026-10-07）：本体在 `engine/site/` + `cmd/skillpress-native verify`，
-   22 条与旧实现在**同一份站点产物上各跑一遍、逐行 diff 一致**（D38 的读数）。
-   ⚠️ 出这条读数的 `tools/site-parity.sh` **已随 D43 退役**（同一批里 `site-corpus-parity.sh` 也一样）
-   ⇒ 今天仓里**没有能复跑它**的判据，这句请当**历史读数**读；现役那条路是自己跑 `bash tools/verify.sh`。
-2. **native CLI 能 `moon install` 装上、产物与 js 逐字节一致**（P10，2026-10-07 实测）：
-   `moon install ./cmd/skillpress-native --bin <目录>` 装出来的是**本机可执行件（使用者零 Node）**，
-   跑 `gen-file` 的产物与 js **逐字节一致**（921 行；判据 `tools/native-parity.sh`，含 `--selftest` 六条诱饵）。
-   ⚠️ 三条写在明处的账：① **吃到 `check` / `attach` 时程序根必须显式给**
-   （`--program` 或 `SKILLPRESS_PROGRAM`）—— `moon install` 把可执行件放进 `~/.moon/bin/`，
-   那里没有 `claims.txt` / `skills.lock.json` / `template/`，而 **native 不猜**（不给会先打一句
-   「程序根没给（native 不猜）」，然后门照常红）；② **日常那条路仍是 Node**（`tools/run-js.mjs`）—— `moon install` 走 release 构建，慢一档（站点判据已经搬完了，它自己就是 native 那条路）；
-   ③ 两条**已知口径差**：js 的 `md_kids` 用 `localeCompare`（分语言环境）而 native 用 UTF-16 码元序
-   （同一层里既有大写又有小写开头的名字会排得不同）；native 没有 `process.exitCode`，退出码记在 `Ref` 里由可执行件收摊时用。
-3. ✅ **界面已抽成包**（P6 起）：站点壳住在 `shell/`（tokens / theme / layout / sidebar / toc / blocks /
-   article / pages / topbar / mobile / route…），实例 `app.mbt` 只剩几行接线。形状、验收读数与
-   "哪些还没做"在 `DESIGN-site.md §11–§12`，施工单在 `PLAN-ui.md`。
-4. **`pack` 还没做**（`attach` **已落地**，见「脚手架」一节）：`pack` 命令存在，但会明说"还没做"并以非零退出
-   （不做"看着像跑了"的假动作）。
-5. **还没做的**（卡点与归属写在 `DESIGN-site.md §12.2` / `PLAN-ui.md` 的卡点表）：
-   ✅ **搜索 ⌘K 已落地（2026-10-07）**：顶栏入口 + `⌘K`/`Ctrl+K`、输入即筛、命中分**整页 / 小节**
-   两种粒度、点一下**切页并跳到那一节**；索引**渲染期现算**（只在浮层打开时算），浮层复用"根不滚 +
-   绝对定位"（**不必 portal**）。读数：`_scratch/search-check.mjs`（真鼠标 + 真按键）。
-   ✅ **目录可点 + 跟读高亮也已落地**（`_scratch/toc-click.mjs`）。
-   ✅ **正文链接也可点了**（#9，`_scratch/link-check.mjs`）：`Span::Link` + 引擎把目标**折成页面键**，
-   站内**路由跳页**（不刷新）、站外走 `@sub.open_url`；代码块工具条（#5）与 prod 产物档（#14）也已落地。
-   ✅ **#10 图片也落地了**（2026-10-07）：整行一条的 `![alt](src)` ⇒ 引擎折 URL + `press` 拷资产到实例
-   `img/` + `build-web` 拷进 `dist/` + 站点排成**真正的 `<img>`**；读数 `_scratch/image-check.mjs`
-   （真 Chrome 量"真 `<img>` / 解码尺寸 / `alt` / **占版面** / 按 URL 取回字节"，含 `--drop-asset` 证伪）。
-   ⚠️ 两条留在明处的缺口：原生 RN 的 `img` 仍需调用方给尺寸；**行内图片没有去处**（今天退化成一条链接）。
-   ⬜ 还差的：**页面内 `#section` 深链**（目录能跳，但"地址栏里带某一节"还没有）。
-   ✅ 已经还掉的两笔旧账：**窄屏入口**（三个贴边按钮 + 两级交互 + 遮罩互斥，`shell/mobile.mbt`）；
-   **URL 路由**（hash ⇄ 状态双向 + 后退 + 深链 + 404 有到达路径，`shell/route.mbt`）。
-6. ✅ **产物默认就是 prod 档**（2026-10-07 起）：`npm run build` 走 `NODE_ENV=production` + `minify`
-   ⇒ **829 KB**（同一份源码的 dev 档 **2939 KB**，差 3.5 倍；要 dev 档用 `npm run build:dev`）。
-   ⚠️ 档位是**构建期**的（`NODE_ENV` 在打包时被替换成字面量）—— 运行时再设环境变量改不动已打好的产物；
-   `dist/artifact.json` 里的 `mode` 记着这一份是哪个档。
+| 东西 | 上游 | 许可 | 怎么进来的 |
+|---|---|---|---|
+| **tree-sitter 运行时** | [tree-sitter](https://github.com/tree-sitter/tree-sitter) | MIT | **原样 vendor**（`vendor/web-tree-sitter/`）⇒ 拿包的人**一个 npm 依赖都不用装**也能跑 `gen-file` |
+| **五门语法**（moonbit / bash / json / javascript / toml） | 各家官方仓库 | Apache-2.0 / MIT | 随包发（`grammars/*.wasm` + `*.scm`），出处逐个记在 `PROVENANCE.md` |
+| **mizchi/markdown** | <https://github.com/mizchi/markdown> | MIT | MoonBit 依赖：内容管线的 markdown 解析 |
+| **XiLaiTL/moobile** | 本机另一个仓（[`../moobile`](../moobile)） | Apache-2.0 | MoonBit 依赖：站点界面本身是个 moobile 应用 |
+| **React / react-native-web / esbuild** | Meta / Nicolas Gallagher / evanw | MIT | 站点工程构建期与运行期的 npm 依赖（由生成出来的 `package.json` 拉） |

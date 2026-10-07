@@ -14,6 +14,7 @@
 | `{{ENGINE_REL}}` | **实例目录 → 程序根**的相对路径（正斜杠） | `moon.work`、`package.json`、`verify.mjs` |
 | `{{HOST_DEP}}` | 宿主包 `moobile-host` 的依赖值（默认 registry 的 `^<版本>`） | `package.json` 的 dependencies |
 | `{{SITE_TITLE}}` | 站名（来自首页源的 H1；没有就用仓目录名） | `index.html` 的 `<title>` |
+| `{{SKILLS_REL}}` | **实例目录 → 内容根**的相对路径（正斜杠） | `package.json` 的 `press` / `press:check`（⚠️ 不带它就会走"程序根旁边的 `moobile/skills`"那个**开发机默认值**：在用户那边印的是**别人**的内容 —— 2026-10-07 在探针仓里实测到） |
 
 生成器**必须断言"产物里一个占位符都不剩"**：替换漏了不会报错，只会静静编不过。
 
