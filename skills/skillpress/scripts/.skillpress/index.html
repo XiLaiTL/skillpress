@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>skillpress —— 把一堆 skill 印成一个站点</title>
+    <!-- 空 data: 图标 —— 省掉浏览器那条 favicon 404，判据里"控制台不许有 error"才干净 -->
+    <link rel="icon" href="data:," />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      /* ⚠️ `#root` 必须是 flex 容器（不只是「有高度」）：原生 RN 里"根视图 = 屏幕大小"是内置前提，搬进浏览器要手工补这一步。
+         漏了它：应用根是弹性项（flex:1），块盒里没有可分配的 flex 空间 ⇒ 长到内容高 ⇒
+         滚的是整个页面、顶栏跟着滚出去。 */
+      #root {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- RN 的根节点：`AppRegistry.runApplication({ rootTag })` 挂的就是它 -->
+    <!-- ⚠️ 首屏主题：**必须在这段同步脚本里定下来**（在 bundle 之前）。
+         真源是这里 ⇒ MoonBit 侧 `shell/hosttheme.mbt` 的 `initial` 读 `globalThis.__skillpress_theme`。
+         读不到就会闪一下（先亮后暗）——那是"渲染之后才知道用哪套"的代价，不许退化成那样。 -->
+    <script>
+      (function () {
+        var pref = 'auto';
+        try { pref = localStorage.getItem('sp-theme') || 'auto'; } catch (e) {}
+        var dark = pref === 'dark' ||
+          (pref === 'auto' && !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
+        globalThis.__skillpress_theme = { pref: pref, dark: !!dark };
+      })();
+    </script>
+    <div id="root"></div>
+    <script src="./bundle.js"></script>
+  </body>
+</html>

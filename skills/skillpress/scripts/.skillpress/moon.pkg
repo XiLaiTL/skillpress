@@ -1,0 +1,26 @@
+// 实例的包依赖 —— 只有三条 import，这是**下限**，不是全部能力。
+//
+//   ① `XiLaiTL/moobile`   宿主能力（组件、样式、TEA 骨架）
+//   ② 内容包（**生成物**）：`<模块名>/content` —— 内容的值，由 `press` 写出来
+//   ③ `XiLaiTL/skillpress/shell` 界面包 —— 界面**不抄进这个工程**（判据 A2 盯着这件事）
+//
+// ⚠️ 加能力 = 加一条 import + 对应 npm 包（+ 重跑 `npx moobile-host regen`）。
+// ⚠️ 想抄一份界面进来？那会让"升 skillpress 包 = 所有站点一起升级"这条断掉。
+supported_targets = "+js"
+
+import {
+  "XiLaiTL/moobile" @moobile,
+  "skillpress-site/content" @content,
+  "XiLaiTL/skillpress/shell" @shell,
+}
+
+options(
+  link: {
+    "js": {
+      "format": "esm",
+      "exports": [
+        "app",
+      ],
+    },
+  },
+)

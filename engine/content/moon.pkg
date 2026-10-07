@@ -1,12 +1,22 @@
+// 内容管线（纯逻辑 + IO）。
+//
+// ⚠️ **IO 是两头各自实现的**：`io.mbt`（js）走引导层（`globalThis.__skillpress_ts` 上的
+//    `mdKids` / `scriptKids` + Node 的 fs），`io.native.mbt`（native）走 `moonbitlang/x` + 一个
+//    20 行的 C 桩（stderr 输出）。两份必须给出**同样的遍历顺序** —— 那是逐字节判据的一部分。
 import {
   "XiLaiTL/skillpress/engine/highlight" @hl,
+  "XiLaiTL/skillpress/engine/gates" @gates,
+  "moonbitlang/x/fs" @fs,
+  // 内容根摘要要用 sha256（见 file.mbt 的 footprint_of）——纯 MoonBit，两端都编得过
+  "moonbitlang/x/crypto" @crypto,
 }
 
-// 上色链与 IO 都是 js 专用的（薄垫片调 web-tree-sitter、读文件走宿主），所以这个包也跟着
-supported_targets = "+js"
+supported_targets = "+js +native"
 
 options(
   targets: {
     "io.mbt": [ "js" ],
+    "io.native.mbt": [ "native" ],
   },
+  "native-stub": [ "note.c" ],
 )

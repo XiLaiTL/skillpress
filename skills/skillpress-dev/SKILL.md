@@ -1,7 +1,7 @@
 ---
 name: skillpress-dev
 description: 改 skillpress 程序本身（引擎 / 三道门 / 上色 / 站点判据 / 规范与账本）：四个根在哪、改了什么跑哪条门、怎么加一条判据和它的诱饵、落锁的规矩、以及那些会安静咬人的坑。
-whenToUse: 你要动 `lib/*.mjs`（内容管线 / 高亮 / check / docfacts / verify-site）、要加或改一道门的判据、动语法资产与 SPEC/SKILLS/DRIFT，或者遇到"门绿着，但它查的不是我以为的那份东西"这类症状。
+whenToUse: 你要动引擎（`engine/**` 的 MoonBit（内容管线 / 门 / 上色）与 `engine/site/`（站点判据））、要加或改一道门的判据、动语法资产与 SPEC/SKILLS/DRIFT，或者遇到「门绿着，但它查的不是我以为的那份东西」这类症状。
 ---
 
 # skillpress 开发者 —— 改这套程序
@@ -13,7 +13,7 @@ whenToUse: 你要动 `lib/*.mjs`（内容管线 / 高亮 / check / docfacts / ve
 
 | 根 | 在哪 | 谁说了算 |
 |---|---|---|
-| **程序** | 本仓库根（`interest/skillpress`） | `lib/roots.mjs` —— **唯一算法** |
+| **程序** | 本仓库根（`interest/skillpress`） | `cmd/skillpress/cli/args.mbt`（门与 CLI）+ `engine/site/entry.mbt`（站点判据）—— **唯一算法** |
 | **仓库**（内容仓） | **旁边的** `../moobile/`；找不到才退回"程序往上 3 层" | 同上：`--repo` / `SKILLPRESS_REPO` |
 | **内容** | `<内容仓>/skills` | 同上：`--skills` / `SKILLPRESS_SKILLS` |
 | **实例** | `<内容>/skillpress/scripts/.skillpress` | 同上：`--app` / `SKILLPRESS_APP_DIR` |
@@ -24,23 +24,34 @@ whenToUse: 你要动 `lib/*.mjs`（内容管线 / 高亮 / check / docfacts / ve
 ## 二、改了什么 → 跑什么（都在**程序根**跑）
 
 ```bash
-node bin/skillpress.mjs check             # 门：skill 自己（G1–G8）
-node bin/skillpress.mjs check --selftest  # 证伪：诱饵必须全被点名
-node bin/skillpress.mjs press --check     # 生成物与源一致吗
-node bin/skillpress.mjs facts             # 事实来源对账（docs 有没有撒谎）
-node bin/skillpress.mjs audit             # 上色的闸门（召回率 / 漏色比例）
-node bin/skillpress.mjs verify            # 站点判据：真 Chrome 无头 + CDP 真鼠标
+node tools/run-js.mjs check               # 门：skill 自己（G1–G8）
+moon test engine/gates                   # 证伪：22 条 wbtest，诱饵必须全被点名
+node tools/press.mjs --check              # 生成物与源一致吗
+# facts（事实来源对账）按 D18 住在**内容仓**：moobile/tools/skillpress-gates.mjs --gate facts
+node tools/run-js.mjs audit               # 上色的闞8门（召回率 / 漏色比例）
+bash tools/verify.sh                     # 站点判据（22 条；**要一次 native 编译**）
 ```
 
-> 在**内容仓根**跑同一份程序就多一层：`node ../skillpress/bin/skillpress.mjs …`。
+站点判据的**现役**那一份在 native CLI 里（要 C 工具链；js 那条路上 `moonbitlang/async`
+没有 http server / websocket / process）：
+
+```bash
+moon build cmd/skillpress-native --target native
+_build/native/debug/build/cmd/skillpress-native/skillpress-native verify [--skills <内容根>] [--app <实例>]
+```
+
+> 在**内容仓根**跑同一份程序就多一层：`node ../skillpress/tools/run-js.mjs …`。
 
 | 动了什么 | 必须跟着跑 |
 |---|---|
-| `lib/check.mjs` 的判据 | `check --selftest` —— **新判据必须配诱饵**，否则等于没加 |
-| `lib/gen-content.mjs` / `lib/highlight.mjs` | `press` → `press --check`；上色的改动还要 `audit` |
-| `lib/verify-site.mjs`（站点判据） | `verify`；加断言照它文件头那张表写（每条抓哪个失败模式） |
-| `lib/docfacts.mjs` | `facts` |
+| `engine/gates/` 的判据 | `moon test engine/gates`（22 条 wbtest）—— **新判据必须配诱饵**，否则等于没加 |
+| `engine/content/` / `engine/highlight/` | `bash tools/engine-fixtures.sh`（四份读数 vs 入库 golden；有意的变化就 `--capture` 重采）；上色的改动还要 `node tools/run-js.mjs audit` |
+| `engine/site/**`（站点判据**本体**） | `bash tools/verify.sh`（22 条，真 Chrome）；加断言照 `engine/site/checks.mbt` 里那张表写（每条抓哪个失败模式），加完跑 `bash tools/engine-fixtures.sh` |
+| `cmd/skillpress-native/**`（站点判据的**入口**） | 同上（`verify` 只有 native 那份有） |
+| `facts`（按 D18 住在**内容仓**） | `moobile/tools/skillpress-gates.mjs --gate facts` |
 | `grammars/**` | `audit` + 更新 `grammars/PROVENANCE.md` 的 sha256 |
+| **native 那一侧**（`engine/gates/native/**`、`engine/content/io.native.mbt`、`engine/highlight/{ts_shim.native.mbt,ts.c,gram-*.c}`、`cmd/skillpress-native/**`、`vendor/tree-sitter{,-grammars}/**`） | `bash tools/native-parity.sh`（+ `--selftest`）—— 同一份语料上 **native 与 js 的产物逐字节一致**。改 `vendor/web-tree-sitter/**` 或 `vendor/tree-sitter/**` 时先读两份 `PROVENANCE.md`：**两个 runtime 必须同版本**（版本不齐会差几行、而两边看上去都还绿），脚本自己会把版本号与 sha256 对一遍 |
+| `engine/scaffold/**` / `template/instance/**` / `cmd/skillpress/cli/attach.mbt` | `bash tools/attach-check.sh`（+ `--selftest`）；**模板动了要重生成自举那份实例**：`node tools/run-js.mjs attach --repo . --skills skills --force`（它写的是**别人的仓库** ⇒ 判据盯的是"幂等 / 不覆盖 / 坏输入不落盘"）；改完想确认"生成出来真能跑"就加 `--build`（拷依赖 + 真编一次，慢） |
 | 内容源（在**内容仓**） | `check` → 复核体量 → `check --update-lock <名字>` → `press` |
 | `SPEC.md` / `SKILLS.md` / `DRIFT.md` | 查有没有被引用的路径与 `§` 号（G3 / G6）—— **改引用，别改判据** |
 
@@ -86,7 +97,7 @@ node bin/skillpress.mjs verify            # 站点判据：真 Chrome 无头 + C
 跑门时**显式指这个根**（默认那个根是内容仓的）：
 
 ```bash
-node bin/skillpress.mjs check --skills skills
+node tools/run-js.mjs check --skills skills
 ```
 
 落锁同样认这个根，而且 `--update-lock` **出现在哪儿都认**（曾经它必须正好是第一个参数，
@@ -94,22 +105,25 @@ node bin/skillpress.mjs check --skills skills
 其实什么都没发生）：
 
 ```bash
-node bin/skillpress.mjs check --skills skills --update-lock
+node tools/run-js.mjs check --skills skills --update-lock
 ```
 
 `skills.lock.json` 仍然**只有一份**（跟着程序走 = 它是机制的契约），但每条指纹都记着
 **它属于哪个内容根** ⇒ 查 A 根不会把 B 根的条目报成"已删除的 skill"。
 
-⚠️ **还没自举**（诚实清单）：`press` 只往内容仓那个实例写，所以 `skills/` 里的这两份
-暂时**上不了站点**（自举 = 程序自己也有实例，是下一步）。
+✅ **已经自举**：程序仓的 `skills/` 自己就是一份语料，实例在 `skills/skillpress/scripts/.skillpress/`
+—— 由脚手架生成（`node tools/run-js.mjs attach --repo . --skills skills`；`--repo` 要显式给）。
 
 ## 六、诚实清单（现状，别写成"已支持"）
 
-- **引擎今天还是 Node**（3404 行 `.mjs`）—— ⚠️ **要动引擎之前先看 `PLAN.md` 的 P8**：
-  已经定了要迁到 MoonBit（D15），阶段、判据与风险都在那儿。**不单独发 npm 包了。**
-- **还没发布**：靠源码路径调用（`node bin/skillpress.mjs …`）；发布形态见 P8 与 P6。
-- `pack` / `attach` **还没做**：命令存在，但会明说"还没做"并非零退出（不做"看着像跑了"的假动作）。
-- 界面**还没抽成 `shell` 包**：整套界面住在内容侧的实例 `app.mbt` 里，实例与程序之间隔着一份界面代码。
+- **引擎已经是 MoonBit**（`engine/**`）—— 残余的 `.mjs` 只有三个跨进程的工具（`press` / `dom-dump` / 引导层）。
+  迁移的阶段与读数在 `PLAN.md` 的 P8。**不单独发 npm 包了。**
+- **还没发布**：靠源码路径调用（`node tools/run-js.mjs …` / `bash tools/verify.sh`）；发布形态见 P8 与 P6。
+- `pack` **还没做**：命令存在，但会明说"还没做"并非零退出（不做"看着像跑了"的假动作）。
+  （`attach` **已落地**，见 `PLAN.md` 的 P9 与 `engine/scaffold/`。）
+- 界面**已经抽成 `shell` 包**（P6）：实例的 `app.mbt` 只剩接线。
+- ⚠️ 引擎迁移的**进度**只有一处答案：`PLAN.md` 的 P8（这份清单里原先那句"引擎今天还是 Node"
+  已经过期 —— 内容管线、通用门、上色与站点判据都已经是 MoonBit，**`lib/` 与 `bin/` 已经整体退役**（D43））。
 
 ## 七、指针
 

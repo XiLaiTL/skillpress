@@ -3,18 +3,18 @@
   "skills": {
     "skillpress-dev": {
       "files": 4,
-      "lines": 396,
-      "bytes": 27558,
-      "rows": 72,
-      "codeBlocks": 4,
+      "lines": 410,
+      "bytes": 29913,
+      "rows": 75,
+      "codeBlocks": 5,
       "root": "D:\\ai_project\\interest\\skillpress\\skills"
     },
     "skillpress-user": {
       "files": 3,
-      "lines": 301,
-      "bytes": 18464,
+      "lines": 328,
+      "bytes": 20425,
       "rows": 84,
-      "codeBlocks": 4,
+      "codeBlocks": 6,
       "root": "D:\\ai_project\\interest\\skillpress\\skills"
     },
     "moobile-app-development": {

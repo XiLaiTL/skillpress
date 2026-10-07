@@ -10,6 +10,8 @@
 /// 一份 skill 的完整字面量原料（`blocks` 里的代码块此时已贴好 runs）。
 pub struct DocLit {
   slug : String
+  /// 中文人话的名字（界面用它；`slug` 只给机器）。
+  title : String
   desc : String
   full_desc : String
   when : String
@@ -43,6 +45,7 @@ fn doc_lit_lines(d : DocLit, pad : String, comma : Bool) -> Array[String] {
   let out : Array[String] = []
   out.push(pad + "{")
   out.push(pad + "  slug: \"" + esc(d.slug) + "\",")
+  out.push(pad + "  title: \"" + esc(d.title) + "\",")
   out.push(pad + "  desc: \"" + esc(d.desc) + "\",")
   out.push(pad + "  full_desc: \"" + esc(d.full_desc) + "\",")
   out.push(pad + "  when: \"" + esc(d.when) + "\",")
@@ -153,4 +156,112 @@ fn find_page_lines() -> Array[String] {
     "  (-1, -1, -1)",
     "}",
   ]
+}
+
+// ── 页脚那三个值（DESIGN-site.md §5 页脚那一行） ──────────────────────────────
+
+///|
+/// 生成侧要填的页脚值。
+///
+/// ⚠️ 这里**没有 `generated_at`**：时间戳**不进内容包** —— 内容包要逐字节可复现
+///    （`press --check` 拿同一份内容重跑必须一致），塞一个"生成那一刻"进去会让它每次变红。
+///    真源是**宿主**（构建脚本），运行期读 `globalThis.__skillpress_build`。
+///    理由与三个字段的空值语义写在 `shell/types.mbt` 的 `Footer`（一处定义，两处引用）。
+pub struct FooterLit {
+  license : String
+  fingerprint : String
+}
+
+///|
+/// **内容根摘要**：把每个内容文件的结构指纹归拢成一个 sha256 摘要。
+///
+/// 口径**复用 G8 那一套**（`@gates.fingerprint`：行数 / 字节 / 表格行 / 围栏块）——
+/// 这里只多做"把多份揉成一个可展示的值"这一步，**不是另立一套内容哈希**（两处口径 = 迟早对不上）。
+///
+/// ⚠️ **不排序**：这个顺序本身已经是确定性的 —— `dirs` 按 slug 排（生成物就是这么承诺的），
+///    每个 skill 里是 `SKILL.md` → refs → scripts（引导层的枚举顺序；js/native 两头给出同一顺序
+///    本来是既有的硬要求）。再加一道排序只会多一个口径，收益是 0。
+///
+/// ⚠️ 拼接形态要**带分隔符**（每段之间用制表符、每条之间用换行）：
+///    否则两条相邻的字段会粘在一起，而那种碰撞**不会报错** ——
+///    它只会让「两份不同的内容」显示成同一个指纹（最坏的一种安静）。
+pub fn footprint_of(pairs : Array[(String, @gates.Fingerprint)]) -> String {
+  let buf = StringBuilder()
+  for pair in pairs {
+    let (path, fp) = pair
+    // 长度前缀 + 数字之间逗号 + 记录之间分号：**不需要任何转义**，也不可能因为拼接而撞摘要。
+    // （为什么不用制表符/换行当分隔符：那样得往字符串字面量里塞转义，而"转义写错"会让分隔符
+    //   悄悄变成别的字符 —— 摘要照样算得出来，只是它已经不代表这份内容了。这一版是踩完之后改的。）
+    buf.write_string(path.length().to_string())
+    buf.write_string(":")
+    buf.write_string(path)
+    buf.write_string("|")
+    buf.write_string(fp.lines.to_string())
+    buf.write_string(",")
+    buf.write_string(fp.bytes.to_string())
+    buf.write_string(",")
+    buf.write_string(fp.rows.to_string())
+    buf.write_string(",")
+    buf.write_string(fp.codeBlocks.to_string())
+    buf.write_string(";")
+  }
+  @crypto.bytes_to_hex_string(@crypto.sha256(buf.to_string().to_bytes()))
+}
+
+///|
+/// 页脚那一段的发射（`generated_at` 固定空串 —— 它的真源在宿主侧，见 `FooterLit`）。
+fn footer_lit_lines(f : FooterLit) -> Array[String] {
+  [
+    "///| 页脚要交代的出处（DESIGN-site.md §5）：许可 / 生成时间 / 内容根指纹。",
+    "///",
+    "/// ⚠️ 空串 = 拿不到 ⇒ 页脚那一项**不画**（不写「许可 —」这种占位）。",
+    "///    三个字段各自为什么可能空，写在 `shell/types.mbt` 的 `Footer` 里（一处定义）。",
+    "pub fn footer() -> " + REC + "Footer {",
+    "  {",
+    "    license: \"" + esc(f.license) + "\",",
+    "    generated_at: \"\",   // 由宿主构建脚本注入（内容包必须逐字节可复现）",
+    "    root_fingerprint: \"" + esc(f.fingerprint) + "\",",
+    "  }",
+    "}",
+    "",
+  ]
+}
+
+///|
+/// **`llms.txt` 的正文**（Agent 出口之一，DESIGN-site.md §5「Agent 出口」那一行）。
+///
+/// 形状照原型 `_scratch/ui-ref/demo.html` 里那份（每份 skill 一段：中文 `title` + 一行 `desc` +
+/// **原文路径**；子页逐条）—— 不另发明一套：那个形态是可点的、也是 Agent 真能照着走的形式。
+///
+/// ⚠️ **原文路径从 `slug` / `name` 现拼**（`skills/<slug>/SKILL.md`、`skills/<slug>/references/<name>.md`、
+///    脚本那类是 `skills/<slug>/scripts/<name>`）—— 与站点 URL 方案（`#/s/<slug>/<kid>/`）**同一套命名**，
+///    别再各造一份（两份路径口径 = 迟早对不上，而 Agent 拿到的是一个走不通的地址）。
+///
+/// ⚠️ 这份文本要**逐字节可复现**（`press --check` 拿它跟磁盘那份逐行比）⇒ **不许写时间戳**。
+pub fn llms_lines(home : HomeLit?, docs : Array[DocLit]) -> Array[String] {
+  let out : Array[String] = []
+  out.push("# llms.txt")
+  out.push("")
+  out.push("> 给 Agent 的整站索引：每一份 skill 一段，`原文` 就是它的路径（逐字节等于内容源那份文件）。")
+  if home is Some(h) {
+    out.push("")
+    out.push("## 首页（" + h.title + "）")
+    out.push("- 原文: skills/skillpress/WEBSITE.md")
+  }
+  for d in docs {
+    out.push("")
+    out.push("## " + d.title + " (" + d.slug + ")")
+    out.push("- " + d.desc)
+    out.push("- 原文: skills/" + d.slug + "/SKILL.md")
+    for k in d.kids {
+      let path = if k.kind == "script" {
+        "skills/" + d.slug + "/scripts/" + k.name
+      } else {
+        "skills/" + d.slug + "/references/" + k.name + ".md"
+      }
+      out.push("- " + k.title + "：" + path)
+    }
+  }
+  out.push("")
+  out
 }

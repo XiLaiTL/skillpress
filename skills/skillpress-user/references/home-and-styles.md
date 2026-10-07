@@ -59,7 +59,7 @@ description: 首页（那份叫 skillpress 的 skill）的写作规矩、markdow
 字号在各处的 `font_size`（正文 ~14、栏目标题 ~17.5、H3 ~15、H4/小字 ~13.5）；
 标题、正文、引用、表格、代码块分别有自己的视图函数，改一处只影响那一类。
 
-**代码块的颜色是另一条链**：色号（`PALETTE` 的索引）由程序 `lib/highlight.mjs` 决定，
+**代码块的颜色是另一条链**：色号（调色板的索引）由程序 `engine/highlight/hl.mbt` 决定，
 而"这个色号长什么样"由 `app.mbt` 的 `tok_color` 决定 —— **索引两边对齐，改要一起改**，
 错位不会报错，只是颜色悄悄变了。
 
@@ -72,7 +72,7 @@ RN 上有几条"写了不报错但没效果"的陷阱（按下一类、`transfor
 
 | 这边 | 改什么 |
 |---|---|
-| 程序侧 `lib/gen-content.mjs` | 解析：把 markdown 里的新写法变成类型化数据（`Block` / `Span` 的新分支） |
+| 程序侧 `engine/content/blocks.mbt` | 解析：把 markdown 里的新写法变成类型化数据（`Block` / `Span` 的新分支） |
 | 实例侧 `app.mbt` | 渲染：`block_view` 里给新分支写画法（现成 8 种：标题三档 / 段落 / 引用 / 代码块 / 列表 / 表格 / 分隔线） |
 
 只改一边的症状：解析出来了但页面不显示（`match` 穷尽性会提醒 app 侧），
@@ -82,8 +82,8 @@ RN 上有几条"写了不报错但没效果"的陷阱（按下一类、`transfor
 ## 五、改完的验收
 
 ```bash
-node ../skillpress/bin/skillpress.mjs press --check   # 内容源与生成物一致
-node ../skillpress/bin/skillpress.mjs audit           # 上色的闸门（改配色/色号后必跑）
+node ../skillpress/tools/press.mjs --check             # 内容源与生成物一致
+node ../skillpress/tools/run-js.mjs audit             # 上色的闸门（改配色/色号后必跑）
 ```
 
 实例里 `npm run build` → `npm run serve` 看效果；要机器判据就跑 `verify`

@@ -1,4 +1,15 @@
 ///|
+/// **一次生成的全部产物**（`content.generated.mbt` + `llms.txt`）。
+///
+/// ⚠️ 为什么绑在一起返回：`llms.txt` 必须**与内容包同源**（同一份解析、同一套 slug/kid 枚举）。
+///    让调用方各跑一遍「生成」就等于两份口径 —— 本仓明令禁止同一件事两个副本。
+pub(all) struct Generated {
+  mbt : String
+  llms : String
+  problems : Array[String]
+}
+
+///|
 /// 整份内容包的生成（旧实现 `generate` 的编排）。
 ///
 /// 顺序照抄（**顺序也是判据**）：先解析全部 → 建页面键索引（首页认纯链接节要用）→ 解析首页 →
@@ -16,7 +27,7 @@ fn field(data : Map[String, String], key : String) -> String {
 ///
 /// `read` / `md_kids` / `script_kids` 由调用方注入（IO 归宿主，规矩在这一层）——
 /// 这样这层逻辑是**纯**的：给它一份内容根的形状，它给回那份文件。
-pub fn gen_content(
+pub fn gen_content_full(
   root : String,
   dirs : Array[String],
   home_file : String,
@@ -24,7 +35,8 @@ pub fn gen_content(
   md_kids : (String) -> Array[String],
   script_kids : (String) -> Array[String],
   note : (String) -> Unit,
-) -> (String, Array[String]) raise {
+  license : String,
+) -> Generated raise {
   let problems : Array[String] = []
   // ⓪ 首页源**先**选好（R2/D20）：索引与 kids 都要用它把首页源排除出去（首页不算子页）
   let pick = pick_home(root, home_file, read, note)
@@ -43,8 +55,15 @@ pub fn gen_content(
     let text = read(root + "/" + d + "/SKILL.md")
     let data = frontmatter_data(text)
     let body = frontmatter_body(text)
+    // 界面上的名字 = frontmatter `title` → 正文 H1 → 回退 slug（与子页 `Kid.title` 同一套取法）
+    let h1 = first_h1(body)
+    let doc_title = match data.get("title") {
+      Some(t) => t
+      None => if h1 != "" { h1 } else { d }
+    }
     docs.push({
       slug: d,
+      title: doc_title,
       desc: summarize(field(data, "description"), 60),
       full_desc: field(data, "description"),
       when: field(data, "whenToUse"),
@@ -89,6 +108,7 @@ pub fn gen_content(
     }
     filled.push({
       slug: d.slug,
+      title: d.title,
       desc: d.desc,
       full_desc: d.full_desc,
       when: d.when,
@@ -133,5 +153,54 @@ pub fn gen_content(
   for line in find_page_lines() {
     out.push(line)
   }
-  (out.fold(init="", fn(acc, l) { acc + l + "\n" }), problems)
+  // ⑥ 页脚那一块：**内容根摘要**（真值，生成期算）。
+  //    ⚠️ 文件清单与**生成物自己用的那份同源** —— 同一个 `dirs`、同一套 kids 枚举，
+  //    不另立一份"要指纹的文件列表"（两份清单 = 迟早一份多一份少，而摘要看不出少了谁）。
+  //    去重是必需的：首页源回退那一路**就是**某份 skill 的 `SKILL.md`（`read_kids` 里同样要排掉它）。
+  let pairs : Array[(String, @gates.Fingerprint)] = []
+  let seen : Array[String] = []
+  for d in dirs {
+    let dir = root + "/" + d
+    let rels : Array[String] = ["SKILL.md"]
+    for rel in md_kids(dir) {
+      rels.push(rel)
+    }
+    for rel in script_kids(dir) {
+      rels.push(rel)
+    }
+    for rel in rels {
+      let key = d + "/" + rel
+      if !seen.contains(key) {
+        seen.push(key)
+        pairs.push((key, @gates.fingerprint(read(dir + "/" + rel))))
+      }
+    }
+  }
+  if hr.source != "" && !seen.contains(hr.source) {
+    pairs.push((hr.source, @gates.fingerprint(read(root + "/" + hr.source))))
+  }
+  out.push("")
+  for line in footer_lit_lines({ license: license, fingerprint: footprint_of(pairs) }) {
+    out.push(line)
+  }
+  // llms.txt（Agent 出口）：同一份解析产出的第二件产物（见 Generated 的注释）。
+  let llms = llms_lines(home, filled).fold(init="", fn(acc, l) { acc + l + "\n" })
+  { mbt: out.fold(init="", fn(acc, l) { acc + l + "\n" }), llms, problems }
+}
+
+
+///|
+/// 旧口径的薄包装：只要内容包文本 + 问题清单（`gen-file` 那条路走它）。
+pub fn gen_content(
+  root : String,
+  dirs : Array[String],
+  home_file : String,
+  read : (String) -> String,
+  md_kids : (String) -> Array[String],
+  script_kids : (String) -> Array[String],
+  note : (String) -> Unit,
+  license : String,
+) -> (String, Array[String]) raise {
+  let g = gen_content_full(root, dirs, home_file, read, md_kids, script_kids, note, license)
+  (g.mbt, g.problems)
 }

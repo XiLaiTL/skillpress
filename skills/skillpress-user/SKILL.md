@@ -11,22 +11,46 @@ whenToUse: 你要**用** skillpress 做站点（一份 skill 变网站 / 多份 
 三条命令（在**内容仓根**跑；程序是它旁边的兄弟 `../skillpress/`）：
 
 ```bash
-node ../skillpress/bin/skillpress.mjs press          # 内容源 → 站点的内容包（生成物）
-node ../skillpress/bin/skillpress.mjs press --check  # 门：生成物与源一致吗
-node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无头，自起服务
+node ../skillpress/tools/press.mjs press              # 内容源 → 站点的内容包（生成物）
+node ../skillpress/tools/press.mjs --check            # 门：生成物与源一致吗
+bash ../skillpress/tools/verify.sh                   # 判据：22 条（真 Chrome；要一次 native 编译）
 ```
 
-> 在**程序仓根**跑同一份程序就是 `node bin/skillpress.mjs …`。内容仓不在兄弟位置时，
+站点判据的**现役**那一份是 `skillpress-native verify`（真 Chrome 无头 + CDP，22 条）——
+⚠️ **只有 native 那份有**（要一次 C 工具链）：站点判据要 async 的 http server / websocket /
+process，而它们在 `moonbitlang/async` 的 js 目标上没有实现。**实例里最省事的是 `npm run verify`**
+（实例的 `verify.mjs` 会把"引擎在哪、本实例在哪"接上去，找不到就明说 SKIP）。
+
+> 在**程序仓根**跑同一份程序就是 `node tools/run-js.mjs …` / `bash tools/verify.sh`。内容仓不在兄弟位置时，
 > 用 `--repo <内容仓根>` 或 `SKILLPRESS_REPO` 显式指定 —— **它不猜**（猜错的表现是"站点没更新"）。
 
-## 一、今天怎么落一个站点（现状，别当成"已支持"）
+⚠️ **今天要不要 Node**：日常要 —— 上面这三条走的是**源码路径 + Node 启动器**。
+native 那一侧**已经验过**：`moon install ./cmd/skillpress-native` 装出来的是**本机可执行件（零 Node）**，
+装出来的那支 release 二进制跑 `gen-file`，产物与 js **逐字节一致**（判据 `bash tools/native-parity.sh` 钉着）。
+⚠️ 但它有**两处必须显式给的东西**：吃到 `check` / `attach` 时**要给程序根**
+（`--program <程序根>` 或 `SKILLPRESS_PROGRAM=<程序根>`）—— `moon install` 把可执行件放进 `~/.moon/bin/`，
+程序数据（`claims.txt` / `skills.lock.json` / `template/`）不在它旁边，而 **native 不猜**；
+不给会先说一句「程序根没给（native 不猜）」再照常跑门。两条路今天都能走，日常仍以 Node 这条为准
+（`moon install` 走的是 release 构建，慢一档）。
 
-⚠️ **`pack` / `attach` 还没做** —— 这两条命令存在，但会明说"还没做"并以非零退出。
-今天只有一条真路：**拿现成的站点实例当模板**。
+## 一、怎么落一个站点
+
+**一条命令**（脚手架，P9 已落地）：
+
+```bash
+node tools/run-js.mjs attach --repo <仓根> --skills <内容根>      [--ignore "<名字>=<理由>"]… [--home <README 路径>] [--force] [--dry-run]
+```
+
+它扫内容根 → 问（或按 `--ignore` 收）哪几份**不上书架**（每条都要**理由**）→ 首页源取
+`<仓根>/README.md`（复制 + 改写）→ 写整套 `skills/skillpress/{SKILL.md, WEBSITE.md, scripts/.skillpress/**}`。
+**幂等**、**不覆盖人写的东西**（要覆盖加 `--force`）、**算不出来就一个字节都不写**。
+⚠️ `pack`（打成便携目录）**还没做**。
+
+要**特化**那个实例（换模块名、加能力包）时才手工改下面这些 —— 它们都由脚手架生成，别再抄一份：
 
 | 实例里的东西 | 是什么 | 你要动它吗 |
 |---|---|---|
-| `app.mbt` | 整套界面（顶栏 / 侧栏树 / 两模式状态机） | 改外观时动它 |
+| `app.mbt` | **只剩接线**（界面 P6 起住在程序包的 `shell/` 里） | 基本不用动；改外观看 `shell/theme.mbt` |
 | `content/` | **生成物**（`press` 写的），别手改 | 不动 |
 | `index.html` / `index.js` / `App.js` | 静态宿主三件 | 一般不动 |
 | `build-web.mjs` / `serve-web.mjs` | esbuild 打包 / 零依赖静态服务 | 一般不动 |
@@ -40,7 +64,7 @@ node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无�
 
 | 你放什么 | 站点上变成什么 |
 |---|---|
-| `<内容根>/skillpress/SKILL.md` | **首页**：H1 = 站名与大标题，首个 `##` 之前 = 首屏引言。⚠️ **已定要改（D19/D20，还没落地）**：首页的内容源要改成 `skillpress/WEBSITE.md`，`SKILL.md` 只讲工具本身 —— 今天仍读 `SKILL.md`。 |
+| `<内容根>/skillpress/SKILL.md` | **首页**（**回退**那一档）：H1 = 站名与大标题，首个 `##` 之前 = 首屏引言。✅ R2 已落地：首页源**优先** `<内容根>/skillpress/WEBSITE.md`，没有它才回退到 `SKILL.md`（`--home` 可显式指一份；判据 `tools/site-source.sh`）。首页那份 `SKILL.md` 讲工具本身。 |
 | 它里面的每个 `##` | 顶栏的**一条栏位**（换的是正文里的哪一节） |
 | `<内容根>/<别的名字>/SKILL.md` | 文档区里的**一份 skill**（侧栏按名字排序） |
 | `references/*.md` ｜ `FAQ.md` ｜ `scripts/*` | 那份 skill 的**子页**（树上展开） |
@@ -57,9 +81,9 @@ node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无�
 | 想改 | 去哪 |
 |---|---|
 | 配色 / 字号 / 间距 | 站点应用 `app.mbt` 顶部那组颜色常量（`c_bg` `c_ink` `c_accent` `c_head` …）与各处的 `font_size` |
-| 代码块**颜色** | 程序 `lib/highlight.mjs` 的 `PALETTE` ↔ 应用的 `tok_color`：**索引两边对齐，改要一起改** |
+| 代码块**颜色** | 程序 `engine/highlight/hl.mbt` 的调色板 ↔ 应用的 `tok_color`：**索引两边对齐，改要一起改** |
 | 页面骨架（顶栏 / 侧栏 / 两模式） | `app.mbt` 的 `view()` 与 `page_of()`；顶栏栏位由内容决定，**别写死** |
-| 一块**新构造**（图片 / 折叠…） | 两边一起改：`lib/gen-content.mjs` 解析 + `app.mbt` 渲染（解析边界刻意窄，见 refs） |
+| 一块**新构造**（图片 / 折叠…） | 两边一起改：`engine/content/blocks.mbt` 解析 + `shell/` 渲染（解析边界刻意窄，见 refs） |
 
 ⚠️ **不许手改 `content/content.generated.mbt`**（生成物）。改了内容源就重跑 `press`；
 生成物与源不一致时 `press --check` 会红，并指出**第一处差异**。
@@ -89,9 +113,9 @@ node ../skillpress/bin/skillpress.mjs verify         # 判据：真 Chrome 无�
 
 ## 六、还没做（别当成已支持）
 
-`pack`（一组 skill → 便携目录）｜ `attach`（挂进已有项目）｜ 界面抽成程序里的 `shell` 包
-（那时实例只剩几行 `@skillpress.site(...)`）｜ 锚点 / 目录 / 搜索 ｜ 窄屏折叠菜单 ｜ 生产 bundle
+`pack`（一组 skill → 便携目录）｜ 锚点 / 目录 / 搜索 ｜ 窄屏折叠菜单 ｜ 生产 bundle
 （现在是 dev 模式，约 6 MB，大头是 react-native-web）。
+（`attach` 与"界面抽成 `shell` 包"**都已经落地** —— 别再把它们列进"还没做"。）
 
 这些会变，**别当契约** —— 去程序的 `PLAN.md` 看。
 

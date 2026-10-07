@@ -5,8 +5,8 @@ description: gen-content 编出来的类型化数据、markdown 的解析边界�
 
 # 站点管线内部
 
-**什么时候读它**：你要动内容管线（`lib/gen-content.mjs`）、动上色（`lib/highlight.mjs`）、
-加一条站点判据（`lib/verify-site.mjs`），或者遇到"改了内容源但站点没变"。
+**什么时候读它**：你要动内容管线（`engine/content/`）、动上色（`engine/highlight/`）、
+加一条站点判据（`engine/site/checks.mbt`），或者遇到「改了内容源但站点没变」。
 
 ## 一、数据形状（内容包只有数据，渲染在应用里）
 
@@ -60,7 +60,7 @@ description: gen-content 编出来的类型化数据、markdown 的解析边界�
 
 ## 四、上色（构建期，tree-sitter）
 
-形状：`lib/highlight.mjs`（引擎）+ `grammars`（vendor 的 wasm 与 `highlights.scm`，
+形状：`engine/highlight/`（引擎）+ `grammars`（vendor 的 wasm 与 `highlights.scm`，
 出处与 sha256 见那份 `PROVENANCE.md`）。`web-tree-sitter` 是这台引擎**唯一**的 npm 依赖。
 
 两条硬规矩：
@@ -80,7 +80,7 @@ tree-sitter 会给出 ERROR 节点，而 **ERROR 里的东西一个 capture 都�
 闸门是 `audit`：用纯正则数出"必须上色的词法元素"，报召回率与漏色比例，越线即红
 （要准数就跑一遍）。
 
-## 五、站点判据怎么加一条（`lib/verify-site.mjs`）
+## 五、站点判据怎么加一条（`engine/site/checks.mbt`）
 
 判据清单的**家是那个脚本的文件头**（一张表：每条断言抓哪个失败模式）—— 加之前先读它。
 

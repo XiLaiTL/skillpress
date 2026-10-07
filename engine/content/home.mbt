@@ -114,7 +114,7 @@ pub struct HomeLit {
 /// `home_rel` = 首页源的内容根相对路径（如 `skillpress/WEBSITE.md`）—— **它不进索引**（D20）：
 /// 否则同一个文件**既当首页、又当书架里的一页**，两套渲染规矩打架，纯链接节还能指向首页自己。
 /// ⚠️ 回退那一路（首页是 `skillpress/SKILL.md`）本来就进不了索引 ⇒ 这一步在旧形状语料上是**空转**，
-/// `file-parity` 的对账因此不受影响。
+/// `engine-fixtures` 的对账因此不受影响。
 pub fn build_index(
   dirs : Array[String],
   refs_of : (String) -> Array[(String, String)],

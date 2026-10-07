@@ -1,0 +1,6 @@
+gen-content：内容里有解不开的东西（**不静默丢**，逐条点名）：
+  ✗ skills/bad/SKILL.md:5 不支持的构造（图片）：![行首图片](x.png)
+  ✗ skills/bad/SKILL.md:7 不支持的构造（原始 HTML）：<div>行首原始 HTML</div>
+  ✗ skills/bad/SKILL.md:9 表格缺分隔行
+  ✗ skills/bad/SKILL.md:14 代码块没闭合
+  ✗ skills/bad/references/sub.md:5 不支持的构造（图片）：![子页里的图片](y.png)

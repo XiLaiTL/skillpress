@@ -1,6 +1,6 @@
 ---
 title: 四个根：算法、两种布局、程序为什么在仓库外
-description: 程序/仓库/内容/实例四个根的定位算法（lib/roots.mjs 是唯一实现）、两种布局（兄弟 vs 嵌套）与"先找旁边的 moobile"、程序搬出内容仓的两次反复与代价、G3 的三个候选根、实例怎么指向程序。
+description: 程序/仓库/内容/实例四个根的定位算法（cmd/skillpress/cli/args.mbt + engine/site/entry.mbt 是唯一实现）、两种布局（兄弟 vs 嵌套）与"先找旁边的 moobile"、程序搬出内容仓的两次反复与代价、G3 的三个候选根、实例怎么指向程序。
 ---
 
 # 四个根
@@ -8,11 +8,11 @@ description: 程序/仓库/内容/实例四个根的定位算法（lib/roots.mjs
 **什么时候读它**：你要动任何与"文件在哪"有关的东西（路径、生成物落点、门的候选根），
 或者遇到"门/管线查的不是我以为的那份目录"。
 
-## 一、四个根与覆盖顺序（唯一实现在 `lib/roots.mjs`）
+## 一、四个根与覆盖顺序（唯一实现在 `cmd/skillpress/cli/args.mbt` + `engine/site/entry.mbt`）
 
 | 根 | 命令行 | 环境变量 | 默认 |
 |---|---|---|---|
-| **程序** | （由文件位置决定） | — | `lib/` 的上一层 = 本仓库根 |
+| **程序** | （由文件位置决定） | — | `cmd/` 的上一层 = 本仓库根 |
 | **仓库**（内容仓） | `--repo <目录>` | `SKILLPRESS_REPO` | **旁边的 `moobile/`**；找不到才退回"程序往上 3 层" |
 | **内容** | `--skills <目录>` | `SKILLPRESS_SKILLS` | `<内容仓>/skills` |
 | **实例** | `--app <目录>` | `SKILLPRESS_APP_DIR` | `<内容>/skillpress/scripts/.skillpress` |
@@ -30,7 +30,7 @@ description: 程序/仓库/内容/实例四个根的定位算法（lib/roots.mjs
 布局 A（现在）：兄弟                      布局 B（搬家前）：嵌套
 interest/                                <内容仓>/  moobile/
 ├── skillpress/   ★ 程序                  ├── skills/      ★ 内容
-│   ├── bin/ lib/ grammars/               └── examples/apps/skillpress/  ★ 程序
+│   ├── engine/ cmd/ grammars/            └── examples/apps/skillpress/  ★ 程序
 └── moobile/      ★ 内容仓
     └── skills/   ★ 内容
 ```
@@ -43,7 +43,7 @@ interest/                                <内容仓>/  moobile/
 
 - **为什么**：普通目录**看得见**（翻仓库的人一眼看到），而且**会跟着发布包走** ——
   实测 `moon package --list`：普通目录默认进包，点目录（`.agents` / `.dsh` / `.skillpress`）默认不进。
-- **默认值因此是**：`<仓库>/skills` 优先，老仓库退回 `.agents` 下的 `skills`（见 `lib/roots.mjs` 的 `defaultSkills`）。
+- **默认值因此是**：`<仓库>/skills` 优先，老仓库退回 `.agents` 下的 `skills`（见 `cmd/skillpress/cli/args.mbt` 的 `default_skills`）。
 - **代价**：`skills/` 不在 harness 的扫描根里（扫描根只有 `.dsh` 下的 `skills` 与 `.agents` 下的 `skills` 这两个），
   所以搬过去之后 agent **不会自动加载**它们。要两者都要，只有配 DSH 的 `customSkillDirs`；
   **别两边各放一份** —— 两份内容就是两份会漂的真相。
@@ -59,7 +59,7 @@ interest/                                <内容仓>/  moobile/
 | 候选根 | 谁用它 |
 |---|---|
 | **内容仓根** | 多数内容讲的是内容仓自己（`docs/**`、`examples/**`…） |
-| **程序根** | 内容里"这套工具在哪儿"的指针（`bin/skillpress.mjs`、`lib/check.mjs`、`grammars/PROVENANCE.md`） |
+| **程序根** | 内容里「这套工具在哪儿」的指针（`cmd/skillpress`、`engine/gates/`、`grammars/PROVENANCE.md`） |
 | **那个 skill 自己的目录** | 随 skill 一起发的工具（它自己的 `scripts` 子目录、`references/**`） |
 
 ⚠️ 程序根这一条是搬家时才补的：在那之前 `check.mjs` 里的"第二个根"写的是**内容仓根**

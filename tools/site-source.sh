@@ -214,34 +214,27 @@ printf '%s' "$(node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skil
 cp "$W/home.bak" "$SKILLPRESS_CORPUS/skillpress/WEBSITE.md"   # 撤回探针
 rm -rf "$P6"
 
-# ── ⑦ 门与**旧门**在同一份副本上逐字节一致 ──────────────────────────────────────
-# 为什么必须挪到副本上：R4 之后旧实现不认识忽略清单 ⇒ 在真语料上两边**必然**差出"被跳过的那一份"
-# （那不是 bug，是设计）。副本上没有清单、没有 WEBSITE.md ⇒ 读的内容相同 ⇒ 可以整份报告逐字节比。
-# ⚠️ 跑法要用**真仓库根**（旧门的 G5/G6 要靠那边的 `.mbt` 索引）+ **显式空清单**（不然默认路径会把
-#    真清单漏进来）。G5/G6 按 D18 不搬 —— 用真索引时它们在旧门那一侧**通过**，所以两边输出仍然相等。
-echo "⑦ 门在副本上与旧门逐字节一致"
-C10=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh 2>/dev/null) ||
-  bad "⑦ 造不出副本（前提不成立）"
-if [ -n "${C10:-}" ]; then
-  : > "$W/empty-ignore.md"
-  node lib/check.mjs --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" > "$W/gate-old.txt" 2>&1
-  ro=$?
-  # ⚠️ 跑的是**新 CLI**（`run-js.mjs check`），不是开发入口 —— 出厂那条路才是要钉的东西
-  node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --ignore "$W/empty-ignore.md" \
-    > "$W/gate-new.txt" 2>&1
-  rn=$?
-  if [ "$ro" = "$rn" ] && diff -q "$W/gate-old.txt" "$W/gate-new.txt" > /dev/null; then
-    ok "⑦ 旧门与新 CLI 在副本上**逐字节一致**（rc 都是 $ro，$(grep -c . "$W/gate-new.txt") 行）"
-  else
-    bad "⑦ 门对账不一致（旧 rc=$ro 新 rc=$rn）"
-    diff "$W/gate-old.txt" "$W/gate-new.txt" | head -8 | sed 's/^/      /'
-  fi
-fi
+# ── ⑦ （**已退役**）门与旧门在副本上逐字节一致 ──────────────────────────────
+# 2026-10-07（PLAN 的 D43）：这一步原来把「旧门（`lib/check.mjs`）的报告」与「新 CLI 的报告」
+# 在副本上逐字节比。旧门随 `lib/` 退役了 ⇒ 这个比法没有另一边了。
+#
+# ⚠️ **不把它换成「副本上全绿」**（我试过，它红了）：副本是**拿真语料拷来去掉 `WEBSITE.md`** 的，
+#    于是 `skillpress/SKILL.md` 就变回一份**普通 skill** —— 它满不满足 G2 取决于**内容仓当前长什么样**。
+#    拿一个随内容变化的东西当断言，就是又造一条会腐的基线（D29 那类错）。
+#
+# 它曾经证明的事已经记在别处：与旧门 **diff = 0**（75 行，PLAN 的 D31）、并换成了
+# `engine/gates/gates_wbtest.mbt` 里的 **22 条 wbtest**（`npm run check:selftest`）；而「门能跑」这件事
+# 由 `acceptance.sh` 的 A3 与下面的 ⑧ 落锁循环给着。
 
 # ── ⑧ 落锁（写侧）走一遍完整循环（**在临时程序根里做，真锁一个字都不碰**）──────────
 # 为什么单列：写侧是"让门变绿"的唯一入口，它坏掉的样子最危险 —— 要么悄悄不写、要么把别人的指纹
 # 一起锁掉。所以：落锁 ⇒ 不再报「新增」；改一个字节 ⇒ **必须**报「指纹变了」。
 echo "⑧ 落锁写侧（临时程序根）"
+# ⚠️ ⑦ 退役之后，这份「读法相同的副本」仍然要造 —— ⑧ 在它上面落锁、改一个字节，
+#    真语料一个字节都不碰（副本在 `_build/` 里）。
+C10=$(SKILLPRESS_CORPUS="$SKILLPRESS_CORPUS" bash tools/mk-parity-corpus.sh 2>/dev/null) ||
+  bad "造不出副本（⑧ 的前提不成立）"
+
 P7=$(mktemp -d)
 node tools/run-js.mjs check --repo "$SKILLPRESS_CORPUS/.." --skills "$C10" --program "$P7" \
   --update-lock > "$W/lock1.txt" 2>&1

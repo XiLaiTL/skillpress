@@ -1,0 +1,13 @@
+== MoonBit 引擎：全语料对账（7 份 .md）==
+alpha-skill/SKILL.md|bash|bash|裸着解析|dark=8|58
+beta-skill/SKILL.md|json|json|裸着解析|dark=14|97
+beta-skill/SKILL.md|toml|toml|裸着解析|dark=0|78
+beta-skill/SKILL.md|moonbit|moonbit|裸着解析|dark=1|144
+beta-skill/SKILL.md|javascript|javascript|裸着解析|dark=0|97
+beta-skill/SKILL.md|bash|bash|裸着解析|dark=14|104
+== 汇总（按语言）==
+  moonbit|1 块|dark=1|144|0.6944444444444444%
+  bash|2 块|dark=22|162|13.580246913580247%
+  json|1 块|dark=14|97|14.432989690721648%
+  javascript|1 块|dark=0|97|0%
+  toml|1 块|dark=0|78|0%

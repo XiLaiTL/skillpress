@@ -22,6 +22,19 @@ struct Entry {
 }
 
 ///|
+/// 条目的两个**访问器**：`Entry` 是抽象类型（跨包读不到字段，实测报
+/// `This expression has type ...Entry, which is a abstract type and not a struct`）。
+/// 脚手架 `attach` 要**沿用盘上那份清单** ⇒ 得把读出来的条目转成它自己那套类型，所以需要这两个。
+pub fn Entry::name(self : Entry) -> String {
+  self.name
+}
+
+///|
+pub fn Entry::reason(self : Entry) -> String {
+  self.reason
+}
+
+///|
 /// 解析结果：条目 + 问题清单（问题非空 ⇒ 调用方应当逐条点名并把退出码设成 2）。
 pub struct Parsed {
   entries : Array[Entry]
@@ -130,4 +143,19 @@ pub fn notice_lines(skipped : Array[Entry]) -> Array[String] {
     out.push("  ⊘ " + e.name + " —— " + e.reason)
   }
   out
+}
+
+///|
+/// 问题清单的**访问器** —— 与 `Entry::name` / `Entry::reason` 同一个理由：
+/// 字段是包私有的，跨包读不到（实测报 `... which is a abstract type and not a struct`）。
+///
+/// ⚠️ 拿到非空就应当**逐条点名并退 2**，而且**一份都不套用** —— "半套用"是最难查的状态。
+pub fn Parsed::problems(self : Parsed) -> Array[String] {
+  self.problems
+}
+
+///|
+/// 条目清单的**访问器**（同上）。顺序 = 盘上清单里的顺序，进判据。
+pub fn Parsed::entries(self : Parsed) -> Array[Entry] {
+  self.entries
 }
