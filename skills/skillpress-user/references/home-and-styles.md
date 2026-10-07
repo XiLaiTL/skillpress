@@ -46,18 +46,16 @@ description: 首页（那份叫 skillpress 的 skill）的写作规矩、markdow
 
 ## 三、改外观：配色、字号、代码颜色
 
-配色与字号都在站点应用的 `app.mbt` 里（文件顶部一组常量，改这里就换皮）：
+配色与字号**都在程序包里**（⚠️ **不在**实例的 `app.mbt` —— 那里只剩接线）：
 
-| 常量 | 管什么 |
+| 文件 | 管什么 |
 |---|---|
-| `c_bg` / `c_card` / `c_side` | 纸色底 / 卡片 / 文档区侧栏 |
-| `c_ink` / `c_ink2` / `c_ink3` | 正文三级字色 |
-| `c_accent` | 强调色（引用竖线、选中态） |
-| `c_line` / `c_code` | 分隔线 / 行内代码底色 |
-| `c_head` / `c_head_ink` / `c_head_ink2` / `c_head_on` | 顶栏底色 / 顶栏字色 / 次级字色 / 选中块 |
+| 程序的 `shell/tokens.mbt` | **设计 token 的唯一来源**：色值只在最底层的"原语"里写死；上面是语义色（`Palette`：一个用途一个名字，如 `indigo_light` / `paper_light`）、再上面是明暗不变量（间距 / 字号 / 行高 / 圆角，如 `fs_base` 15.5、`fs_h1` 30.0） |
+| 程序的 `shell/theme.mbt` | 把 `Palette` 按明暗（`Scheme`）与三态偏好（`Pref`）组装成 `Theme` **值**，跟着 Model 走；上色色号的翻译在 `Theme::tok_color` |
 
-字号在各处的 `font_size`（正文 ~14、栏目标题 ~17.5、H3 ~15、H4/小字 ~13.5）；
-标题、正文、引用、表格、代码块分别有自己的视图函数，改一处只影响那一类。
+铁律是"**渲染代码里不许出现字面色号**"：组件只引用语义名，换皮才只改一处。
+（⚠️ 以前那份"在 `app.mbt` 顶部改一组 `c_bg` / `c_ink` / `c_head` 常量"的写法**已经过期**：
+那些常量不存在了。）
 
 **代码块的颜色是另一条链**：色号（调色板的索引）由程序 `engine/highlight/hl.mbt` 决定，
 而"这个色号长什么样"由 `app.mbt` 的 `tok_color` 决定 —— **索引两边对齐，改要一起改**，
@@ -65,8 +63,8 @@ description: 首页（那份叫 skillpress 的 skill）的写作规矩、markdow
 
 ⚠️ 样式层的坑（改样式前值得知道）：这套界面是 moobile 的样式系统，
 RN 上有几条"写了不报错但没效果"的陷阱（按下一类、`transform` 每项只读第一个键、
-`position: sticky` 连构造器都没有、`View` 不滚动）。这些的家是内容仓的那份
-`skills/moobile-pitfalls/`，别在这儿重抄。
+`position: sticky` 连构造器都没有、`View` 不滚动）。这些的家是内容仓 moobile 那份讲坑的
+`moobile-pitfalls` skill，别在这儿重抄。
 
 ## 四、加一块新构造 = 两边一起改
 

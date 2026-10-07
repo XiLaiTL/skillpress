@@ -13,10 +13,10 @@ whenToUse: 你要**用** skillpress 做站点（一份 skill 变网站 / 多份 
 ```bash
 node ../skillpress/tools/press.mjs press              # 内容源 → 站点的内容包（生成物）
 node ../skillpress/tools/press.mjs --check            # 门：生成物与源一致吗
-bash ../skillpress/tools/verify.sh                   # 判据：22 条（真 Chrome；要一次 native 编译）
+bash ../skillpress/tools/verify.sh                   # 判据：23 条（真 Chrome；要一次 native 编译）
 ```
 
-站点判据的**现役**那一份是 `skillpress-native verify`（真 Chrome 无头 + CDP，22 条）——
+站点判据的**现役**那一份是 `skillpress-native verify`（真 Chrome 无头 + CDP，23 条）——
 ⚠️ **只有 native 那份有**（要一次 C 工具链）：站点判据要 async 的 http server / websocket /
 process，而它们在 `moonbitlang/async` 的 js 目标上没有实现。**实例里最省事的是 `npm run verify`**
 （实例的 `verify.mjs` 会把"引擎在哪、本实例在哪"接上去，找不到就明说 SKIP）。
@@ -80,9 +80,9 @@ node tools/run-js.mjs attach --repo <仓根> --skills <内容根>      [--ignore
 
 | 想改 | 去哪 |
 |---|---|
-| 配色 / 字号 / 间距 | 站点应用 `app.mbt` 顶部那组颜色常量（`c_bg` `c_ink` `c_accent` `c_head` …）与各处的 `font_size` |
-| 代码块**颜色** | 程序 `engine/highlight/hl.mbt` 的调色板 ↔ 应用的 `tok_color`：**索引两边对齐，改要一起改** |
-| 页面骨架（顶栏 / 侧栏 / 两模式） | `app.mbt` 的 `view()` 与 `page_of()`；顶栏栏位由内容决定，**别写死** |
+| 配色 / 字号 / 间距 | 程序的 `shell/tokens.mbt`（**设计 token 的唯一来源**：调色板 `Palette` + 字号/行高）与 `shell/theme.mbt`（明暗 × 三态偏好 → `Theme` 值）。⚠️ **不是实例的 `app.mbt`** —— 那里只剩接线，以前那组 `c_bg` / `c_ink` / `c_head` 常量**已经不存在了** |
+| 代码块**颜色** | 程序 `engine/highlight/hl.mbt` 产的色号 ↔ `shell/theme.mbt` 的 `Theme::tok_color`：**索引两边对齐，改要一起改** |
+| 页面骨架（顶栏 / 侧栏 / 正文） | 程序的 `shell/`（`site.mbt` 的 `view()`、`article.mbt`、`sidebar.mbt`…）；⚠️ 实例的 `app.mbt` 只剩 19 行接线（判据 A2 钉着"≤20 行"）。顶栏栏位由内容决定，**别写死** |
 | 一块**新构造**（图片 / 折叠…） | 两边一起改：`engine/content/blocks.mbt` 解析 + `shell/` 渲染（解析边界刻意窄，见 refs） |
 
 ⚠️ **不许手改 `content/content.generated.mbt`**（生成物）。改了内容源就重跑 `press`；
@@ -113,9 +113,9 @@ node tools/run-js.mjs attach --repo <仓根> --skills <内容根>      [--ignore
 
 ## 六、还没做（别当成已支持）
 
-`pack`（一组 skill → 便携目录）｜ 锚点 / 目录 / 搜索 ｜ 窄屏折叠菜单 ｜ 生产 bundle
-（现在是 dev 模式，约 6 MB，大头是 react-native-web）。
-（`attach` 与"界面抽成 `shell` 包"**都已经落地** —— 别再把它们列进"还没做"。）
+`pack`（一组 skill → 便携目录）｜ 首页里 `##` 的正文不上首页 ｜ 页内锚点的深链（`#section`）｜
+窄屏顶栏的折叠菜单 ｜ 预渲染（整站客户端渲染，`#root` 是空壳；搜索索引也在渲染期现算）。
+（本页目录 / 站内搜索 / 书架树 / `attach` / "界面抽成 `shell` 包"**都已经落地** —— 别再把它们列进"还没做"。）
 
 这些会变，**别当契约** —— 去程序的 `PLAN.md` 看。
 
@@ -128,6 +128,6 @@ node tools/run-js.mjs attach --repo <仓根> --skills <内容根>      [--ignore
 | 投影规范：收录判据 / 结构 / 预算 / 站点边界 | 程序 `SPEC.md`（§2 / §3 / §8） |
 | 集合划分、产出顺序 | 程序 `SKILLS.md` |
 | 计划与未做 | 程序 `PLAN.md` |
-| 目录形状（程序 / 内容 / 实例三个根） | `skills/skillpress/references/layout.md` |
-| 站点管线内部（数据形状、两种模式、上色细则） | `skills/skillpress/references/site-pipeline.md` |
+| 目录形状（程序 / 内容 / 实例四个根、两种布局） | 另一份 skill `skillpress-dev`（程序侧）：`skills/skillpress-dev/references/roots.md` |
+| 站点管线内部（数据形状、两种模式、上色细则） | 同上（程序侧）：`skills/skillpress-dev/references/pipeline.md` |
 | 改**程序本身**（引擎 / 门 / 判据） | 另一份 skill：`skillpress-dev` |

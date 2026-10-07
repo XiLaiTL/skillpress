@@ -1,5 +1,5 @@
 ///|
-/// **站点判据（P8.3）的入口** —— 自起静态服务 + 起无头 Chrome + 走 CDP 跑那 22 条断言。
+/// **站点判据（P8.3）的入口** —— 自起静态服务 + 起无头 Chrome + 走 CDP 跑那 23 条断言。
 ///
 /// ⚠️ 这个包是**库**（不是可执行件）：入口在 **`cmd/skillpress-native`**（`verify` / `dump-corpus`
 ///    两个子命令），因为分发必须落在可执行件那一层 —— moon 没有条件 import，而共享的
@@ -120,7 +120,7 @@ pub fn run_dump_corpus(args : Array[String]) -> Unit {
 }
 
 ///|
-/// 站点判据主流程（参数解析 → 语料 → 起服务 → 起浏览器 → 22 条断言 → 收尾退出）。
+/// 站点判据主流程（参数解析 → 语料 → 起服务 → 起浏览器 → 23 条断言 → 收尾退出）。
 ///|
 /// **站点判据的入口**（两个子命令都自己 `@sys.exit`，不返回）：
 ///
@@ -163,7 +163,7 @@ fn cmd_index(args : Array[String], names : Array[String]) -> Int {
 }
 
 ///|
-/// `verify`：自起静态服务 + 起无头 Chrome + 走 CDP 跑那 22 条断言。
+/// `verify`：自起静态服务 + 起无头 Chrome + 走 CDP 跑那 23 条断言。
 async fn run_verify(args : Array[String]) -> Unit {
   @gnative.set_binary_stdio()
   let host = @gnative.native_host()
@@ -338,7 +338,7 @@ async fn run_verify(args : Array[String]) -> Unit {
       }
     }
 
-    // ④ 连上、握手、导航，然后跑 22 条断言
+    // ④ 连上、握手、导航，然后跑 23 条断言
     let cdp = Cdp::connect(ws_url)
     let results = Results::new()
     let ctx : Ctx = {

@@ -28,8 +28,8 @@ node tools/run-js.mjs check               # 门：skill 自己（G1–G8）
 moon test engine/gates                   # 证伪：22 条 wbtest，诱饵必须全被点名
 node tools/press.mjs --check              # 生成物与源一致吗
 # facts（事实来源对账）按 D18 住在**内容仓**：moobile/tools/skillpress-gates.mjs --gate facts
-node tools/run-js.mjs audit               # 上色的闞8门（召回率 / 漏色比例）
-bash tools/verify.sh                     # 站点判据（22 条；**要一次 native 编译**）
+node tools/run-js.mjs audit               # 上色的回归闸门（召回率 / 漏色比例）
+bash tools/verify.sh                     # 站点判据（23 条；**要一次 native 编译**）
 ```
 
 站点判据的**现役**那一份在 native CLI 里（要 C 工具链；js 那条路上 `moonbitlang/async`
@@ -46,7 +46,7 @@ _build/native/debug/build/cmd/skillpress-native/skillpress-native verify [--skil
 |---|---|
 | `engine/gates/` 的判据 | `moon test engine/gates`（22 条 wbtest）—— **新判据必须配诱饵**，否则等于没加 |
 | `engine/content/` / `engine/highlight/` | `bash tools/engine-fixtures.sh`（四份读数 vs 入库 golden；有意的变化就 `--capture` 重采）；上色的改动还要 `node tools/run-js.mjs audit` |
-| `engine/site/**`（站点判据**本体**） | `bash tools/verify.sh`（22 条，真 Chrome）；加断言照 `engine/site/checks.mbt` 里那张表写（每条抓哪个失败模式），加完跑 `bash tools/engine-fixtures.sh` |
+| `engine/site/**`（站点判据**本体**） | `bash tools/verify.sh`（23 条，真 Chrome）；加断言照 `engine/site/checks.mbt` 里那张表写（每条抓哪个失败模式），加完跑 `bash tools/engine-fixtures.sh` |
 | `cmd/skillpress-native/**`（站点判据的**入口**） | 同上（`verify` 只有 native 那份有） |
 | `facts`（按 D18 住在**内容仓**） | `moobile/tools/skillpress-gates.mjs --gate facts` |
 | `grammars/**` | `audit` + 更新 `grammars/PROVENANCE.md` 的 sha256 |
@@ -118,12 +118,12 @@ node tools/run-js.mjs check --skills skills --update-lock
 
 - **引擎已经是 MoonBit**（`engine/**`）—— 残余的 `.mjs` 只有三个跨进程的工具（`press` / `dom-dump` / 引导层）。
   迁移的阶段与读数在 `PLAN.md` 的 P8。**不单独发 npm 包了。**
-- **还没发布**：靠源码路径调用（`node tools/run-js.mjs …` / `bash tools/verify.sh`）；发布形态见 P8 与 P6。
+- **已发布**：registry 上这一版是 `XiLaiTL/skillpress@0.1.1`（`tools/published-check.sh` 验过：装得下来、在别的工程里编得过）；本仓开发期仍走源码路径（`node tools/run-js.mjs …` / `bash tools/verify.sh`）。
 - `pack` **还没做**：命令存在，但会明说"还没做"并非零退出（不做"看着像跑了"的假动作）。
   （`attach` **已落地**，见 `PLAN.md` 的 P9 与 `engine/scaffold/`。）
 - 界面**已经抽成 `shell` 包**（P6）：实例的 `app.mbt` 只剩接线。
 - ⚠️ 引擎迁移的**进度**只有一处答案：`PLAN.md` 的 P8（这份清单里原先那句"引擎今天还是 Node"
-  已经过期 —— 内容管线、通用门、上色与站点判据都已经是 MoonBit，**`lib/` 与 `bin/` 已经整体退役**（D43））。
+  已经过期 —— 内容管线、通用门、上色与站点判据都已经是 MoonBit，**`lib` 与 `bin` 两个旧目录已经整体退役**（D43））。
 
 ## 七、指针
 

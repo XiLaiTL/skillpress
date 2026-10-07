@@ -78,7 +78,7 @@ async fn wait_raw(cdp : Cdp, sub : String, tries : Int) -> Bool raise {
 }
 
 ///|
-/// 主流程：22 条断言，顺序与旧实现一致。
+/// 主流程：23 条断言，顺序与旧实现一致。
 pub async fn run_flow(ctx : Ctx) -> Unit raise {
   let cdp = ctx.cdp
   let r = ctx.results

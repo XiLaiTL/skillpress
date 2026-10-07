@@ -28,7 +28,7 @@ preferred_target = "js"
 //    要拆开只能把 skillpress 拆成两个模块（引擎一个、界面一个）。
 //
 // ⚠️ `moonbitlang/async` 是 **P8.3 站点判据**带来的依赖（`engine/site/`：自起静态服务 +
-//    起无头 Chrome + 走 CDP 跑 22 条断言）。**它不额外增加任何下载**：这个版本本来就已经是
+//    起无头 Chrome + 走 CDP 跑 23 条断言）。**它不额外增加任何下载**：这个版本本来就已经是
 //    传递依赖（`mizchi/markdown` 要 `async@0.20.3`、`XiLaiTL/moobile` 要 `async@0.21.0`
 //    ⇒ 解析出来就是下面这个 0.21.0）。直接声明只是"我确实要用它"的如实记录。
 //    ⚠️ **代价照写**：`async` 的 websocket / http-server / process 在 **js 上没有实现**

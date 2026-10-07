@@ -18,6 +18,11 @@
 #                     按 D18 跟 `facts` 一起**搬进内容仓根**了，不再是这份包的东西。）
 #   moon.mod ｜ README.md ｜ SPEC.md ｜ SKILLS.md ｜ DRIFT.md ｜ PLAN.md
 #   LICENSE ｜ THIRD-PARTY-NOTICE.md
+#   CONTRIBUTING.md  改程序那一侧的入口（门的清单、CLI 全表、改什么跑什么）——
+#                    README 同时是 mooncakes 上的门面，所以它指过去的那份也得在包里。
+#   assets/**        README 里那两张站点截图（`site-home.png` / `site-doc.png`）。
+#                    ⚠️ 图是**事实**：界面一改它就过期，重拍命令写在 CONTRIBUTING.md §7。
+#                    留着不发的话，mooncakes 上的 README 会挂着两张断图 —— 那比多发 300 KB 更糟。
 #
 # ── 刻意**不**发布的（每条都有理由，别默默加回来）──────────────────────────────
 #

@@ -4,7 +4,7 @@
     "skillpress-dev": {
       "files": 4,
       "lines": 410,
-      "bytes": 29913,
+      "bytes": 30062,
       "rows": 75,
       "codeBlocks": 5,
       "root": "D:\\ai_project\\interest\\skillpress\\skills"
@@ -12,8 +12,8 @@
     "skillpress-user": {
       "files": 3,
       "lines": 328,
-      "bytes": 20425,
-      "rows": 84,
+      "bytes": 21279,
+      "rows": 81,
       "codeBlocks": 6,
       "root": "D:\\ai_project\\interest\\skillpress\\skills"
     },
@@ -75,8 +75,8 @@
     },
     "skillpress/WEBSITE.md": {
       "files": 1,
-      "lines": 63,
-      "bytes": 3764,
+      "lines": 30,
+      "bytes": 1914,
       "rows": 0,
       "codeBlocks": 1,
       "root": "D:\\ai_project\\interest\\moobile\\skills"

@@ -16,12 +16,14 @@ description: 站点怎么从内容源长出来：一个 skill 的最小站点、
 | **内容** | `<内容仓>/skills/`（可以换成任何目录：`--skills`） | **你写的 skill** |
 | **实例** | 一个 MoonBit 工程（现成的在 `skills/skillpress/scripts/.skillpress/`） | 界面 + 宿主 + 生成物 |
 
-`press` 把**内容**读出来、写进**实例**的 `content/content.generated.mbt`；界面住在实例的 `app.mbt` 里。
-三个根怎么定位（`--repo` / `--skills` / `--app` 与环境变量）见 `skills/skillpress/references/layout.md`。
+`press` 把**内容**读出来、写进**实例**的 `content/content.generated.mbt`；界面住在**程序包的
+`shell/`** 里（P6 起），实例的 `app.mbt` 只剩接线。
+四个根怎么定位（`--repo` / `--skills` / `--app` 与环境变量、两种布局）见另一份 skill
+`skillpress-dev`（程序侧）：`skills/skillpress-dev/references/roots.md`。
 
 ## 二、一份 skill 的最小站点
 
-1. 内容根里建 `<内容根>/skillpress/SKILL.md` —— ⚠️ **首页那份的名字写死是 `skillpress`**（⚠️ **已定要改（D19/D20，还没落地）**：首页的内容源要改成 `skillpress/WEBSITE.md`，`SKILL.md` 只讲工具本身 —— 今天仍读 `SKILL.md`。）：
+1. 内容根里建 `<内容根>/skillpress/SKILL.md` —— ⚠️ **首页那份的目录名写死是 `skillpress`**（✅ **已落地（D19/D20）**：首页源优先 `<内容根>/skillpress/WEBSITE.md`，没有它才回退 `SKILL.md`；`--home` 可显式指一份）：
    生成器直接取 `join(SKILLS, "skillpress", "SKILL.md")`，名字不对**报错**，不会静默给你一个空首页。
 2. 写它 —— H1 = 站名与首屏大标题，首个 `##` 之前 = 首屏引言，每个 `##` = 顶栏一条栏位。
 3. `press` → `press --check`。
