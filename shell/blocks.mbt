@@ -145,10 +145,19 @@ fn heading(
   weight : @style.FontWeight,
   top : Double,
   bottom : Double,
+  anchor : String?,
 ) -> @html.Html {
   let p = theme.palette
+  // 锚点（`id`）挂在**外层那个 div** 上：滚到它 = 滚到这一节的开头（含上边距），
+  // 而不是滚到文字叶子那儿（那样会贴着字、看起来像少滚了一点）。
+  // ⚠️ `id` 这条通道是 moobile 的**节点寻址**：RNW 落到 DOM 的 `id`，RN 侧 `id` 优先于 `nativeID`。
+  let base = attrs(@style.Style::new().margin_top(@style.px(top)).margin_bottom(@style.px(bottom)))
+  let box = match anchor {
+    Some(a) => base.id(a)
+    None => base
+  }
   @html.div(
-    attrs=attrs(@style.Style::new().margin_top(@style.px(top)).margin_bottom(@style.px(bottom))),
+    attrs=box,
     [
       inline_text(
         theme,
@@ -211,7 +220,7 @@ fn body_text(theme : Theme) -> @style.Style {
 }
 
 ///| 一个块 → 视图。
-pub fn block_view(theme : Theme, b : Block) -> @html.Html {
+pub fn block_view(theme : Theme, b : Block, anchor : String?) -> @html.Html {
   let p = theme.palette
   match b {
     Hr =>
@@ -226,9 +235,10 @@ pub fn block_view(theme : Theme, b : Block) -> @html.Html {
         ([] : Array[@html.Html]),
       )
     // 标题层级 3 档（DESIGN §1 A2）：h2 48/16、h3 32/12、h4 24/8
-    H2(sp) => heading(theme, sp, fs_h2, @style.FontWeight::W700, sp7, sp4)
-    H3(sp) => heading(theme, sp, fs_h3, @style.FontWeight::W600, sp6, sp3)
-    H4(sp) => heading(theme, sp, fs_base, @style.FontWeight::W600, sp5, sp2)
+    H2(sp) => heading(theme, sp, fs_h2, @style.FontWeight::W700, sp7, sp4, anchor)
+    H3(sp) => heading(theme, sp, fs_h3, @style.FontWeight::W600, sp6, sp3, anchor)
+    // h4 不进目录 ⇒ 没有锚点（口径与 `toc_of` 一致：只数 h2/h3）
+    H4(sp) => heading(theme, sp, fs_base, @style.FontWeight::W600, sp5, sp2, None)
     P(sp) =>
       @html.div(
         attrs=attrs(@style.Style::new().margin_bottom(@style.px(sp4))),
@@ -264,8 +274,28 @@ pub fn block_view(theme : Theme, b : Block) -> @html.Html {
 ///|
 /// 一串块 → 视图（正文那一栏的内容）。
 pub fn blocks_view(theme : Theme, blocks : Array[Block]) -> @html.Html {
+  // ⚠️ 锚点编号**只数 h2/h3**（h4 不进目录）—— 与 `toc.mbt` 的 `toc_of` 同一口径。
+  //    两处各数一遍是刻意的：让"目录第 i 条"与"正文第 i 节"由**同一份 blocks 的顺序**决定，
+  //    而不是靠谁记住传给谁。改口径时两边一起改（`heading_anchor` 只有一处实现）。
+  let kids : Array[@html.Html] = []
+  let mut k = 0
+  for b in blocks {
+    let is_section = match b {
+      H2(_) => true
+      H3(_) => true
+      _ => false
+    }
+    let anchor = if is_section {
+      let a = heading_anchor(k)
+      k = k + 1
+      Some(a)
+    } else {
+      None
+    }
+    kids.push(block_view(theme, b, anchor))
+  }
   @html.div(
     attrs=attrs(@style.Style::new().flex_direction(@style.FlexDirection::Column)),
-    blocks.map(fn(b) { block_view(theme, b) }),
+    kids,
   )
 }

@@ -895,6 +895,7 @@ js 那条路的行为**没变**（`press --check` ×2 + 门 + 29 条 wbtest 全�
 | 4 | **判据全绿** | 十三条，一条都不能少：`acceptance.sh`（A1/A2/A3）｜`file-parity`（含 `--selftest` 五条）｜`blocks-parity`｜`highlight-parity`｜`blocks-fixtures`（含夹具四）｜`native-parity`（**两个 target 的产物逐字节一致** + 六条诱饵）｜`site-source`（R2 首页源 + R4 忽略清单 + D20 指纹）｜`line-budget`（R9）｜`diagnostics-ledger`（诊断口径账本）｜`mbt-traps`（MoonBit 坑位）｜`shell-traps`（双引号里的反引号 = **会真的执行**）｜`package-check`（第 2 条）｜`consumer-check`（从 zip 出发的消费者视角）—— 再加 `fresh-clone-check.sh`：**干净克隆 + 现编下也是这些读数**；发布之后再加 `published-check.sh`（第 7 条：从 registry 装下来、在别的工程里编过） |
 | 5 | **凭据** | `moon login`（**需要用户**）—— 到这一步先问 |
 | 6 | 发布 | `moon publish` |
+| 7′ | **⚠️ 发布前必须抬 moobile 的版本锚点** | `shell/` 用了 moobile 的**节点寻址**（`@sub.scroll_to_node` / `node_rect` / `node_scroll_top`），而那是**未发布**的 API —— 今天靠程序根的 `moon.work` 吃**本地源码**（前提：内容仓在兄弟目录 `../moobile`）。**发出带这三个 API 的 moobile 版本之后**：把 `moon.mod` 里 `XiLaiTL/moobile@0.5.0` 抬到新版本，然后**删掉 `moon.work`**。⚠️ 在此之前，**从干净克隆单跑 `moon check` 会红**（克隆里没有兄弟仓、registry 上也没有那三个 API）—— 这是**已知的过渡代价**，不是没做 |
 | 7 | **发布后：外部视角** | 另一个工程 `moon add XiLaiTL/skillpress@<ver>` → `moon check` 编过（**这才是 A1 的注册表那条判据** —— 本地工作区那套不算数）；再跑一次 `tools/acceptance.sh` |
 
 ⚠️ `moon package --list` 的读数**只在模块没人在改时可信**（实测：有子代理在改时它会报"20 个错误"，

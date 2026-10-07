@@ -53,7 +53,7 @@ fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
   } else {
     None
   }
-  let toc_side : @html.Html? = if rail >= 3 { Some(toc_rail(theme, toc)) } else { None }
+  let toc_side : @html.Html? = if rail >= 3 { Some(toc_rail(theme, toc, emit)) } else { None }
   // 窄屏那一层：rail 1 才画（贴边按钮 + 两级交互 + sheet）。
   // ⚠️ 它必须挂在**根**里（`shell` 的最后一个孩子）：根不滚 ⇒ 绝对定位等价于 fixed。
   let overlay : Array[@html.Html] = if rail == 1 {

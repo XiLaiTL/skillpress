@@ -100,6 +100,9 @@ pub enum Msg {
   CloseSheet
   /// 键盘按下（今天只用它认 Esc）
   Key(String)
+  /// **点目录某一条**：滚到正文里那一节的锚点（下标 = 目录里的第几条，从 0 数）。
+  /// 动作由 `@sub.scroll_to_node` 发 —— 见 `shell/toc.mbt` 的账。
+  TocTo(Int)
   /// **地址变了**：后退 / 前进 / 手改地址 / 点同文档链接（`on_url_changed` 递过来的是整条 URL）。
   /// 载荷是 hash 那一段（`#/…`）—— 与 `route.mbt` 的解析口径一致。
   UrlChanged(String)
@@ -205,6 +208,11 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
     Resized(w) => ({ ..model, vw: w }, @cmd.none)
     /// 两级：第一次点只让按钮**浮出**，第二次点才弹 sheet；点开着的那一个 = 收起
     /// （DESIGN §4.3："平时贴边停靠 → 第一次点浮出来 → 第二次点弹层"）。
+    TocTo(i) =>
+      // 滚到那一节。⚠️ 节点名由 `heading_anchor(i)` **两边各自算**（目录行与正文标题），
+      //    口径是"第 i 个 h2/h3" —— 同一次渲染里两边数出来的顺序必然一致。
+      //    `block="start"` = 让那一节**顶到内容区上沿**（与站点"跳过去"的语义一致）。
+      (model, @sub.scroll_to_node(heading_anchor(i), block="start"))
     Tap(i) =>
       if model.peek == 0 {
         ({ ..model, peek: 1 }, @cmd.none)
