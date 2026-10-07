@@ -26,7 +26,17 @@ SRC=$(cd "$(dirname "$0")/.." && pwd -W)
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定内容仓（例：../moobile/skills）}"
 export SKILLPRESS_CORPUS
 
-W=$(mktemp -d)
+# ⚠️ 克隆**必须落在本仓的兄弟目录里**（2026-10-07 改）：
+#    本仓根上的 `moon.work` 有一条成员是 `../moobile`（开发期吃本地 moobile 源码用），
+#    `skills/skillpress/scripts/.skillpress/moon.work` 里那条 `../../../../../moobile` 同理 ——
+#    克隆到 `mktemp -d` 那种随便哪都行的地方，`moon build` 会报
+#    "failed to resolve workspace member `../moobile`"（os error 2），
+#    于是**六条判据一起红**，而真因是"克隆摆错了地方"，不是代码坏了（实测踩到）。
+#    `moon.work` 的文件头写着这条前提（"位置不对时 moon check 会报找不到模块"）——
+#    这里照它做，并把临时目录放在程序根的兄弟位上。
+W="$(cd "$(dirname "$0")/.." && pwd -W)/../.sp-fresh-clone-$$"
+rm -rf "$W"
+mkdir -p "$W"
 C="$W/clone"
 trap 'cd /; rm -rf "$W"' EXIT
 echo "干净克隆自查 —— 源：$SRC"

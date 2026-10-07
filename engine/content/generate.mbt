@@ -36,6 +36,9 @@ pub fn gen_content_full(
   script_kids : (String) -> Array[String],
   note : (String) -> Unit,
   license : String,
+  // 图片在站点上的目录前缀（`--asset-base`，如 `img/`）。**站点把图放哪儿是站点的事** ——
+  // 引擎只负责把"相对那份 md 的路径"折成"内容根里的规范路径"（见 `links.mbt` 的 `asset_src`）。
+  asset_base : String,
 ) -> Generated raise {
   let problems : Array[String] = []
   // ⓪ 首页源**先**选好（R2/D20）：索引与 kids 都要用它把首页源排除出去（首页不算子页）
@@ -71,6 +74,7 @@ pub fn gen_content_full(
         parse_blocks(body, "skills/" + d + "/SKILL.md", fn(p) { problems.push(p) }),
         "skills/" + d + "/SKILL.md",
         index,
+        asset_base,
       ),
       kids: read_kids(
         root + "/" + d,
@@ -80,11 +84,12 @@ pub fn gen_content_full(
         fn(p) { problems.push(p) },
         pick.label,
         index,
+        asset_base,
       ),
     })
   }
   // ③ 首页（源已经选好；这里只解析）
-  let hr = read_home(pick, index)
+  let hr = read_home(pick, index, asset_base)
   for p in hr.problems {
     problems.push(p)
   }
@@ -122,19 +127,20 @@ pub fn gen_content_full(
     })
   }
   // ⑤ 发射（顺序与空行都照抄旧实现）
-  let out = header_lines()
-  // 这条注释里点名的**首页源**要与实际用的一致（否则生成物在撒谎）。
-  // ⚠️ 回退那一路必须与旧实现**逐字节一致** —— 旧实现把 `skills/skillpress/SKILL.md` 写死在这句里，
-  //    而这句话在归一化规则里**不会被抹掉**（规则①只抹开头的 `//` 块，`///|` 文档注释算正文）。
-  //    所以内容根口径写成 `skills/<相对路径>`；`--home` 覆盖时就用给的那条路径（那是"用户指定"，不猜）。
-  let home_src = if hr.source == "" {
+  // 首页源：`///|` 那条文档注释与文件头那句注释**都要用真的那个**（见下面各自的说明）。
+  let home_src0 = if hr.source == "" {
     "skills/skillpress/SKILL.md"
   } else if hr.source.has_prefix("skillpress/") {
     "skills/" + hr.source
   } else {
     hr.source
   }
-  out.push("///| 首页（来自 `" + home_src + "`）。")
+  let out = header_lines(home_src0)
+  // 这条注释里点名的**首页源**要与实际用的一致（否则生成物在撒谎）。
+  // ⚠️ 回退那一路必须与旧实现**逐字节一致** —— 旧实现把 `skills/skillpress/SKILL.md` 写死在这句里，
+  //    而这句话在归一化规则里**不会被抹掉**（规则①只抹开头的 `//` 块，`///|` 文档注释算正文）。
+  //    所以内容根口径写成 `skills/<相对路径>`；`--home` 覆盖时就用给的那条路径（那是"用户指定"，不猜）。
+  out.push("///| 首页（来自 `" + home_src0 + "`）。")
   out.push("pub fn home() -> " + REC + "Home {")
   match home {
     Some(h) => for line in home_lit_lines(h, "  ") {
@@ -182,14 +188,25 @@ pub fn gen_content_full(
     }
   }
   if hr.source != "" && !seen.contains(hr.source) {
-    pairs.push((hr.source, @gates.fingerprint(read(root + "/" + hr.source))))
+    // ⚠️ 指纹要用**这次真的用到的那份文本**（`pick.text`），**不许**用 `read(root + "/" + hr.source)` 再读一遍
+    //    （2026-10-07 修，实测的后果是**产物不幂等**）：
+    //    首页这份文件被**两条路径**读 —— ① `pick_home` 用的是调用方给的**标签**（可能是相对路径，
+    //    也可能是 `--home` 指的一条绝对路径）；② 这里的指纹当初按"内容根 + 标签"拼了个绝对路径。
+    //    于是调用方那个"虚拟读"（`attach` 用它在首页还没落盘时喂一份计划稿）**只命中 ① 那条**：
+    //    第一次 `attach` 时盘上还没有 `WEBSITE.md` ⇒ 指纹算的是**空串**，第二次跑文件已经在了
+    //    ⇒ 指纹变了 ⇒ `attach-check` 的"幂等"那一条红（而页面照常渲染，只是内容包悄悄换了）。
+    //    **同一份内容两个读法 = 迟早分叉**；这里收成一处：文本同一个，指纹自然同一个。
+    pairs.push((hr.source, @gates.fingerprint(pick.text)))
   }
   out.push("")
   for line in footer_lit_lines({ license: license, fingerprint: footprint_of(pairs) }) {
     out.push(line)
   }
   // llms.txt（Agent 出口）：同一份解析产出的第二件产物（见 Generated 的注释）。
-  let llms = llms_lines(home, filled).fold(init="", fn(acc, l) { acc + l + "\n" })
+  // ⚠️ 第三个参数是**这次真的选中的首页源**（`hr.source`：`skillpress/WEBSITE.md`，或回退时的
+  //    `skillpress/SKILL.md`）—— 首页那条原文路径**不许写死**（那会让"没写 WEBSITE.md 的工程"
+  //    印出来的 llms.txt 指一份不存在的文件，`press` 当场停下。见 `llms_lines` 的注释）。
+  let llms = llms_lines(home, filled, hr.source).fold(init="", fn(acc, l) { acc + l + "\n" })
   { mbt: out.fold(init="", fn(acc, l) { acc + l + "\n" }), llms, problems }
 }
 
@@ -205,7 +222,10 @@ pub fn gen_content(
   script_kids : (String) -> Array[String],
   note : (String) -> Unit,
   license : String,
+  // ⚠️ 这一层是**旧口径的薄包装**（老判据/探针在用）：给一个默认前缀，别逼所有调用方都改。
+  //    真源只有一处（`--asset-base`），这里只是它的默认值。
+  asset_base? : String = "img/",
 ) -> (String, Array[String]) raise {
-  let g = gen_content_full(root, dirs, home_file, read, md_kids, script_kids, note, license)
+  let g = gen_content_full(root, dirs, home_file, read, md_kids, script_kids, note, license, asset_base)
   (g.mbt, g.problems)
 }

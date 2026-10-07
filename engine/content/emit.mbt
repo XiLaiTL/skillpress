@@ -88,6 +88,7 @@ pub fn emit_block(b : Block, pad : String) -> String {
     Quote(spans) => pad + REC + "Quote(" + span_list(spans) + "),"
     Code(lang, text, runs) =>
       pad + REC + "Code(\"" + esc(lang) + "\", \"" + esc(text) + "\", " + run_list(runs) + "),"
+    Image(alt, src) => pad + REC + "Image(\"" + esc(alt) + "\", \"" + esc(src) + "\")," 
     Ul(items) => {
       let parts : Array[String] = []
       for it in items {

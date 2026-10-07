@@ -32,7 +32,7 @@
  *    `tools/consumer-check.sh` 拿它证明"只想跑门的人不被高亮挡住"。
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -53,6 +53,43 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  * 表现是"改了没生效"，而且 `moon build` 还会说 "no work to do"（它按**新**路径判新鲜度）。
  * ⇒ 修法：**两处都找**、取**最新**的那份；一条都没有就报错并给出怎么编。
  */
+/** 引擎源码里**最新**的那个 mtime（`engine/` + `cmd/` + 根包的那些 `.mbt`）—— 判"产物是不是旧的"。 */
+function newestSourceMtime() {
+  let newest = 0;
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name === "_build" || e.name === "node_modules" || e.name === ".git") continue;
+      const full = join(dir, e.name);
+      // ⚠️ **native-only 的源不算 js 产物的新鲜度**（2026-10-07 实测的第二次假红）：
+      //    `engine/site/**`（站点判据那一包）与 `cmd/skillpress-native/**` 只编 native
+      //    （`moon.pkg` 里 `supported_targets = "+native"`）⇒ 改了它们，`moon build cmd/skillpress --target js`
+      //    本来就不该重编（它说 "no work to do"，是对的），而这一层要是把它们算成源码，
+      //    就会红在"产物比源码旧"上，把所有 `node tools/run-js.mjs …` 全堵住。
+      //    判据只该盯"能被编进 js 产物的那些文件" —— 与下面排除 `*_wbtest.mbt` 是同一条道理。
+      if (full.includes("engine" + sep + "site") || full.includes("cmd" + sep + "skillpress-native")) continue;
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith(".mbt") || e.name === "moon.pkg" || e.name === "moon.mod") {
+        // ⚠️ **白盒测试文件不算"源码"**（2026-10-07 实测的假红）：`*_wbtest.mbt` 只被
+        //    `moon test` 编，**不进 js 产物** —— 改了它之后 `moon build` 说 "no work to do"（对），
+        //    而这一层要是把它算成源码，就会红在"产物比源码旧"上，把人堵在门口
+        //    （实测：改一条测试的期望值 ⇒ 所有 `node tools/run-js.mjs …` 全被拒）。
+        //    判据只该盯"能被编进产物的那些文件"。
+        if (e.name.endsWith("_wbtest.mbt")) continue;
+        const m = statSync(full).mtimeMs;
+        if (m > newest) newest = m;
+      }
+    }
+  };
+  for (const d of ["engine", "cmd", "launcher", "tools/mbtools"]) walk(join(ROOT, d));
+  return newest;
+}
+
 function builtCli() {
   const candidates = [
     join(ROOT, "_build", "js", "debug", "build", "cmd", "skillpress", "skillpress.js"),
@@ -83,6 +120,28 @@ function builtCli() {
   }
   if (found.length > 1 && process.env.SKILLPRESS_CLI_DEBUG) {
     console.error(`· 有多份 js 产物，用最新的那份：${p}`);
+  }
+  // ⚠️⚠️ **新鲜度自检**（2026-10-07 一天之内被这条咬了三次，所以它现在是一条硬拦）：
+  //    判据读的是**编出来的 js**，而"源码比产物新"这件事**不会自己喊** ——
+  //    `moon build` 有时会说 "no work to do"（它按自己那套路径判新鲜度）、
+  //    而这里读的可能正是上一次留下的那份 ⇒ 表现是**"改了没生效"**，
+  //    排查一次要半小时（真发生过三次：`Span::Link` / 首页折键 / 图片块）。
+  //    ⇒ 拿"最新源码的 mtime"与"产物的 mtime"比：源码更新就**当场停下**并给出怎么编。
+  //    （要故意跑旧产物：`SKILLPRESS_ALLOW_STALE=1`。）
+  if (!process.env.SKILLPRESS_ALLOW_STALE) {
+    const newest = newestSourceMtime();
+    if (newest > statSync(p).mtimeMs) {
+      console.error(
+        `✗ 引擎源码比这份 js 产物**新**（源码 ${new Date(newest).toLocaleString()} > 产物 ${new Date(statSync(p).mtimeMs).toLocaleString()}）
+` +
+          `  产物：${p}
+` +
+          `  这就是"改了没生效"的来源 —— 先跑：moon -C "${ROOT}" build cmd/skillpress --target js
+` +
+          `  （确认过就是要用旧产物：SKILLPRESS_ALLOW_STALE=1）`,
+      );
+      process.exit(2);
+    }
   }
   return p;
 }

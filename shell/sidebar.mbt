@@ -245,7 +245,11 @@ fn sidebar(
       .padding_top(@style.px(sp6))
       .padding_horizontal(@style.px(sp3))
       .padding_bottom(@style.px(sp7)),
-    ),
+    // 侧栏一个**具名节点**（`#sidebar`）：判据要能指到"侧栏这个容器"。
+    // ⚠️ 站点判据原来靠**文字**找它（"哪个元素的内容以 `SKILL 文档` 开头"）—— 那句标题随 IA 改一次，
+    //    判据就瞎一次（实测：新 IA 里它已经不在了 ⇒ "树在左、正文在右"那条**量不到东西**）。
+    //    名字比文字稳，与 `#prose` / `#topnav` / `#toc-rail` 同一套做法。
+    ).id("sidebar"),
     [head, @html.div(attrs=attrs(@style.Style::new().flex_direction(@style.FlexDirection::Column)), items), foot],
   )
 }

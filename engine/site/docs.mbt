@@ -43,6 +43,16 @@ pub fn docs_of(
     let fm = frontmatter_slice(text)
     let when = fm_value(fm, "whenToUse")
     let desc = fm_value(fm, "description")
+    // 界面上显示的名字：与引擎同一套取法（frontmatter `title` → 正文 H1 → 回退 slug）
+    let fm_title = fm_value(fm, "title")
+    let h1_title = first_h1_line(text)
+    let title = if fm_title != "" {
+      fm_title
+    } else if h1_title != "" {
+      h1_title
+    } else {
+      slug
+    }
     let kids : Array[KidProbe] = []
     for pair in @content.name_kids(@content.md_kids(dir)) {
       let (name, rel) = pair
@@ -58,7 +68,7 @@ pub fn docs_of(
       }
       kids.push({ name, probe })
     }
-    out.push({ slug, when, desc, kids })
+    out.push({ slug, title, when, desc, kids })
   }
   out
 }

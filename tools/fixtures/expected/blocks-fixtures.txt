@@ -1,5 +1,5 @@
 ### alpha
-        P([Txt("段落里有 "), Code("code"), Txt("、"), Bold("bold"), Txt("、label"), Code("references/x.md"), Txt("、"), Code("same"), Txt("、"), Code("ext"), Txt("、 Code"), Code("references/x.md"), Txt(" 与 a 和 b"), Code("references/x.md"), Txt("（多反引号标签——测 replace 是否全局）。")]),
+        P([Txt("段落里有 "), Code("code"), Txt("、"), Bold("bold"), Txt("、"), Link("label", "references/x.md", true), Code("references/x.md"), Txt("、"), Link("same", "same", true), Txt("、"), Link("ext", "https://a.b", true), Txt("、 "), Link("Code", "references/x.md", true), Code("references/x.md"), Txt(" 与 "), Link("a 和 b", "references/x.md", false), Code("references/x.md"), Txt("（多反引号标签——测 replace 是否全局）。")]),
         P([Txt("连续空白 会被压成一个空格，反斜杠 \\ 与引号 \" 要转义，tab 在下面： 带 tab 的一行。")]),
         H4([Txt("四级标题")]),
         P([Txt("##### 五级标题会退化成段落")]),
@@ -8,7 +8,7 @@
         Ul([(0, "", [Txt("顶格一项")]), (1, "", [Txt("缩进两项（indent=1）")]), (0, "", [Txt("星号项")])]),
         Ul([(0, "1. ", [Txt("有序第一")]), (0, "2. ", [Txt("有序第二")]), (0, "3. ", [Txt("括号序号（num 也写 "), Code(". "), Txt("）")]), (0, "10. ", [Txt("两位数")])]),
         P([Txt("表格：")]),
-        Table([[Txt("线")], [Txt("错了会怎样")], [Txt("细则")]], [[[Txt("空单元格")], ([] : Array[Span]), [Code("x")]], [[Txt("两侧有空格")], [Bold("粗")], [Txt("链接"), Code("same")]]]),
+        Table([[Txt("线")], [Txt("错了会怎样")], [Txt("细则")]], [[[Txt("空单元格")], ([] : Array[Span]), [Code("x")]], [[Txt("两侧有空格")], [Bold("粗")], [Link("链接", "same", false), Code("same")]]]),
         Quote([Txt("引用第一行 引用第二行")]),
         Hr,
         Code("bash", "echo \"hi\"", [("echo", 6), (" ", 0), ("\"hi\"", 2)]),
@@ -17,7 +17,7 @@
 
 ### beta
         P([Txt("中文段落：这里有一个不断行空格（NBSP）和 emoji 🚀，以及全角标点：，。！")]),
-        P([Txt("图片会被跳过：!图"), Code("x.png")]),
+        P([Txt("图片会被跳过：!"), Link("图", "x.png", false), Code("x.png")]),
         P([Txt("原始 HTML 也会被跳过：<div>hi</div>")]),
         P([Txt("一个没有语言标记的块，与一个空块：")]),
         Code("", "无标记", ([] : Array[(String, Int)])),

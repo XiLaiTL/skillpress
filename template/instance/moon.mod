@@ -16,7 +16,7 @@ description = "skillpress 站点实例：用 skillpress 把本仓的 skills/ 印
 preferred_target = "js"
 
 import {
-  "XiLaiTL/moobile@0.5.0",
+  "XiLaiTL/moobile@0.6.0",
   // 站点界面就是这里来的：本工程只接线，界面（顶栏 / 侧栏树 / 正文渲染）在包 `shell` 里。
   // ⚠️ 未发布时靠 `moon.work` 指向**本地源码**；发布之后这条依赖从 registry 解析，
   //    工作区那个文件就可以删掉。

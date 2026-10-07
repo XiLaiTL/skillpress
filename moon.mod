@@ -36,7 +36,7 @@ preferred_target = "js"
 //    这条与"js 那条路只要 Node"是两回事，别混着读。
 import {
   "mizchi/markdown@0.8.3",
-  "XiLaiTL/moobile@0.5.0",
+  "XiLaiTL/moobile@0.6.0",
   "moonbitlang/x@0.5.5",
   "moonbitlang/async@0.21.0",
 }

@@ -500,5 +500,7 @@ footer.license = Apache-2.0
 
 - **内环**：`node tools/ui-probe.mjs` —— `moon build`（js，秒级）+ 一次无头 Chrome，量**新判据**。
   它把"真视口宽度"用 **iframe** 给（Chrome 的窗口有最小宽，`--window-size=420` 实测是 512 —— §11 那笔账）。
-- **官方**：`engine/site/`（native `skillpress verify`）那 22 条**判的是旧 IA**（"顶栏的分栏排在同一行"、"文档 / SKILL"…）
+- **官方**：`engine/site/`（native `skillpress verify`）那批断言**已是新 IA**（23 条全绿，2026-10-07 换血，
+  见 `PLAN.md` D45）—— 它量的是 `#topnav` 那一排 / `#sidebar` / `#prose` / `#copy-*` 这些**具名节点**，
+  不再按整页文字猜（旧版那句"判的是旧 IA"是换血之前的坐标）
   ⇒ **M4 要整体换血**，在那之前两边不可混读。

@@ -140,7 +140,13 @@ if (existsSync(MOON_MOD)) {
 }
 
 // ① 内容包（`gen-file`）
-const mbtText = engine("--license", license);
+//
+// ⚠️ `--asset-base` **显式传**（不靠引擎的默认值）：这个前缀是"引擎往产物里写什么"与
+//    "press 把图拷到哪儿"两边的**同一份口径**，靠默认值对齐 = 哪天默认值改了就是**静默 404**。
+//    名字由 `ASSET_*` 两个常量唯一决定（下面 ③.5 用它们）。
+const ASSET_BASE = "img/";
+const ASSET_DIR = join(APP, "img");
+const mbtText = engine("--license", license, "--asset-base", ASSET_BASE);
 sync(OUT, mbtText, "站点的内容值");
 
 // ② llms.txt（**同一套前置、同一份解析**的另一件产物：只换吐哪一份）
@@ -204,6 +210,66 @@ if (CHECK) {
   console.log(`✓ 写入 ${MD_DIR}/（${wanted.length} 份原文拷贝）`);
 }
 
+// ③.5 **图片资产**（对标表 #10）：内容里的图 → 实例的 `img/`。
+//
+// 为什么必须有一道**拷**：内容里的 `![alt](../assets/x.png)` 是"相对**那份 md**"的路径，
+// 而浏览器是按**页面 URL** 解析 src 的 —— 引擎把它折成了 `img/assets/x.png`（相对站点根），
+// 但那个地址在站点上**得真有这份文件**。没人拷 = 站点上每个图都是 404，
+// 而 404 的 `<img>` **不报错**（就是个空框）—— 正是"静默失效"那一类。
+//
+// 清单**从生成物里现读**（不另外解析内容根，理由同 ③：同一件事不许两个副本）。
+const imgs = [...mbtText.matchAll(/@shell\.Image\("(?:[^"\\]|\\.)*",\s*"((?:[^"\\]|\\.)*)"\)/g)]
+  .map((m) => m[1].replace(/\\(.)/g, "$1"));
+const internal = [];
+const outside = [];
+const unfolded = [];
+for (const src of imgs) {
+  if (/^(https?:)?\/\/|^data:|^mailto:/.test(src)) outside.push(src);
+  else if (src.startsWith(ASSET_BASE)) internal.push(src.slice(ASSET_BASE.length));
+  // 既不是站外、也不带 `img/`：引擎**没折过**它（写法超出了它认的两支）⇒ 这个地址在站点上
+  // 一定加载不到。**点名报错，不静默跳过** —— 静默跳过的表现是"页面上少一张图"，最难查。
+  else unfolded.push(src);
+}
+if (unfolded.length) {
+  console.error(`✗ 这些图片地址既不是站外 URL、也不带 \`${ASSET_BASE}\` 前缀 —— 引擎没能折它：`);
+  for (const s of new Set(unfolded)) console.error(`    ${s}`);
+  console.error("  （内容里写的是相对那份 md 的路径；以 `/` 开头会被当「相对内容根」）");
+  process.exit(2);
+}
+const imgMissing = internal.filter((rel) => !existsSync(join(SKILLS, rel)));
+if (imgMissing.length) {
+  console.error("✗ 内容根里找不到这些图片（内容包里引用了、盘上没有）：");
+  for (const rel of new Set(imgMissing)) console.error(`    ${rel}`);
+  process.exit(2);
+}
+if (CHECK) {
+  const stale = [];
+  for (const rel of internal) {
+    const dst = join(ASSET_DIR, rel);
+    if (!existsSync(dst)) stale.push(rel + "（实例里缺）");
+    else if (!readFileSync(dst).equals(readFileSync(join(SKILLS, rel)))) stale.push(rel + "（逐字节不同）");
+  }
+  for (const rel of walk(ASSET_DIR, ASSET_DIR, [])) {
+    if (!internal.includes(rel)) stale.push(rel + "（实例里有、内容包没引用）");
+  }
+  if (stale.length === 0) {
+    console.log(`✓ 一致：${ASSET_DIR}/（${internal.length} 张图，逐字节相同${
+      outside.length ? `；另有 ${outside.length} 张站外图不归站点管` : ""}）`);
+  } else {
+    bad = 1;
+    console.error(`✗ 不一致：图片资产 ${stale.length} 处 ——`);
+    for (const rel of stale.slice(0, 5)) console.error(`    ${rel}`);
+  }
+} else {
+  for (const rel of new Set(internal)) {
+    const dst = join(ASSET_DIR, rel);
+    mkdirSync(dirname(dst), { recursive: true });
+    copyFileSync(join(SKILLS, rel), dst);
+  }
+  console.log(`✓ 写入 ${ASSET_DIR}/（${new Set(internal).size} 张图${
+    outside.length ? `；${outside.length} 张站外图原样留着` : ""}）`);
+}
+
 // ④ **对得上**：每份 skill 的中文 title 都出现在 llms.txt 里（两份产物同源的自证）。
 //    这不是"再解析一遍内容根"（那会变成第二份口径），只是拿**生成物里已有的** title 去索引里找。
 const titles = [...mbtText.matchAll(/^\s+title: "([^"]*)",$/gm)].map((m) => m[1]);
@@ -214,14 +280,18 @@ if (missed.length) {
 }
 console.log(`✓ 同源自证：内容包里的 ${titles.length} 个 title 都在 llms.txt 里`);
 
-// ⑤ 陈旧检查（只在 `--check` 下）：**产物比内容源旧** ⇒ 这份产物已经不代表内容了。
-//    ⚠️ 这条与"生成得对不对"是两件事：`sync()` 比的是"现跑 vs 磁盘"，看不出来"内容改过没重跑"。
+// ⑤ 收尾（只在 `--check` 下）。
+//
+// ⚠️ 这里**原来**还有一条 mtime 判据：「产物比内容源旧 ⇒ 重跑一次 press」。它 2026-10-07 被**删了**，
+//    原因是它**假红**：`sync()` 只在"磁盘那份与现跑不同"时才写盘（刻意的：不动没变的文件），
+//    所以一条**内容改了、但产物逐字节没变**的改动之后（例：改一条链接的**写法**、生成物里那串
+//    恰好一样长也一样）—— 产物 mtime 比内容源旧，于是这条报"内容改过、产物还没跟"，
+//    而前面三步刚刚逐字节证明过产物**就是**现跑的。**代理指标与真判据打架时，让代理指标退场。**
+//    真判据在 ①–④：`sync()` 的"磁盘 == 现跑"逐字节比（内容真变了、产物没跟 ⇒ 那里必红），
+//    md/ 与 img/ 的同款逐字节比，加上"产物比内容源旧"想抓的那件事已经被它覆盖。
+//    另：引擎本身的新鲜度由 `launcher/skillpress.mjs` 守着（源码比 js 产物新就**拒绝跑**），
+//    所以"拿旧引擎印出来的产物"这条也已经在别处堵住了。
 if (CHECK) {
-  const prod = [LLMS, OUT].filter(existsSync).map((p) => statSync(p).mtimeMs);
-  const src = wanted.map((rel) => statSync(abs(rel)).mtimeMs);
-  if (prod.length && src.length && Math.min(...prod) < Math.max(...src)) {
-    console.error("✗ 产物比内容源旧 ⇒ 重跑一次 press（内容改过、产物还没跟）");
-    bad = 1;
-  }
+  console.log(`✓ 齐全：内容包 / llms.txt / md（${wanted.length} 份）/ img（${internal.length} 张）四类产物都对上了`);
   process.exit(bad);
 }

@@ -129,6 +129,49 @@ pub async fn has_docs_tab(cdp : Cdp) -> Bool raise {
 }
 
 ///|
+/// 顶栏导航那一排**逐条读出来**（`#topnav` 的直接子元素自己的文字）。
+///
+/// ⚠️ 为什么要**指到 `#topnav`** 而不是整页找文字（2026-10-07 换血时定的）：
+///    旧判据按"整页里有没有这几个字"来判"顶栏列了哪些分栏"，于是
+///    ① **正文里的同名文字会冒充顶栏**（首页那张 CTA 卡片上就写着「文档 / SKILL」⇒ 假绿过一次）；
+///    ② 顶栏**少一条**只要正文里恰好有那几个字就看不出来。
+///    现在只量这一排：多了少了都当场红。
+pub async fn nav_labels(cdp : Cdp) -> Array[String] raise {
+  // ⚠️ 内层 JS 一律用**单引号**：MoonBit 的字符串是双引号，混着写就要一层转义（踩过）。
+  let js = "(() => {" +
+    " const box = document.getElementById('topnav');" +
+    " if (!box) return [];" +
+    " return [...box.children].map(e => (e.innerText || '').trim()).filter(t => t !== '');" +
+    "})()"
+  let j = cdp.eval_json(js)
+  let out : Array[String] = []
+  match j {
+    Array(items) =>
+      for it in items {
+        match it {
+          String(t) => out.push(t)
+          _ => ()
+        }
+      }
+    _ => ()
+  }
+  out
+}
+
+///|
+/// 顶栏里**有没有这一条**（`#topbar` 范围内、按元素整条文本严格相等）。
+pub async fn topbar_has(cdp : Cdp, label : String) -> Bool raise {
+  let js = "(() => {" +
+    " const box = document.getElementById('topbar');" +
+    " if (!box) return false;" +
+    " return [...box.querySelectorAll('div,button,span')].some(e => (e.innerText||'').trim() === " +
+    js_lit(label) +
+    ");" +
+    "})()"
+  cdp.eval_bool(js)
+}
+
+///|
 /// 给一组标签取它们各自元素的 `y`（同一个元素口径）；**缺一个就给 `None`**。
 ///
 /// 用途：断言"顶栏的分栏排在**同一行**里"。RN 里换行、挤掉、被压在下面**都是静默的**
@@ -148,7 +191,9 @@ pub async fn nav_ys(cdp : Cdp, labels : Array[String]) -> Array[Int]? raise {
     " const labels = " + arr + ";" +
     " const ys = [];" +
     " for (const L of labels) {" +
-    " const el = [...document.querySelectorAll('div,button,span')].filter(e => (e.innerText||\"\").trim() === L).pop();" +
+    " const box = document.getElementById('topnav');" +
+    " if (!box) return null;" +
+    " const el = [...box.querySelectorAll('div,button,span')].filter(e => (e.innerText||'').trim() === L).pop();" +
     " if (!el) return null;" +
     " ys.push(Math.round(el.getBoundingClientRect().y));" +
     " }" +
@@ -227,10 +272,14 @@ pub async fn inline_probe(cdp : Cdp, probe : String) -> InlineProbe raise {
 ///
 /// 用途：断言"树在左、正文在右"。**RN 里顺序/尺寸错了也是静默的**。
 pub async fn docs_geo(cdp : Cdp, slug : String) -> Geo? raise {
+  // ⚠️ 两个容器都用**具名节点**：`#sidebar`（侧栏根）与 `#prose`（正文那一栏）。
+  //    旧实现是按**文字**找的（"哪个元素的内容以 `SKILL 文档` 开头"、以及"哪个元素正好写着这个 slug"）——
+  //    新 IA 里那句标题没了、渲染的也是 title 不是 slug ⇒ 两条都量不到东西（实测"找不到侧栏或正文"）。
+  //    判据要量的东西（左右两栏的位置）与"栏里的字是什么"无关 ⇒ 指到**容器**就好。
+  let _ = slug
   let js = "(() => {" +
-    " const side = [...document.querySelectorAll('*')].filter(e => (e.innerText||\"\").startsWith(\"SKILL 文档\")).pop();" +
-    " const pane = [...document.querySelectorAll('div,span')].filter(e => (e.innerText||\"\").trim() === " +
-    js_lit(slug) + ").pop();" +
+    " const side = document.getElementById('sidebar');" +
+    " const pane = document.getElementById('prose');" +
     " if (!side || !pane) return null;" +
     " return { sideX: Math.round(side.getBoundingClientRect().x), paneX: Math.round(pane.getBoundingClientRect().x) };" +
     " })()"

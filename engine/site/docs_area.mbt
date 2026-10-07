@@ -26,13 +26,24 @@ pub async fn run_docs_area(ctx : Ctx, secs : Array[Sec], all : Array[Doc]) -> Un
   let r = ctx.results
   let _ = secs
 
-  // ── ⑪ 进入文档区（正文换成第一份 skill）──────────────────────────────────
+  // ── ⑪ 进入书架页（正文换成书架：第一份 skill 的摘要那一行）──────────────────
+  //
+  // ⚠️ 2026-10-07 换血：旧断言点的是「文档 / SKILL」那个模式切换（D3 之后退休），
+  //    探针用的是 **slug**（而 slug 在**侧栏**里也有 ⇒ "等它出现"这条其实分辨不出
+  //    "正文换了没有"）。现在入口是顶栏的「书架」，探针用**摘要**（书架页那一行才渲染它）。
   let first_slug = if all.length() > 0 { all[0].slug } else { "" }
-  let entered = if first_slug != "" { wait_text(cdp, first_slug, 40) } else { false }
+  let shelf_probe = if all.length() > 0 { take(plain(all[0].desc), 18) } else { "" }
+  let entered = shelf_probe != "" && wait_text(cdp, shelf_probe, 40)
   r.check(
     entered,
-    "点「文档 / SKILL」后进入文档区（正文换成第一份 skill）",
-    if entered { "" } else { "换了模式但正文没变" },
+    "点「书架」后进入书架页（正文列出全部 skill 与它们的摘要）",
+    if entered {
+      take(shelf_probe, 24)
+    } else if first_slug != "" {
+      "书架页没出现第一份 skill 的摘要（" + first_slug + "）"
+    } else {
+      "语料里一份 skill 都没有"
+    },
   )
 
   let dt = body_text(cdp)
@@ -40,8 +51,9 @@ pub async fn run_docs_area(ctx : Ctx, secs : Array[Sec], all : Array[Doc]) -> Un
   // ── ⑫ 侧栏列出全部 skill ────────────────────────────────────────────────
   let missing : Array[String] = []
   for d in all {
-    if !dt.contains(d.slug) {
-      missing.push(d.slug)
+    // ⚠️ 找的是 **title**（读者看得见的那一行），不是 slug —— 理由见 `Doc.title` 的注释
+    if !dt.contains(d.title) {
+      missing.push(d.title)
     }
   }
   r.check(
@@ -93,7 +105,7 @@ pub async fn run_docs_area(ctx : Ctx, secs : Array[Sec], all : Array[Doc]) -> Un
   // ── ⑮⑯⑰ 点第 2 个 skill ───────────────────────────────────────────────
   if all.length() >= 2 {
     let second = all[1]
-    let b = find_center(cdp, "div,button", second.slug, false)
+    let b = find_center(cdp, "div,button", second.title, false)
     match b {
       Some(pt) => {
         cdp.click_at(pt.x, pt.y)
@@ -117,9 +129,21 @@ pub async fn run_docs_area(ctx : Ctx, secs : Array[Sec], all : Array[Doc]) -> Un
         // "少了一个空格/换行"编译器不拦、控制台不报，只有对着源比才看得见）
         let src_file = @gates.join_path(@gates.join_path(ctx.root, second.slug), "SKILL.md")
         let src_blocks = fenced_blocks(ctx.live_host.read(src_file))
+        // ⚠️ 判"逐字一致"用的是"**渲染出来的块里包含源码**"（2026-10-07 改）：
+        //    代码块那个容器里除了代码，还有**工具条那一行**（语言标签 + 「复制」），
+        //    所以整块的 `innerText` 不会等于源码。旧写法要求**完全相等** ⇒ 一条都命中不了
+        //    （实测 0/2，看着像"span 切分把代码改了"，其实代码一个字没错）。
+        //    "包含"仍然是**逐字**的：源码在渲染结果里原样出现，少一个空格都不行。
         let hit : Array[String] = []
         for sb in src_blocks {
-          if arr_has(hl.texts, norm(sb)) {
+          let want = norm(sb)
+          let mut found = false
+          for t in hl.texts {
+            if t.contains(want) {
+              found = true
+            }
+          }
+          if found {
             hit.push(sb)
           }
         }
@@ -150,31 +174,55 @@ pub async fn run_docs_area(ctx : Ctx, secs : Array[Sec], all : Array[Doc]) -> Un
   match with_kid {
     Some(wk) => {
       let kid = wk.kids[0]
-      let arrow = arrow_box(cdp, wk.slug)
+      // ⚠️ **展开是双态的**（2026-10-07 换血）：新 IA 会把"正在读的那一份"**自动展开**
+      //    （目录挂在当前文件下面）⇒ 旧断言"点一下箭头就该露出子页"会**把已经展开的节点收起来**，
+      //    然后报"箭头点了没反应"（实测：正是这么红的）。
+      //    改成**先读当前状态**：已经开了就点一下**收起**（顺带把"收起"也验了，比旧断言更强），
+      //    然后再点开。两端都不是"假设"，而是**量出来的**。
+      let open_now = wait_raw(cdp, kid.probe, 2)
+      let arrow = arrow_box(cdp, wk.title)
       match arrow {
         Some(pt) => {
-          cdp.click_at(pt.x, pt.y)
-          let shown = wait_raw(cdp, kid.name, 30)
+          if open_now {
+            cdp.click_at(pt.x, pt.y)
+            let hid = !wait_raw(cdp, kid.probe, 20)
+            r.check(
+              hid,
+              "收起 " + wk.title + " 后它的子页从树里消失（" + kid.probe + "）",
+              if hid { "" } else { "点箭头没能收起 —— 展开/收起是同一个开关吗" },
+            )
+            // 位置会随收起而变：重新取一次箭头
+            match arrow_box(cdp, wk.title) {
+              Some(p2) => cdp.click_at(p2.x, p2.y)
+              None => r.check(false, "收起后重新找到 " + wk.title + " 的展开箭头", "")
+            }
+          } else {
+            cdp.click_at(pt.x, pt.y)
+          }
+          // ⚠️ 等的是子页**在界面上显示的名字**（`kid.probe` = frontmatter title → H1 → 文件名）：
+          //    旧写法等的是 `kid.name`（**文件名**），而那只有"没有 title/H1 的子页"才渲染得到 ——
+          //    这份语料里子页都有标题 ⇒ 旧写法会**假红**。
+          let shown = wait_raw(cdp, kid.probe, 30)
           r.check(
             shown,
-            "展开 " + wk.slug + " 后露出它的子页（" + kid.name + "）",
+            "展开 " + wk.title + " 后露出它的子页（" + kid.probe + "）",
             if shown { "" } else { "箭头点了没反应" },
           )
-          let kb = kid_box(cdp, kid.name)
+          let kb = kid_box(cdp, kid.probe)
           match kb {
             Some(kp) => {
               cdp.click_at(kp.x, kp.y)
               let opened = wait_raw(cdp, kid.probe, 30)
               r.check(
                 opened,
-                "点子页后正文换成 ref 的内容（" + kid.name + "）",
+                "点子页后正文换成 ref 的内容（" + kid.probe + "）",
                 if opened { "" } else { "子页点了没反应" },
               )
             }
-            None => r.check(false, "找到子页那一行（" + kid.name + "）", "")
+            None => r.check(false, "找到子页那一行（" + kid.probe + "）", "")
           }
         }
-        None => r.check(false, "找到 " + wk.slug + " 的展开箭头", "")
+        None => r.check(false, "找到 " + wk.title + " 的展开箭头", "")
       }
     }
     None => info("没有带子页的 skill —— 跳过树的两条（加一个 references/*.md 就会自动生效）")
@@ -202,10 +250,37 @@ pub async fn run_link_section(ctx : Ctx, secs : Array[Sec]) -> Unit raise {
       let _ = click_text(cdp, "首页")
       // 目标解析与引擎**同一套**：先按首页目录相对、再按内容根相对
       let target = resolve_link_target(ctx.live_host, dir_of(ctx.home_file), ctx.root, ls.link)
-      let probe = if target != "" {
-        pick_probe(read_source(ctx.live_host.read(target)))
-      } else {
-        ""
+      // ⚠️ 判"落到了哪一页"用**那一页的标题**（2026-10-07 换血）：
+      //    旧写法拿目标文件里"第一段够长的正文"当探针，而正文里的段落未必原样渲染
+      //    （标题/列表/表格/代码块都可能被排成别的形态）⇒ 探针取不中时看着像"点了没反应"，
+      //    其实**页面已经跳对了**（实测：手工点它，hash 与正文标题都对）。
+      //    标题是**渲染出来的那一行**（`Doc.title`：frontmatter → H1 → slug），拿它当探针最稳。
+      // 目标那一页的 **slug**：从路径里现取（`<…>/<slug>/SKILL.md` 的倒数第二段）。
+      // ⚠️ 用**链接原文**当回退（不依赖"目标文件解析成功"）：解析那条路要读盘，
+      //    而这条判据只想知道"要点开的是哪一页" —— 实测就是这里拿到空串，
+      //    于是探针为空、判据报"没跳"（而 hash 明明已经跳到对的那一页上了）。
+      let mut slug = ""
+      let cand = if target != "" { target } else { ls.link }
+      let segs : Array[String] = []
+      for raw in cand.split("/") {
+        for s2 in raw.split("\\") {
+          let t = s2.to_owned()
+          if t != "" && t != "." && t != ".." {
+            segs.push(t)
+          }
+        }
+      }
+      if segs.length() >= 2 {
+        slug = segs[segs.length() - 2]
+      }
+      let mut probe = ""
+      for d in ctx.docs {
+        if slug != "" && d.slug == slug {
+          probe = d.title
+        }
+      }
+      if probe == "" && target != "" {
+        probe = pick_probe(read_source(ctx.live_host.read(target)))
       }
       if click_text(cdp, ls.label) {
         let landed = probe != "" && wait_text(cdp, take(norm(probe), 20), 40)
@@ -215,7 +290,11 @@ pub async fn run_link_section(ctx : Ctx, secs : Array[Sec]) -> Unit raise {
           if landed {
             take(probe, 24)
           } else {
-            "没跳到 " + ls.link + "（点了没反应，或跳错了页）"
+            // ⚠️ 失败时**把停在哪一页也打出来**：只写"点了没反应"没法查
+            //    （这一句正是"没点动"与"跳对了但探针没取中"的分水岭）。
+            "没跳到 " + ls.link + "（slug=" + slug + "，探针=" + take(probe, 30) + "）；现在停在 `" +
+            (cdp.eval_str("location.hash") catch { _ => "?" }) +
+            "`，正文开头：" + take(norm(body_text(cdp)), 30)
           },
         )
       } else {

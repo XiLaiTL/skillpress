@@ -29,8 +29,14 @@ pub struct Stick {
 ///          上色把代码切成几十个 span，"少了一个空格/换行"编译器不拦、控制台不报，
 ///          只有对着源逐字比才看得见。
 pub async fn code_blocks(cdp : Cdp) -> CodeBlocks raise {
+  // ⚠️ 认代码块**不许认颜色**（2026-10-07 换血）：旧写法认的是当年那个暖色主题的
+  //    `code_bg` 字面量 `rgb(240, 233, 218)` —— 主题一换（现在是浅色 `#f7f7f8`）就**一个盒子都认不出来**，
+  //    而症状是"页面上没有代码块"这种看着像**站点坏了**的假红（实测：那条红了整整一轮）。
+  //    ⇒ 改成认**结构**：代码块的工具条里有「复制」按钮，而它有具名节点（`#copy-<i>`），
+  //      从按钮往上两层正是那个块。判据要量的东西（块数与配色数）与"底色偏暖还是偏冷"无关。
   let js = "(() => {" +
-    " const boxes = [...document.querySelectorAll('div')].filter(d => getComputedStyle(d).backgroundColor === 'rgb(240, 233, 218)');" +
+    " const btns = [...document.querySelectorAll('[id^=copy-]')];" +
+    " const boxes = btns.map(b => b.parentElement && b.parentElement.parentElement).filter(Boolean);" +
     " const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();" +
     " const texts = boxes.map(b => norm(b.innerText));" +
     " let colors = 0;" +
@@ -99,7 +105,13 @@ pub async fn arrow_box(cdp : Cdp, slug : String) -> Box? raise {
 pub async fn kid_box(cdp : Cdp, name : String) -> Box? raise {
   let js = "(() => {" +
     " const n = " + js_lit(name) + ";" +
-    " const el = [...document.querySelectorAll('div,button')].find(e => e.innerText.trim() === \"\\u{00a7} \" + n || e.innerText.trim() === \"\\u{2317} \" + n);" +
+    // ⚠️ 三种形态都认（2026-10-07）：新 IA 里子页那一行**就是它的标题**（层级靠缩进表达），
+    //    旧形态是 `§ 名字` / `⌗ 名字`（script 类用 `⌗`）。只认旧形态 ⇒ "找到子页那一行"**永远红**
+    //    （实测：树明明展开了、那一行就在眼前，判据却说找不到 —— 而这看着像"站点坏了"）。
+    " const el = [...document.querySelectorAll('div,button')].find(e => {" +
+    " const t = e.innerText.trim();" +
+    " return t === n || t === \"\\u{00a7} \" + n || t === \"\\u{2317} \" + n;" +
+    " });" +
     " if (!el) return null;" +
     " const r = el.getBoundingClientRect();" +
     " return { x: r.x + r.width / 2, y: r.y + r.height / 2 };" +

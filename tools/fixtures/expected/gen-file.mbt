@@ -115,6 +115,8 @@ pub fn skills() -> Array[@shell.Doc] {
         @shell.P([@shell.Txt("这一份用来验"), @shell.Bold("链接解析"), @shell.Txt("："), @shell.Code("[alpha](../alpha-skill/SKILL.md)"), @shell.Txt(" 是"), @shell.Bold("相对本文件所在目录"), @shell.Txt("的一跳， 而 "), @shell.Code("[alpha 的细则](alpha-skill/references/notes.md)"), @shell.Txt(" 是"), @shell.Bold("相对内容根"), @shell.Txt("的一跳 —— 两条都要能解开。")]),
         @shell.H2([@shell.Txt("行内标记")]),
         @shell.P([@shell.Txt("一段话里可以有 "), @shell.Bold("加粗"), @shell.Txt("、"), @shell.Code("行内代码"), @shell.Txt("、*斜体*、以及 "), @shell.Link("一个链到别处的链接", "alpha-skill/ref/notes", false), @shell.Code("../alpha-skill/references/notes.md"), @shell.Txt("。 行内标记剥掉之后应当与页面上 "), @shell.Code("innerText"), @shell.Txt(" 对得上。")]),
+        @shell.H2([@shell.Txt("图片（整行一条）")]),
+        @shell.Image("一张夹具图", "img/assets/fixture.png"),
         @shell.H2([@shell.Txt("收尾")]),
         @shell.P([@shell.Txt("最后一段也是正文，用来验\"文件末尾的块与空行\"。")]),
       ],
@@ -185,7 +187,7 @@ pub fn footer() -> @shell.Footer {
   {
     license: "",
     generated_at: "",   // 由宿主构建脚本注入（内容包必须逐字节可复现）
-    root_fingerprint: "27f1ac155f17d328af5c7ac04e95e7e4ac54d54b82c034f1e3b1a1cf8f933f29",
+    root_fingerprint: "323e0e599e65713495941219468a2d3e389a9f0cdbb4514415f40c2c96cad199",
   }
 }
 

@@ -216,6 +216,8 @@ fn gen_file() -> Unit {
       // ⇒ 过渡期由调用方（`press`）从**实例自己的 `moon.mod` 声明**里读出来传进来；
       //    传不进来就是空串，页脚那一项**不画**（不写占位、更不写死一个假值）。
       opt("--license"),
+      // 图片在站点上的目录前缀。默认 `img/`：`press` 按同一个名字把图拷进实例（一份口径两处用）。
+      if has_opt("--asset-base") { opt("--asset-base") } else { "img/" },
     )
   } catch {
     e => {

@@ -21,100 +21,6 @@
 //   同样是子集所限，账记在这里。
 
 ///|
-/// 一个代码块。**构建期**已经高亮好了（tree-sitter），这里只是照着色号上色：
-/// 外层一个 `Text` 撑字体与行高，片段嵌在它里面、只改颜色（嵌套 Text 上的盒属性会丢，见文件头）。
-fn code_block(
-  theme : Theme,
-  lang : String,
-  text : String,
-  runs : Array[(String, Int)],
-  idx : Int,
-  copied : Bool,
-  emit : @cmd.Emit[Msg],
-) -> @html.Html {
-  let p = theme.palette
-  let kids : Array[@html.Html] = if runs.length() > 0 {
-    // `theme.tok(色号)`：色号是引擎在构建期算的（1..9，0 = 正文色），明暗两套各翻各的
-    runs.map(r => @html.span(attrs=attrs(@style.Style::new().color(theme.tok_color(r.1))), r.0))
-  } else {
-    [@html.span(attrs=attrs(@style.Style::new()), text)]
-  }
-  let base = @style.Style::new()
-    .font_family(mono)
-    .font_size(fs_sm)
-    .line_height_em(lh_aux)
-    .color(p.fg1)
-    .white_space(@style.WhiteSpace::PreWrap)
-  // ── 工具条（对标表 #5：语言标签 + 复制）─────────────────────────────────────
-  //
-  // ⚠️ 语言标签**只在引擎给了语言时画**（`lang == ""` ⇒ 留空）：不编一个 "text" 糊上去 ——
-  //    那是"看起来有信息、其实是假的"（§1 反面验收）。
-  // ⚠️ 复制按钮必须是 `@html.button`（`div` 上的 `on_click` 在 web 上是死处理器）。
-  let bar : Array[@html.Html] = []
-  bar.push(
-    @html.div(
-      attrs=attrs(
-        @style.Style::new()
-        .font_family(mono)
-        .font_size(fs_meta)
-        .color(p.fg3),
-      ),
-      lang,
-    ),
-  )
-  bar.push(
-    @html.button(
-      attrs=attrs(
-        @style.Style::new()
-        .font_size(fs_meta)
-        .color(if copied { p.brand } else { p.fg3 })
-        .padding_vertical(@style.px(sp1))
-        .padding_horizontal(@style.px(sp2))
-        .border_width(0.0)
-        .border_radius(r2)
-        .background_color("transparent"),
-      )
-      // 节点名：判据按名字点它（`copy-<第几个代码块>`，与工具条的序号一致）
-      .id("copy-" + idx.to_string()),
-      on_click=emit(CopyCode(idx, text)),
-      if copied { "已复制" } else { "复制" },
-    ),
-  )
-  let toolbar = @html.div(
-    attrs=attrs(
-      @style.Style::new()
-      .flex_direction(@style.FlexDirection::Row)
-      .align_items(@style.Align::Center)
-      .justify_content(@style.Justify::SpaceBetween)
-      .padding_left(@style.px(sp4))
-      .padding_right(@style.px(sp2))
-      .padding_vertical(@style.px(sp1))
-      .border_bottom_width(1.0)
-      .border_bottom_color(p.code_line),
-    ),
-    bar,
-  )
-  @html.div(
-    attrs=attrs(
-      @style.Style::new()
-      .background_color(p.code_bg)
-      .border_width(1.0)
-      .border_color(p.code_line)
-      .border_radius(r3)
-      .overflow(@style.Overflow::Hidden)
-      .margin_bottom(@style.px(sp5)),
-    ),
-    [
-      toolbar,
-      @html.div(
-        attrs=attrs(@style.Style::new().padding(@style.px(sp4))),
-        [@html.span(attrs=attrs(base), kids)],
-      ),
-    ],
-  )
-}
-
-///|
 /// 表格：表头一行（次级面 + 1px 底线），数据行一行一条分隔线。
 ///
 /// ⚠️ 与 DESIGN §5 差一项：**列宽等分**、**不能横向滚**（那是真表格 + `overflow: auto` 的能力，
@@ -343,6 +249,30 @@ pub fn block_view(
         items.map(fn(it) { bullet_view(theme, it, ctx, emit) }),
       )
     Table(header, rows) => table_view(theme, header, rows, ctx, emit)
+    // **图片**（对标表 #10）：`![alt](src)` 整行一条 ⇒ 一个 `img`。
+    //
+    // ⚠️ 这里**只做"排"**：`src` 由引擎折成"站点能直接加载的 URL"（见 `Block::Image` 的注释），
+    //    站点这一层不做路径解析 —— 站点不知道内容仓的目录长什么样，猜一定猜错。
+    // ⚠️ `max_width = 100%`：内容里的图往往比正文栏宽（截屏、架构图）；不设这条，
+    //    宽图会把 `#prose` 那一栏**撑出横向滚动条**（整页跟着横滚，观感直接崩）。
+    //    `width` / `height` 刻意**不写死**：让它按原图比例排 —— 写死就是"图变形"。
+    // ⚠️ `alt` 一定要传：读屏软件念它，图挂了也还有一句话（两侧的读数都要它，见 #10 的判据）。
+    Image(alt, src) =>
+      @html.img(
+        src~,
+        alt~,
+        // ⚠️ `img` **没有子元素**（HTML 里它本来就是空元素）⇒ 样式走 `attrs=` 具名参数，
+        //    不像 `div` 那样后面还跟一个 children 数组。第一版照 `div` 的写法多写了一个
+        //    `([] : Array[@html.Html])`，编译期当场红在"0 positional arguments"上。
+        //    另一条：`img` 的 `style?` 参数是 `Array[String]`（裸 CSS），而 `attrs(...)` 是
+        //    `Attrs`（库的样式表）—— 两者别混（混了第二个错就是这个类型不匹配）。
+        attrs=attrs(
+          @style.Style::new()
+          .max_width(@style.pct(100.0))
+          .border_radius(6.0)
+          .margin_bottom(@style.px(sp4)),
+        ),
+      )
   }
 }
 

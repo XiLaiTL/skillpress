@@ -225,8 +225,18 @@ pub fn pick_home(
 /// "通用产品"：首页与书架是两个东西，凭什么首页只能指自己目录里的页。
 /// ⚠️ 对账不受影响：老形状语料上 ① 都能命中（命中就不走 ②）⇒ 行为一字不变。
 fn resolve_page(index : Map[String, String], raw : String, home_label : String) -> String {
-  let home_dir = match home_label.rev_find("/") {
-    Some(i) => home_label[:i].to_owned()
+  // ⚠️ 标签里那层 `skills/` 前缀要**先剥掉**（2026-10-07 补）：索引的键是 `<slug>/…`、**不含** `skills/`，
+  //    而传进来的标签是 `skills/skillpress/WEBSITE.md`。不剥的话 ① 那一支算出来是
+  //    `skills/<slug>/SKILL.md`，永远匹配不上 —— 于是"相对本文档"这种写法（GitHub 上点得动的那种，
+  //    也是 `check_links` 要求的唯一一种）在**首页**这一路静默失效，只剩 ② 兜着。
+  //    同一个坑 `links.mbt` 的 `link_key` 已经踩过一次（那边早就剥了）—— 这次是首页这一路的副本。
+  let label = if home_label.has_prefix("skills/") {
+    home_label[7:].to_owned()
+  } else {
+    home_label
+  }
+  let home_dir = match label.rev_find("/") {
+    Some(i) => label[:i].to_owned()
     None => ""
   }
   let k1 = if home_dir == "" {
@@ -249,6 +259,7 @@ fn resolve_page(index : Map[String, String], raw : String, home_label : String) 
 pub fn read_home(
   pick : HomePick,
   index : Map[String, String],
+  asset_base : String,
 ) -> HomeResult {
   let problems : Array[String] = []
   if pick.text == "" {
@@ -361,9 +372,14 @@ pub fn read_home(
     //    这里补的是**块里面**的行内链接。
     home: Some({
       title: if title == "" { "首页" } else { title },
-      lede: resolve_block_links(lede, pick.label, index),
+      lede: resolve_block_links(lede, pick.label, index, asset_base),
       sections: sections.map(fn(s) {
-        { title: s.title, link: s.link, nav: s.nav, blocks: resolve_block_links(s.blocks, pick.label, index) }
+        {
+          title: s.title,
+          link: s.link,
+          nav: s.nav,
+          blocks: resolve_block_links(s.blocks, pick.label, index, asset_base),
+        }
       }),
     }),
     source: pick.label,

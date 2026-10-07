@@ -51,6 +51,13 @@ pub enum Block {
   Code(String, String, Array[(String, Int)])
   Ul(Array[UlItem])
   Table(Array[Array[Span]], Array[Array[Array[Span]]])
+  /// **图片**：`(alt, src)`。
+  ///
+  /// ⚠️ 这是本期从"**点名拒绝**"改成"真收"的一格（对标表 #10）：原来 `![alt](src)` 只会进
+  /// `problems`（"不支持的构造（图片）"）而不渲染。改收的理由是**两端都有对应物**：
+  /// web 是 `<img src>`、RN 是 `<Image source={{uri}}>` —— 差别只在属性的形状，
+  /// 而那由 moobile 的标签表翻译（`img → Image` + `src → source`），内容侧只写标准 markdown。
+  Image(String, String)
 }
 
 // ── 字符工具：索引一律以 **`to_array()` 的下标**为准 ──────────────────────────

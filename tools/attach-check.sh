@@ -66,7 +66,8 @@ MD
 
 APP=skills/skillpress/scripts/.skillpress
 W=$(mktemp -d)
-trap 'rm -rf "$W"' EXIT
+# `KEEP=1 bash tools/attach-check.sh` ⇒ 留下工作目录（排查用；默认仍然清掉）
+if [ "${KEEP:-0}" = "1" ]; then echo "· 工作目录（KEEP=1）：$W"; else trap 'rm -rf "$W"' EXIT; fi
 
 # ── ① 全新夹具：产物齐全 + 那份语料真的能印成站 ──────────────────────────────────
 echo "① 全新夹具：attach 一次"
@@ -104,12 +105,20 @@ fi
 
 # ── ② 幂等：连跑两遍，内容包逐字节不变；再验"人写的文件不被覆盖" ──────────────────
 echo "② 幂等（第二遍不许改变任何东西）"
+cp "$W/a/$APP/content/content.generated.mbt" "$W/before.mbt"
 before=$(sha256sum "$W/a/$APP/content/content.generated.mbt" | cut -d' ' -f1)
 $CLI attach --repo "$W/a" --skills "$W/a/skills" > "$W/a2.log" 2>&1
 rc=$?
 after=$(sha256sum "$W/a/$APP/content/content.generated.mbt" | cut -d' ' -f1)
 [ "$rc" = 0 ] && ok "第二遍退码 0" || bad "第二遍退码 $rc（$(tail -2 "$W/a2.log" | tr '\n' ' ')）"
-[ "$before" = "$after" ] && ok "内容包逐字节不变（书架不随跑的次数漂）" || bad "内容包变了 —— 产物不幂等"
+if [ "$before" = "$after" ]; then
+  ok "内容包逐字节不变（书架不随跑的次数漂）"
+else
+  # ⚠️ 只报"变了"是**不够查的**（2026-10-07 实测）：把第一处差异打出来，否则下一个人得自己重跑一遍
+  cp "$W/a/$APP/content/content.generated.mbt" "$W/after.mbt"
+  bad "内容包变了 —— 产物不幂等；第一处差异：$(diff "$W/before.mbt" "$W/after.mbt" | head -6 | tr '
+' ' ')"
+fi
 # 手改首页：这条断言必须**能看见**改动（不然"没被覆盖"可能只是"本来就没写"）。
 # ⚠️ 探针用**受支持的构造**：原始 HTML 会被引擎点名（那是它该干的事），拿它当"手写痕迹"会红在别处。
 home_before=$(sha256sum "$W/a/skills/skillpress/WEBSITE.md" | cut -d' ' -f1)

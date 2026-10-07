@@ -271,6 +271,12 @@ pub struct KidProbe {
 /// 书架上的一份 skill（旧实现 `docs()` 的读数）。
 pub struct Doc {
   slug : String
+  /// 界面上显示的名字（frontmatter `title` → 正文 H1 → 回退 slug）。
+  ///
+  /// ⚠️ 2026-10-07 加的：旧判据拿 **slug** 去页面上找列表项，而新 IA 渲染的是 **title**
+  ///    （`slug` 只在 URL 与 kicker 里）⇒ "侧栏列出全部 skill" 那条会**假红**（实测缺 3 个）。
+  ///    判据要找的是"读者看得见的那一行"，那就得用读者看得见的名字。
+  title : String
   when : String
   desc : String
   kids : Array[KidProbe]

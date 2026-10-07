@@ -81,8 +81,16 @@ run() { # $1 = 语料目录；其余 = CLI 参数；输出：out/err/rc
 echo "① 首页源（R2 / D19 / D20）"
 C=$(mk_corpus website); run "$C"
 [ "$(cat "$C/rc.txt")" = 0 ] || bad "① WEBSITE.md 那一路退码非 0（$(tail -2 "$C/err.txt" | tr '\n' ' ')）"
-grep -q 'title: "站名来自 WEBSITE"' "$C/out.txt" && ok "① WEBSITE.md 赢（H1 来自它）" || bad "① 首页没取 WEBSITE.md"
-grep -q '站名来自 SKILL' "$C/out.txt" && bad "① 生成物里混进了 SKILL.md 的首页内容" || ok "① SKILL.md 的首页内容没混进来"
+# ⚠️ 两条都要**只看 `home()` 那一段**（2026-10-07 修）：原先 grep 的是**整份生成物**，
+#    而夹具里 `skillpress/` **本身也是一份 skill**（三份之一）⇒ 它的 `title` 就是
+#    `站名来自 SKILL`，于是"SKILL.md 的首页内容混进来了"这条**永远红**（真因完全不在首页那一路）。
+#    判据要说的是"**首页**取的是 WEBSITE.md"，那就把范围收到 `home()` 那一段里 ——
+#    范围收窄**不是放宽**：它把"首页真的来自 WEBSITE"这件事钉得更死（下面 `skills()` 里
+#    出现 `站名来自 SKILL` 是**对的**：那是书架上的那一页）。
+HOME_C="$C/home.txt"
+sed -n '/^pub fn home()/,/^}/p' "$C/out.txt" > "$HOME_C"
+grep -q 'title: "站名来自 WEBSITE"' "$HOME_C" && ok "① WEBSITE.md 赢（H1 来自它）" || bad "① 首页没取 WEBSITE.md"
+grep -q '站名来自 SKILL' "$HOME_C" && bad "① home() 里混进了 SKILL.md 的首页内容" || ok "① SKILL.md 的首页内容没混进 home()"
 grep -qF '· 首页源：`skillpress/WEBSITE.md`' "$C/err.txt" && ok "① 打印了用了哪个源" || bad "① 没打印首页源（R2 要求打印）"
 # D20 的第二个洞：同一个文件**既当首页、又当书架里的一页** ⇒ 两套渲染规矩打架。
 # 所以 `WEBSITE.md` **不算子页**（索引与 kids 都排除它）。
@@ -97,7 +105,8 @@ fi
 # 回退：把 WEBSITE.md 抽走（也顺带覆盖"文件在但是空的"这条边界）
 C2=$(mk_corpus fallback); : > "$C2/root/skillpress/WEBSITE.md"; run "$C2"
 [ "$(cat "$C2/rc.txt")" = 0 ] || bad "① 回退那一路退码非 0"
-grep -q 'title: "站名来自 SKILL"' "$C2/out.txt" && ok "① 没有 WEBSITE.md（或它是空的）⇒ 回退 SKILL.md" || bad "① 回退没生效"
+sed -n '/^pub fn home()/,/^}/p' "$C2/out.txt" > "$C2/home.txt"
+grep -q 'title: "站名来自 SKILL"' "$C2/home.txt" && ok "① 没有 WEBSITE.md（或它是空的）⇒ 回退 SKILL.md" || bad "① 回退没生效"
 grep -qF '按 R2 回退' "$C2/err.txt" && ok "① 回退**打印**了（不打印就成了没人查得出来的谜）" || bad "① 回退没打印"
 
 # `--home` 覆盖
@@ -112,7 +121,8 @@ C3=$(mk_corpus homename); cat > "$C3/custom.md" <<'MD'
 MD
 run "$C3" --home "$C3/custom.md"
 [ "$(cat "$C3/rc.txt")" = 0 ] || bad "① --home 那一路退码非 0"
-grep -q 'title: "站名来自 --home"' "$C3/out.txt" && ok "① --home 覆盖生效" || bad "① --home 没生效"
+sed -n '/^pub fn home()/,/^}/p' "$C3/out.txt" > "$C3/home.txt"
+grep -q 'title: "站名来自 --home"' "$C3/home.txt" && ok "① --home 覆盖生效" || bad "① --home 没生效"
 grep -qF '（--home 指定）' "$C3/err.txt" && ok "① --home 也打印了" || bad "① --home 没打印"
 
 # ── ② 忽略清单：不上书架（R4）＋ **打印"跳过了几份 + 理由"** ──────────────────────
@@ -156,7 +166,18 @@ C6=$(mk_corpus nofile); run "$C6" --ignore "$C6/does-not-exist.md"
 #    接进 CLI 之后这一段应当改成跑 CLI —— 但**断言不许松**。
 echo "④ 门也跳过（R4）"
 timeout 600 moon build --target js > /dev/null 2>&1 || bad "④ 模块编不过，跑不了门"
-DEV=_build/js/debug/build/engine/gates/dev/dev.js
+# ⚠️ **不许写死产物路径**（2026-10-07 实测踩到）：moon 的 js 产物路径取决于**模块在构建根里的身份** ——
+#    独立模块是 `_build/js/debug/build/<pkg>/…`，**工作区成员**多一层 `<作者>/<模块>/` 前缀。
+#    程序根加了 `moon.work`（要吃本地 moobile 源码）之后就走后面那条，于是
+#    `node _build/js/debug/build/engine/gates/dev/dev.js` **找不到文件**（node 报错、退出码 1），
+#    而 ④⑤ 两段把那个 1 当成了"门的读数" ⇒ **两条判据一起假红**（真因完全不在门里）。
+#    ⇒ 两处都找、取 mtime 最新的那份；一条都没有就**明说**，别让下游把"没有文件"读成"门红了"。
+#    （同一条教训的另一次记录在 `launcher/skillpress.mjs` 的文件头。）
+DEV=$(ls -t _build/js/debug/build/engine/gates/dev/dev.js          _build/js/debug/build/*/*/engine/gates/dev/dev.js 2>/dev/null | head -1)
+if [ -z "$DEV" ] || [ ! -f "$DEV" ]; then
+  echo "✗ ④ 找不到 gates/dev 的 js 产物（先 \`moon build --target js\`）—— 产物路径又变了？"
+  exit 1
+fi
 C8=$(mk_corpus gates-ignore)
 printf -- '- beta —— 先不上桌\n' > "$C8/skillpress.ignore.md"
 node "$DEV" --repo "$C8" --skills "$C8/root" --program . > "$C8/gate.txt" 2>&1

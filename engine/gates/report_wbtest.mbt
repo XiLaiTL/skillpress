@@ -1,6 +1,13 @@
 ///|
 /// **锁（G8）与报告组装**的证伪 —— 与 `gates_wbtest.mbt` 共用同一套假宿主与夹具壳。
 ///
+/// ⚠️ 下面几条期望值是**逐字**比对的（报告的措辞也是判据）⇒ `lock.mbt` 改一句话就得改这里。
+///    2026-10-07 就撞过一次：源码里那句"跑一次 `… check --update-lock`"从
+///    `bin/skillpress.mjs` 改成了 `tools/run-js.mjs`（随包发的是启动器，开发期走转发那支），
+///    而**这三条期望值没跟上** ⇒ `moon test` 红了三条，谁也没注意到（后来做图片那条通道时
+///    顺手跑全量才逮到）。**结论不是"别改措辞"，而是"改了就要跑 `moon test`"** ——
+///    措辞被别人钉住，正是这几条的用处。
+///
 /// 为什么单独一个文件：R9（每个源文件 ≤400 行）。这里量的是"**哪一行**被点红"
 /// —— 报告的文字与顺序也是判据（`tools/line-budget.sh` 把这一条变成了可执行的量尺）。
 ///
@@ -36,7 +43,7 @@ test "G8 指纹变了 / 新增 / 已删 / 别的内容根" {
   assert_eq(fails.length(), 1)
   assert_true(hit(fails, "G8 指纹变了：alpha（"))
   assert_true(
-    fails[0].has_suffix("—— 复核这次体量变化，然后 `node ../skillpress/bin/skillpress.mjs check --update-lock`"),
+    fails[0].has_suffix("—— 复核这次体量变化，然后 `node ../skillpress/tools/run-js.mjs check --update-lock`"),
   )
   assert_eq(notes, [
     "G8 新增 skill：delta（7 行 / 0 表格行）—— 确认后用 --update-lock 落锁",
@@ -50,7 +57,7 @@ test "G8 没有 skills.lock.json" {
   let host = mk_host([(fake_skills + "/alpha/SKILL.md", fm_of("alpha"))], [(fake_skills, ["alpha"])])
   let (fails, notes) = check_lock(host, fake_skills, fake_program, skill_dirs(host, fake_skills), skill_dirs(host, fake_skills))
   assert_eq(fails, [
-    "G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
+    "G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/tools/run-js.mjs check --update-lock`",
   ])
   assert_eq(notes.length(), 0)
 }
@@ -97,7 +104,7 @@ test "报告：多文件 skill 的逐行输出与退出码" {
     "    · skills/alpha/FAQ.md  2 行 / 0.0 KB",
     "✗ beta  1 个文件 / 8 行",
     "    ✗ G3 路径不存在：docs/没有这个.md",
-    "    ✗ G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/bin/skillpress.mjs check --update-lock`",
+    "    ✗ G8 没有 skills.lock.json —— 跑一次 `node ../skillpress/tools/run-js.mjs check --update-lock`",
     "\n2 项不合格",
   ])
   assert_eq(out.code, 1)

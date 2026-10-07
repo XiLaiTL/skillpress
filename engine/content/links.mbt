@@ -64,6 +64,7 @@ pub fn resolve_block_links(
   blocks : Array[Block],
   label : String,
   index : Map[String, String],
+  asset_base : String,
 ) -> Array[Block] {
   let out : Array[Block] = []
   for b in blocks {
@@ -102,9 +103,64 @@ pub fn resolve_block_links(
         }
         Table(hd, rs)
       }
+      // **图片的 src 折成"站点能直接加载的 URL"**（对标表 #10）。
+      // ⚠️ 这里**不是**在折"页面键"：第一版拿 `link_key` 折过，而那个函数只认**页面**——
+      //    图片路径永远不在索引里 ⇒ 它一次都没命中过，src 一直是内容里那句原样的相对路径
+      //    （`../assets/fixture.png`），站点照着它去加载**必然 404**：那个路径是相对**那份 md** 的，
+      //    而浏览器是按**页面 URL** 解析的。折键那套"折不动就原样留着"的安全网在这儿是**反的**
+      //    —— 留下来的是个一定加载不到的地址（静默失效，最难查的一类）。
+      Image(alt, src) => Image(alt, asset_src(src, label, asset_base))
       // 代码块与分隔线里没有行内片段
       other => other
     })
   }
   out
+}
+
+///|
+/// 一条图片目标 → **站点能直接加载的 URL**。
+///
+/// 两种：
+///   · **站外 / `data:`**（`http://` `https://` `//` `data:`）⇒ **原样**（那是别人家的服务器，不归站点管）；
+///   · **仓内相对路径** ⇒ 先按"相对那份 md"折成**相对内容根**的规范路径（`../assets/x.png` ⇒
+///     `assets/x.png`），再挂上 `base`（站点上放这些图的目录，如 `img/`）⇒ `img/assets/x.png`。
+///
+/// ⚠️ **不做存在性检查**（那是 `press` 的活）：引擎这一层是**纯文本变换**（它只拿到 `read` 回调，
+///    没有"列举目录"的能力），而 `press` 本来就要把文件**拷**进实例 —— 拷的时候顺手就能发现"少了"，
+///    而且那时候报错能带上"我从哪儿拷到哪儿"两条路径。判据落在真会动手的那一层。
+///
+/// ⚠️ `base` 由调用方给（`--asset-base`，默认 `img/`）：**站点把图放哪儿是站点的事**，
+///    引擎只负责"这一条指向内容根里的哪个文件"。
+pub fn asset_src(raw : String, label : String, base : String) -> String {
+  if is_external_url(raw) {
+    return raw
+  }
+  let l = if label.has_prefix("skills/") {
+    label[7:].to_owned()
+  } else {
+    label
+  }
+  let dir = match l.rev_find("/") {
+    Some(i) => l[:i].to_owned()
+    None => ""
+  }
+  let rel = if raw.has_prefix("/") {
+    // 以 `/` 开头的写法是"相对**内容根**"（与链接那一路同一套口径）⇒ 不拼目录，直接规范化。
+    normalize_rel(raw)
+  } else if dir == "" {
+    normalize_rel(raw)
+  } else {
+    normalize_rel(dir + "/" + raw)
+  }
+  base + rel
+}
+
+///|
+/// 是不是"站外 / 内联"的目标（不归站点管的那些）—— 这类一律**原样**发出去。
+fn is_external_url(raw : String) -> Bool {
+  raw.has_prefix("http://") ||
+  raw.has_prefix("https://") ||
+  raw.has_prefix("//") ||
+  raw.has_prefix("data:") ||
+  raw.has_prefix("mailto:")
 }

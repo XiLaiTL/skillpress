@@ -24,21 +24,28 @@ source tools/_ensure-built.sh
 : "${SKILLPRESS_CORPUS:?用 SKILLPRESS_CORPUS=<内容根> 指定语料（例：../moobile/skills）}"
 
 # ── 前置：native 可执行件（与 `_ensure-built.sh` 同口径：缺了或过期就重编）────────
-NATIVE=""
-for c in _build/native/debug/build/cmd/skillpress-native/skillpress-native.exe \
-         _build/native/debug/build/cmd/skillpress-native/skillpress-native; do
-  [ -f "$c" ] && NATIVE="$c"
-done
+# ⚠️ **产物路径不许写死**（2026-10-07 实测踩到，与 `launcher/skillpress.mjs` 那笔账同源）：
+#    moon 的产物路径取决于**模块在构建根里的身份** —— 独立模块是
+#    `_build/<target>/<profile>/build/<pkg>/…`，**工作区成员**多一层 `<作者>/<模块>/` 前缀。
+#    程序根加了 `moon.work`（要吃本地 moobile 源码）之后走后面那条，而这里写死的是**前面**那条 ——
+#    它**还留在盘上**（旧时间戳），于是这个脚本会**优先挑到旧二进制**去跑对账。
+#    症状不是报错，而是**判据红得莫名其妙**：实测跑的是"链接那一刀"**之前**的 native 产物，
+#    于是 native 那边把链接拍平成 `Txt` + `Code`，看着像"native 与 js 行为不一致"（真因在选错文件）。
+#    ⇒ 两处都找、**取 mtime 最新的那份**。（同一课在 `site-source.sh` 的 `dev.js` 上又演了一遍。）
+pick_native() {
+  ls -t _build/native/debug/build/cmd/skillpress-native/skillpress-native.exe \
+        _build/native/debug/build/cmd/skillpress-native/skillpress-native \
+        _build/native/debug/build/*/*/cmd/skillpress-native/skillpress-native.exe \
+        _build/native/debug/build/*/*/cmd/skillpress-native/skillpress-native 2>/dev/null | head -1
+}
+NATIVE="$(pick_native)"
 if [ -z "$NATIVE" ] || [ -n "$(find engine cmd -name '*.mbt' -newer "$NATIVE" 2>/dev/null | head -1)" ]; then
   echo "（前置：native CLI 缺失或过期 ⇒ 先 moon build cmd/skillpress-native --target native）"
   if ! timeout 1800 moon build cmd/skillpress-native --target native 2>&1 | tail -3; then
     echo "✗ 前置失败：native CLI 编不出来" >&2
     exit 2
   fi
-  for c in _build/native/debug/build/cmd/skillpress-native/skillpress-native.exe \
-           _build/native/debug/build/cmd/skillpress-native/skillpress-native; do
-    [ -f "$c" ] && NATIVE="$c"
-  done
+  NATIVE="$(pick_native)"
 fi
 [ -n "$NATIVE" ] || { echo "✗ 找不到 native 可执行件（编出来了吗？）" >&2; exit 2; }
 

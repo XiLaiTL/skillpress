@@ -32,6 +32,11 @@ pub(all) enum Block {
   P(Array[Span])
   Quote(Array[Span])
   Code(String, String, Array[(String, Int)]) // 语言, 正文, 高亮片段（文本, 色号）
+  /// **图片**：`(alt, src)` —— 整行一条的 `![alt](src)`（对标表 #10）。
+  /// ⚠️ `src` 是**站点能直接加载的 URL**（相对站点根，如 `assets/x.png`）或**站外 URL** 原样 ——
+  /// 把"内容里的相对路径"折成这两者之一是**引擎 + `press`** 的活（见 `engine/content/links.mbt`
+  /// 的 `asset_src` 与 `tools/press.mjs`），站点这一层**不许再算一遍**（同一件事两个副本迟早分叉）。
+  Image(String, String)
   Ul(Array[(Int, String, Array[Span])]) // 缩进, 序号前缀(有序列表用), 内容
   Table(Array[Array[Span]], Array[Array[Array[Span]]]) // 表头, 行
 }

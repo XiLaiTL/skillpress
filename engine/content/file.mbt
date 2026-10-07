@@ -115,7 +115,7 @@ fn home_lit_lines(h : HomeLit, pad : String) -> Array[String] {
 /// ⚠️ **P6 起这里不再有类型声明**：`Span` / `Block` / `Kid` / `Doc` / `NavItem` / `Section` / `Home`
 /// 全搬进了包 `shell`（`shell/types.mbt` 是唯一声明处），生成物只填值。
 /// 这条"搬家"就是 `tools/file-parity.sh` 里那份**归一化**存在的理由（旧形状 = 有类型声明 + 裸构造器）。
-fn header_lines() -> Array[String] {
+fn header_lines(home_src : String) -> Array[String] {
   [
     "// 由 `skillpress` 生成（P6 起是 MoonBit 引擎：`cmd/skillpress gen-file`）—— **别手改**。",
     "//",
@@ -123,7 +123,13 @@ fn header_lines() -> Array[String] {
     "// `NavItem` / `Section` / `Home`）。这份文件只**填值**，所以每个构造器都带 `@shell.` 前缀 ——",
     "// 为什么必须带，见 `engine/content/emit.mbt` 里 `REC` 的注释。",
     "//",
-    "// 内容源：`skills/skillpress/SKILL.md`（首页）+ `skills/<name>/{SKILL.md,references/*.md,scripts/*}`。",
+    // ⚠️ 首页那一段**不许写死**（2026-10-07 补）：真源是这次真的选中的那个源
+    //    （`WEBSITE.md` 优先，回退才轮到 `SKILL.md`，`--home` 覆盖时就用给的那条）。
+    //    写死的后果是**生成物在撒谎** —— 它明明来自 `WEBSITE.md`，注释却说来自 `SKILL.md`。
+    //    （同一个坑在 `llms_lines()` 里更狠：那边写死会让 `press` **当场停下**，见 FINDINGS。）
+    //    ⚠️ 改这句**不动任何 golden**：归一化规则①把开头的 `//` 块整块抹掉，
+    //    所以这条注释从来不在对账范围内 —— 也正因如此，它能错很久没人发现。
+    "// 内容源：`" + home_src + "`（首页）+ `skills/<name>/{SKILL.md,references/*.md,scripts/*}`。",
     "// 为什么在构建期解析 markdown：见 `tools/gen-content.mjs` 的文件头（映射的**参照实现**还在那边）。",
     "",
   ]
@@ -238,7 +244,15 @@ fn footer_lit_lines(f : FooterLit) -> Array[String] {
 ///    别再各造一份（两份路径口径 = 迟早对不上，而 Agent 拿到的是一个走不通的地址）。
 ///
 /// ⚠️ 这份文本要**逐字节可复现**（`press --check` 拿它跟磁盘那份逐行比）⇒ **不许写时间戳**。
-pub fn llms_lines(home : HomeLit?, docs : Array[DocLit]) -> Array[String] {
+///
+/// ⚠️⚠️ 首页那条原文路径**必须用这次真的选中的那个源**（`home_source`）——
+///    这一行原来**写死**着 `skills/skillpress/WEBSITE.md`，而文件头上面那句注释写的恰恰是
+///    "原文路径从 slug / name 现拼"。写死的后果不是"文案不准"：**首页回退到 `SKILL.md`
+///    的内容根上（R2 明确支持、也没写 `WEBSITE.md` 的工程就是这样）**，llms.txt 会指一份
+///    **不存在的文件**，而 `press` 下一步要按这份清单把原文拷进 `md/` ⇒ **当场报错停下**
+///    （实测：`tools/fixtures/corpus/skills` 这份夹具语料上，站点根本印不出来）。
+///    这是 2026-10-07 做图片那条通道时撞出来的 —— 判据覆盖不到的那半边，一直是坏的。
+pub fn llms_lines(home : HomeLit?, docs : Array[DocLit], home_source : String) -> Array[String] {
   let out : Array[String] = []
   out.push("# llms.txt")
   out.push("")
@@ -246,7 +260,7 @@ pub fn llms_lines(home : HomeLit?, docs : Array[DocLit]) -> Array[String] {
   if home is Some(h) {
     out.push("")
     out.push("## 首页（" + h.title + "）")
-    out.push("- 原文: skills/skillpress/WEBSITE.md")
+    out.push("- 原文: skills/" + home_source)
   }
   for d in docs {
     out.push("")

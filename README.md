@@ -74,7 +74,7 @@ node tools/run-js.mjs attach --skills <别人的内容根> --ignore "某份=它�
 |---|---|
 | ~~`lib/`~~ ~~`bin/`~~ | **已整体退役**（2026-10-07，PLAN 的 D43）：它们是迁移期的**冻结旧实现**（真相参照物），现役实现全在 `engine/**` + `cmd/**`。参照物的职责由 `tools/fixtures/expected/` 里的**入库 golden** 接管。⚠️ 仓库里凡是提 `lib/xxx.mjs` / `bin/skillpress.mjs` 的地方，现在都是**历史坐标**（对账与迁移记录里的出处），不是活文件 |
 | `skills/` | **程序自己的 skill**（见下节）—— `skills` 是"给别人看的内容"，不是这里 |
-| `engine/site/` | **站点判据的本体**（P8.3）：进程内静态服务 + 起无头 Chrome + 走 CDP 跑 22 条断言（语料侧读数 / 页面侧读数 / 断言编排 / 报告）。⚠️ **native-only**：要 async 的 http server / websocket / process，而它们在 `moonbitlang/async` 的 js 目标上**没有实现** ⇒ 这条路上要一次 native 编译 |
+| `engine/site/` | **站点判据的本体**（P8.3）：进程内静态服务 + 起无头 Chrome + 走 CDP 跑 **23 条断言**（语料侧读数 / 页面侧读数 / 断言编排 / 报告）。⚠️ **native-only**：要 async 的 http server / websocket / process，而它们在 `moonbitlang/async` 的 js 目标上**没有实现** ⇒ 这条路上要一次 native 编译 |
 | `grammars/` | vendor 的语法资产（wasm + `highlights.scm`），出处与 sha256 见它的 `PROVENANCE.md` |
 | `vendor/web-tree-sitter/` | vendor 的 tree-sitter **运行时**（MIT：一个 ESM 入口 + 一个 wasm）—— 与 `grammars/` 一起**随包发** ⇒ 拿到包的人**一个 npm 依赖都不用装**（见它的 `PROVENANCE.md`） |
 | `launcher/skillpress.mjs` | 随包发的**启动器**（**js 那条路**的）**，也是引导层的唯一实现**：`Parser.init()` 是 Promise 而 js 产物是 CJS ⇒ 需要一个能 await 的 Node 启动器（`check` 那条路上连 tree-sitter 都不 import）。开发期的 `tools/run-js.mjs` 转发到它（D35）。**native 那条路不需要它** —— 见 `cmd/skillpress-native/` |
@@ -111,7 +111,8 @@ node tools/run-js.mjs attach --skills <别人的内容根> --ignore "某份=它�
 export SKILLPRESS_CORPUS=../moobile/skills     # 下面的命令都按这个内容根跑
 # ① ② ③（迁移期的三条对账判据：整份生成物 / 上色 / 文档块）**已随 `lib/` 退役**（D43）——
 #    它们的职责现在由 ⑫ 承担（参照物从「现场跑的旧实现」换成了入库 golden）。
-bash tools/blocks-fixtures.sh     # ④ 夹具：残缺的围栏 / 缺分隔行的表格 / 图片与原始 HTML / 空内容根 —— 与入库 golden 逐字节比
+bash tools/blocks-fixtures.sh     # ④ 夹具：残缺的围栏 / 缺分隔行的表格 / 原始 HTML / 空内容根 —— 与入库 golden 逐字节比
+                                  #    （`--capture` 重采；整行图片**已支持** ⇒ 夹具三里它是"不许再被点名"的反向控制）
 bash tools/line-budget.sh         # ⑤ R9：每个源文件 ≤400 行（默认全覆盖 + 显式豁免；--selftest 造 401 行的诱饵证明它会红）
 bash tools/diagnostics-ledger.sh  # ⑥ 诊断口径账本：旧实现 76 条诊断逐条"有对应物"或"记了账"（--selftest 改坏锚点即红）
 bash tools/fresh-clone-check.sh   # ⑦ 干净克隆自查：把 HEAD 克隆到临时目录（只有 tracked 文件）、现装现编，再跑上面几条 + R9 + 账本
@@ -137,6 +138,9 @@ bash tools/acceptance.sh          # ⑪ 验收：按 PLAN §6 的 A1/A2/A3 逐�
 bash tools/normalize-gen.sh --selftest                       # 归一化只抹形状：值 / 顺序 / 缩进 / 正文空行改一处都必须红
 node tools/dom-dump.mjs --app <实例> --out a.html --repeat 2  # 真 Chrome 抓 DOM：先自证仪器（两次逐字节相同），再比搬前/搬后
 node tools/press.mjs --check                                 # 实例里的生成物与**新引擎现跑**逐字节一致（= 旧 `press --check` 的位置）
+node _scratch/image-check.mjs                                # 「图片」那条通道（对标表 #10）：现搭一份夹具站点，
+                                                             #   真 Chrome 量"真 <img> / 解码尺寸 / alt / 占版面 / 按 URL 取字节"
+                                                             #   （`--drop-asset` 是它的证伪开关 ⇒ 必须红 3 条）
 ```
 
 前几条会把两边的原始输出与 diff 落在 `_build/parity/`（产物目录，不进仓）。
@@ -188,7 +192,7 @@ node tools/run-js.mjs check --skills skills --update-lock   # 复核体量后落
 node tools/run-js.mjs check            # 门：skill 自己（G1–G8）
 moon test engine/gates                 # 门自己的证伪：22 条 wbtest（诱饵全被点名）
 node tools/run-js.mjs audit            # 上色的回归闸门（召回率 / 未上色比例）
-bash tools/verify.sh                   # 站点判据：22 条（真 Chrome 无头；**要一次 native 编译**）
+bash tools/verify.sh                   # 站点判据：**23 条**（真 Chrome 无头；**要一次 native 编译**）
 moobile/tools/skillpress-gates.mjs --gate facts   # 事实来源对账（按 D18 住在**内容仓**）
 ```
 
@@ -225,8 +229,11 @@ moobile/tools/skillpress-gates.mjs --gate facts   # 事实来源对账（按 D18
    ✅ **目录可点 + 跟读高亮也已落地**（`_scratch/toc-click.mjs`）。
    ✅ **正文链接也可点了**（#9，`_scratch/link-check.mjs`）：`Span::Link` + 引擎把目标**折成页面键**，
    站内**路由跳页**（不刷新）、站外走 `@sub.open_url`；代码块工具条（#5）与 prod 产物档（#14）也已落地。
-   ⬜ 还差的：**页面内 `#section` 深链**（目录能跳，但"地址栏里带某一节"还没有）、
-   以及对标表里的 **#10 图片**（引擎点名拒绝 + 标签表排除 `img` —— 下一刀）。
+   ✅ **#10 图片也落地了**（2026-10-07）：整行一条的 `![alt](src)` ⇒ 引擎折 URL + `press` 拷资产到实例
+   `img/` + `build-web` 拷进 `dist/` + 站点排成**真正的 `<img>`**；读数 `_scratch/image-check.mjs`
+   （真 Chrome 量"真 `<img>` / 解码尺寸 / `alt` / **占版面** / 按 URL 取回字节"，含 `--drop-asset` 证伪）。
+   ⚠️ 两条留在明处的缺口：原生 RN 的 `img` 仍需调用方给尺寸；**行内图片没有去处**（今天退化成一条链接）。
+   ⬜ 还差的：**页面内 `#section` 深链**（目录能跳，但"地址栏里带某一节"还没有）。
    ✅ 已经还掉的两笔旧账：**窄屏入口**（三个贴边按钮 + 两级交互 + 遮罩互斥，`shell/mobile.mbt`）；
    **URL 路由**（hash ⇄ 状态双向 + 后退 + 深链 + 404 有到达路径，`shell/route.mbt`）。
 6. ✅ **产物默认就是 prod 档**（2026-10-07 起）：`npm run build` 走 `NODE_ENV=production` + `minify`

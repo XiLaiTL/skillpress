@@ -224,7 +224,12 @@ fn topbar(theme : Theme, ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @ht
       .border_bottom_width(1.0)
       .border_bottom_color(p.line1)
       .z_index(30.0),
-    ),
+      // ⚠️ 顶栏一个**具名节点**（`id="topbar"`）：判据要能**指到它**再说话。
+      //    站点判据（`engine/site/`）里那些"顶栏有哪几条导航 / 导航排在同一行吗"如果只按
+      //    整页子串找，就会**把正文里的同名文字也算进去**（实测：首页那张 CTA 卡片上写着
+      //    「文档 / SKILL」⇒ 一条本该红的判据假绿）。有名字之后，量的是**顶栏里**的东西。
+      //    （与 `#prose` / `#toc-rail` / `#pane` 同一套做法：判断先要能指得准。）
+    ).id("topbar"),
     [
       brand,
       @html.div(
@@ -233,7 +238,10 @@ fn topbar(theme : Theme, ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @ht
           .flex_direction(@style.FlexDirection::Row)
           .align_items(@style.Align::Center)
           .gap(sp1),
-        ),
+          // 导航那一排的具名节点（`#topnav`）：判据要能**只量这一排** ——
+          // 每一条都是这一排的**直接子元素**，于是"顶栏列了哪几条"可以逐条读出来比
+          // （判据在 `engine/site/`：`#topnav > *` 取条目自己的文字）。
+        ).id("topnav"),
         mid,
       ),
       @html.div(attrs=attrs(@style.Style::new().flex(1.0)), ([] : Array[@html.Html])),

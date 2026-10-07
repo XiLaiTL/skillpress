@@ -40,7 +40,7 @@ pub fn all_tokens() -> Array[String] {
 ///
 /// ⚠️ 这个常量**随包发**（住在 `engine/`，不是 `tools/`）—— 生成器跑在**使用者的机器**上，
 ///    配置留在 `tools/` 里等于使用者拿不到。
-pub let host_dep_default : String = "^0.5.0"
+pub let host_dep_default : String = "^0.6.0"
 
 ///|
 /// 模板文件名 → 写出时的文件名。

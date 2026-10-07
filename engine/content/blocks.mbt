@@ -68,6 +68,40 @@ fn report_at(label : String, line : Int, kind : String, detail : String, report 
 ///
 /// `label` + `report` 是"点名用的"：`dump-blocks` 这条命令不关心（判据是"生成物逐字节一致"），
 /// 传个空标签与不吭声的回调就行；`gen-file` 那一路把它们汇进问题清单（有问题 ⇒ 退 2、不吐产物）。
+///|
+/// 一行是不是"恰好一条图片"：`![alt](src)`（首尾空白允许）。
+///
+/// 认不出给 `None`（调用方负责**点名** —— 本仓的老规矩：不静默丢）。
+/// ⚠️ 判据与纯链接节那条同源：**整行恰好一条**。`alt` 里不许有 `]`、`src` 里不许有 `)` ——
+///    与 `find_next` 里链接的写法保持一致（两处口径要是一致，否则同一行会出现两种解析）。
+fn image_of(line : String) -> Block? {
+  let t = trim(line)
+  if !t.has_prefix("![") {
+    return None
+  }
+  let c = chars(t)
+  // 找 `](`
+  let mut mid = -1
+  for i = 2; i < c.length() - 1; i = i + 1 {
+    if c[i] == ']' && c[i + 1] == '(' {
+      mid = i
+      break
+    }
+  }
+  if mid < 0 {
+    return None
+  }
+  if c[c.length() - 1] != ')' {
+    return None
+  }
+  let alt = slice(c, 2, mid)
+  let src = trim(slice(c, mid + 2, c.length() - 1))
+  if src == "" {
+    return None
+  }
+  Some(Image(alt, src))
+}
+
 pub fn parse_blocks(body : String, label : String, report : (String) -> Unit) -> Array[Block] {
   let lines = split_lines(body)
   let blocks : Array[Block] = []
@@ -187,9 +221,25 @@ pub fn parse_blocks(body : String, label : String, report : (String) -> Unit) ->
       blocks.push(Ul(items))
       continue
     }
-    // 认不出的构造：跳过（不渲染）但**点名** —— 旧实现的两条 `problems.push`
+    // **图片**（对标表 #10）：`![alt](src)` —— 整行就是一条时收成 `Image` 块。
+    // ⚠️ 只认"整行恰好一条图片"（与纯链接节同一条规矩）：行内混排的图片今天仍**点名**，
+    //    因为行内 `<img>` 在 RN 的 `Text` 流里立不住（那是另一件事，别混着做）。
     if t.has_prefix("![") {
-      report_at(label, i + 1, "不支持的构造（图片）", slice(chars(t), 0, 40), report)
+      match image_of(t) {
+        Some(img) => {
+          blocks.push(img)
+          i = i + 1
+          continue
+        }
+        None =>
+          report_at(
+            label,
+            i + 1,
+            "图片只支持「整行恰好一条」：`![alt](src)`（行内混排暂不支持）",
+            slice(chars(t), 0, 40),
+            report,
+          )
+      }
       i = i + 1
       continue
     }
