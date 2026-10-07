@@ -219,6 +219,12 @@ for (const w of widths) {
     const after1 = (await P("snapshot()")).fabs.find((f) => /目录/.test(f.label));
     const moved = after1.left - before.left;
     say(Math.abs(moved) >= 20, `两级①：第一次点**浮出**（几何位移 ${moved}px，离开贴边）`);
+    // **位移是 transform 做的，不是布局**（2026-10-07 起把"负偏移"换成 `Translate`）：
+    // 判据读的是"布局位置 `offsetLeft` 不变、而计算出来的 `transform` 变了" —— 两条一起才成立。
+    say(
+      before.offLeft === after1.offLeft && before.tf !== after1.tf,
+      `两级①的位移来自 **transform**（布局 offsetLeft 不变 = ${before.offLeft}；transform ${before.tf} → ${after1.tf}）`,
+    );
     await clickAt(await P("fab('☰ 目录')"), 400);           // 第二次：弹 sheet
     const sheet1 = (await P("snapshot()")).sheet;
     say(!!sheet1, `两级②：第二次点才弹 sheet（面板高 ${sheet1 && sheet1.h}px）`);

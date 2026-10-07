@@ -160,7 +160,11 @@ window.__p = (function () {
         sheet: (function () { var p = panel(); return p ? { h: box(p).h, x: box(p).x, y: box(p).y } : null; })(),
         fabs: absBoxes().filter(function (el) { return /导航|书架|目录/.test(el.textContent || ''); })
           .map(function (el) { return { label: el.textContent.trim(), x: center(el).x, y: center(el).y,
-            left: Math.round(el.getBoundingClientRect().left), bg: cs(el, 'backgroundColor') }; }),
+            left: Math.round(el.getBoundingClientRect().left), bg: cs(el, 'backgroundColor'),
+            // 这两个是一起读的，用来分开「位移」与「布局」：
+            // offsetLeft 是布局位置（不受 transform 影响），tf 是计算出来的 transform。
+            // 两者配合才能证「浮出是位移做的」（2026-10-07 起站点不再用负偏移）。
+            offLeft: el.offsetLeft, tf: cs(el, 'transform') }; }),
         bodyText: document.body.innerText.trim().slice(0, 60),
       };
     },

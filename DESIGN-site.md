@@ -248,10 +248,14 @@ slug 想给 Agent 看，走面包屑末位与 Agent 面板（那两处本来就�
 **两级交互**：平时**贴边停靠**（半藏，不挡内容）→ **第一次点：按钮浮出**（离开边缘、进入可见态）→ **第二次点：sheet 弹出**。
 sheet：高度上限 70vh、圆角上沿、下滑关闭、点遮罩关闭、**三个互斥**。
 
-**【实现依赖，今天全部没有】**：
-① **portal**（浮层不被父容器 `overflow` 裁）② **遮罩 + 点击穿透**（`@style` 里 `pointer` 命中 0）
-③ **过渡**（`transition` 刻意不加 ⇒ "浮出"与"弹出"今天只能是硬切）。
-⇒ 这一节**必须**先由 moobile（我们自己的仓）补上这三样，否则移动端只能做成"硬切 + 不遮罩"。
+**【实现依赖】—— 2026-10-07 更新：三样里少了半样，另外两样还在**：
+
+| # | 依赖 | 今天的状态 |
+|---|---|---|
+| ① | **portal**（浮层不被父容器 `overflow` 裁） | ❌ 仍然没有。绕法还是老那条：**根不滚 + 绝对定位挂在根上**（等价 fixed），所以浮层必须渲染在 `layout.shell` 的最后一个孩子里 |
+| ② | **遮罩 + 点击穿透**（`@style` 里 `pointer` 命中 0） | ❌ 仍然没有 `pointerEvents`。所以遮罩**只在需要时画**（关着的时候页面上一个多余的可点区域都没有），不是靠 `pointer-events: none` 让它透明 |
+| ③ | **过渡**（`transition`） | ❌ 仍然没有（乙级，D-UI-4 明确不做）⇒ "浮出"与"弹出"**还是硬切** |
+| ~~④~~ | ~~**位移**（"浮出"要挪 22px）~~ | ✅ **已还清（`transform`）**：`Style::transform` 落地之后，"半藏/浮出"用 `Translate` 表达，**不再用负偏移** ⇒ 也不再把横向滚动宽撑出去（实现在 `shell/mobile.mbt`，读数 `tools/ui-probe.mjs`：**布局 `offsetLeft` 不变、`transform` 从 `matrix(…,22,0)` 变到 `matrix(…,-12,0)`**）。⚠️ 别把它读成"有动画了"—— 那要 ③ |
 
 ---
 
@@ -458,7 +462,7 @@ footer.license = Apache-2.0
 ⚠️ 另一条：**`@nav.push_url` 在 0.5.0 里是死代码** —— `rabbita/nav` 的 op **没有任何宿主实现**，调它是**静默 no-op**（正是本仓最忌讳的假通道），所以写地址用的是 `@dom.window().push_url()`（`pushState`，不触发 popstate ⇒ 无重入）。
 👉 **抬版之后只改两个函数**（`url_now()` → `@sub.current_url()`、`push_url_cmd` → `@nav.push_url`），解析/生成与接线一行不用动。**今天不抬也能跑**（web 站点）；RN 上今天没有路由。仪器：`_scratch/route-check.mjs`（带地址进来）+ `_scratch/route-flow.mjs`（在页面里操作：点 → hash → `history.back()`） |
 
-| **M5-⑧** | **moobile 甲级样式**（跨仓）：`cursor` + `box_shadow` 落地；`transform` 给取舍未动；"滚到节点 / 元素测量"给形状未动 | ✓ `style_platform_check` **14 通过 / 0 失败**、`bash tools/verify_all.sh` **exit 0 全绿**、moobile `moon check` 0 errors。**并且它当场纠正了我两处错判断**（见 `PLAN-ui §6.7`）：① 我说 `cursor` 是"web 独有、原生不认" —— **错**，那条门读仓里**真 RN 登记表**（0.83.10 / 0.86.3）当场红："已经支持了：cursor"；② 我说 `box_shadow` 要按后端分叉 —— **不必**，现代 RN 与 RNW 都认一条字符串。⇒ 教训：**"这个能力各端有没有"不该靠推断，该读各端自己的登记表**（本仓已有那种机器校验的门）。**⑤ 的真卡点也探明了**：不是缺滚动 API，是缺**节点寻址**（moobile 没有节点句柄/ref 通道）⇒ 先补那一层，再谈滚到节点与测量 |
+| **M5-⑧** | **moobile 甲级样式**（跨仓）：`cursor` + `box_shadow` 落地；~~`transform` 给取舍未动~~ ⇒ ✅ **2026-10-07 也落地了**（`PLAN-ui §6.7` 的第三处更正：字符串**两端都认** ⇒ 不必按后端分叉、`StyleValue` 一个变体没动；站点侧"半藏/浮出"随后改用 `Translate`，见 §4.3 那张表）；~~"滚到节点 / 元素测量"给形状未动~~ ⇒ ✅ 同日两刀（节点寻址 + 容器级滚动订阅） | ✓ `style_platform_check` **14 通过 / 0 失败**、`bash tools/verify_all.sh` **exit 0 全绿**、moobile `moon check` 0 errors。**并且它当场纠正了我两处错判断**（见 `PLAN-ui §6.7`）：① 我说 `cursor` 是"web 独有、原生不认" —— **错**，那条门读仓里**真 RN 登记表**（0.83.10 / 0.86.3）当场红："已经支持了：cursor"；② 我说 `box_shadow` 要按后端分叉 —— **不必**，现代 RN 与 RNW 都认一条字符串。⇒ 教训：**"这个能力各端有没有"不该靠推断，该读各端自己的登记表**（本仓已有那种机器校验的门）。**⑤ 的真卡点也探明了**：不是缺滚动 API，是缺**节点寻址**（moobile 没有节点句柄/ref 通道）⇒ 先补那一层，再谈滚到节点与测量 |
 
 | **M5-③** | **主题跟随系统**：`shell/hosttheme.mbt`（58 行，读宿主全局，与引擎 `ts_shim.mbt` 同形）+ 两个实例 `index.html` 的 `<head>` 同步脚本（bundle 之前读 `localStorage` + `matchMedia`，把解析结果写进那格）+ `state.mbt` 接线（`initial` 同步读；`SetTheme` 走 `@cmd.custom_cmd` 写回宿主；`SysTick` 轮询，**值没变就返回同一个 model**） | ✓ **首屏不闪**（真 Chrome，`_scratch/theme-firstpaint.mjs`）：种 dark ⇒ **首帧壳底 rgb(24,24,27)**（不是先亮后暗）；种 light ⇒ 首帧白；不种 ⇒ 宿主那格的 dark 与 `matchMedia` **逐位一致**（应用真读了那格，不是自己猜）；点开关 ⇒ `localStorage` 写回 ✓。取首帧的办法：探针注在 `</body>` 之后 ⇒ bundle 已同步挂载完、**任何定时器都还没跑过**。门：`moon check` 0 error（warnings 我方量到 **15**，实现方报 14）/ R9 ✓ 135 文件 / `theme-check` ✓ / `ui-probe` 三档（实现方报绿）＋ **③ 的专项探针我方已独立复跑：`node _scratch/theme-firstpaint.mjs` ⇒ 7 条全过**（种 dark 首帧壳底 `rgb(24,24,27)` / 种 light 首帧白 / 不种则宿主那格与 `matchMedia` 一致且首帧底色跟上 / 点开关写回 `dark`→`auto`）——`ui-probe` 三档本身仍只记**实现方报绿**，别混读 |
 | | ⚠️ **「跟随系统变化」只有「通道存在」，没有行为读数** —— 无头 Chrome 改不了系统级 `prefers-color-scheme`，触发不了。本仓用 `@sub.every(2000)` 轮询顶上，代价（2 秒粒度 + 常驻定时器）写在代码注释；**真正的事件通道要 moobile 补**（`@sub` 公开面没有媒体查询订阅）。**不许读成已解决。** |

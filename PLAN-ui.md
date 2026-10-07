@@ -386,7 +386,7 @@ moobile 里没有"CSS 变量"这个概念 —— 样式就是值，所以主题*
 | 能力 | 语义构造器（`style/style.mbt`） | 后端翻译（`render.mbt`） |
 |---|---|---|
 | `box_shadow` | `box_shadow(color, x, y, blur, spread?)` —— **不暴露 CSS 字符串**（那等于把 web 语法漏进可移植子集） | web/RNW → `boxShadow: "<x>px <y>px <blur>px <spread>px <color>"`；RN → `shadowColor/Offset/Opacity/Radius`（Android 再叠 `elevation`）；两者都缺 ⇒ **不画**（不是抛错：静态站能降级） |
-| `transform` | `translate(x, y)` / `scale(f)` / `rotate(deg)` —— 语义动作，不是裸字符串 | web/RNW → `transform: "translate(...) scale(...)"`；RN → **数组**（`[{translateX}, {scale}]`，顺序敏感）⇒ 语义层必须**保留顺序**（`Array[Transform]`，不是结构体字段） |
+| `transform` | ✅ **已落地（2026-10-07）**：`Style::transform(Array[Transform])`，`Transform::Translate(x, y)` / `Scale(f)` / `Rotate(deg)` —— 语义动作，**调用点给不出裸字符串** | ✅ **实现比这张表写的简单**：实测（读两端真源码）**字符串两端都认** ⇒ 不需要按后端分叉（见下面那条"实测把这张表改了两处"的续记）。真浏览器读数：先移后缩 ⇒ `matrix(2,0,0,2,40,0)`、先缩后移 ⇒ `matrix(2,0,0,2,**80**,0)`（**同一组动作换个顺序结果不同** ⇒ 顺序真的保住了）、`rotate(90deg)` ⇒ `matrix(0,1,-1,0,0,0)` |
 | `cursor` | `cursor(Cursor::Pointer \| Text \| Default)` —— 只有"这是可点的 / 这是文字"两三种语义 | web/RNW → `cursor: "pointer"/"text"/"default"`；RN → **无对应物**（触摸屏没有指针）⇒ 静默不画，**但要在 §3.1 的降级表里写明**（"静默"和"漏了"要分得开） |
 
 **管道已经探明（2026-10-07，读码读出来的，不是猜的）**：
@@ -418,6 +418,20 @@ render.mbt : styles_to_js()  →  set_style_value(o, k, v, font_size)
 
 ⇒ 这两条一起说明一件事：**"这个能力各端有没有"不该靠推断，该靠读各端自己的登记表**（本仓已经有那种机器校验的门，用它）。
 
+**2026-10-07 落 `transform` 时，同一句话又对了一次（第三处更正）**：§6.7 原写"RN 要**数组**、web 要字符串
+⇒ 语义层必须能表达有序序列 ⇒ 要动 `StyleValue`"。**读两端源码之后不成立**：
+
+| 原写 | 实测（读源码） |
+|---|---|
+| RN 只吃数组 | ❌ `Libraries/StyleSheet/processTransform.js` 的签名就是 `Array<Object> \| string`；传字符串时用 `/(\w+)\(([^)]+)\)/g` 拆成**单键对象**、**保序** ⇒ 字符串是它的一等输入 |
+| web 只吃字符串 | ❌ RNW 0.21.3 的 `preprocess.js`：`Async`… 那一支只在 `Array.isArray` 时才翻译，**字符串原样落进 CSS** ⇒ 也认 |
+
+⇒ 于是实现与 `box_shadow` 同一形状：**一条字符串**，`StyleValue` 一个变体都没动。
+⚠️ 但有一条**必须守住**（RN 的硬校验 + 本仓 canvas 的前科）：**一个动作一个函数** ——
+`Translate(x, y)` 吐 `translateX(…) translateY(…)` **两个**函数，绝不吐 `translate(x, y)`；
+因为 RN 的 `_validateTransforms` 要求每个 transform 对象**恰好一个键**，而 RN Skia 只读
+`Object.keys(val)[0]`（第二键静默作废 —— 罗盘曾被画成椭圆）。判据：`style/style_wbtest.mbt` 数函数个数。
+
 **⑤ 的真正卡点（2026-10-07 探明，比"缺滚动 API"更靠前一层）**：
 目录"可点 + 跟读高亮"要的不是滚动函数（web `scrollIntoView` / RN `ScrollView.scrollTo` 都在），而是**节点寻址** ——
 **moobile 今天没有节点句柄 / ref 通道**（拿不到节点 ⇒ 既滚不了也量不了）。
@@ -437,7 +451,7 @@ render.mbt : styles_to_js()  →  set_style_value(o, k, v, font_size)
    在 RN 后端有对应表达（或**明确记录**"该端不画"），且 `moon test` 里有对照读数。
 
 **顺序**：`cursor`（最小、能立刻验证"语义构造器 + 后端翻译"这条管道）→ `box_shadow`（层次，DESIGN §3.3 的 `--shadow-*` 五档等着它）
-→ `transform`（位移 = 窄屏"浮出"与抽屉；DESIGN §4.3 的两个【实现依赖】里它占一条）。
+→ `transform`（位移 = 窄屏"浮出"与抽屉；DESIGN §4.3 的两个【实现依赖】里它占一条）—— ✅ **2026-10-07 三样齐了**。
 
 ⚠️ **代价照写**：这三样落在 **moobile 仓**（另一个模块），要**升版本 + 跑它自己的 `verify_all` / `cap_platform`**；
 skillpress 这边的 `moon.mod` 依赖版本也得跟着抬。**跨仓改动，本仓只做消费者与判据。**
@@ -878,7 +892,7 @@ wc -l shell/*.mbt                           # 每个 ≤400；实例 app.mbt 仍
 | ⑧ | 甲级样式 `cursor` / `box_shadow` / `transform` | **跨仓 moobile**（D-UI-4 已拍 B）。观感大头（阴影 / 抽屉位移 / 悬停手感）全在这一格里；做完 ⑤ 的"浮出"与 ⑥ 的浮层也都沾光 |
 
 **moobile 侧要补的能力清单（照 ⑤⑧ 攒着，一起做更省）**：`cursor` ✅ · `box_shadow` ✅ · **滚到节点** ✅ ·
-**元素测量** ✅ · **容器级滚动订阅** ✅ · `transform`（⬜ 未动 —— 现在只剩它一个）。
+**元素测量** ✅ · **容器级滚动订阅** ✅ · **`transform`** ✅（2026-10-07 落地 —— **这一格清空了**）。
 
 ### 13.6 路由接线（功能排期，2026-10-07 用户定"先齐功能、判据挂起"）
 

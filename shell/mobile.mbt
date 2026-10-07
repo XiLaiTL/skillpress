@@ -15,8 +15,13 @@
 // 1. **没有 `position: fixed`**（`style.mbt` 只有 `Relative` / `Absolute`）。
 //    但**根容器不滚**（三栏各自滚，见 layout.mbt）⇒ 绝对定位挂在根上**等价于 fixed**。
 //    所以这一层必须渲染在**根**里（`layout.shell` 的最后一个孩子），不能塞进某一栏。
-// 2. **没有 `transition` / `transform`**（`style.mbt` 刻意不加）⇒ "浮出"是**硬切**：
-//    贴边时 `left = -22px`、浮出时 `left = 12px`，没有动画。这一条是 §4.3 明确记的【实现依赖】。
+// 2. ✅ **`transform` 已经补上了**（2026-10-07，moobile 的甲级三样收尾）⇒ "浮出"不再靠**负偏移**，
+//    而是"布局位置固定 + `Translate(x)` 位移"：
+//    · **为什么这件事要做**：负偏移会**把横向滚动宽撑出去**（内环实测 768px 下溢出 22px）——
+//      以前只能靠根上的 `overflow: Hidden` 裁掉它（`layout.mbt` 那条注释就是这笔账）；
+//      而**位移不参与布局** ⇒ 撑不出去，根那条裁剪也就不再是"为了这个"。
+//    · **仍然没有 `transition`**（乙级，D-UI-4 明确不做）⇒ "浮出"依旧是**硬切**，没有动画。
+//      这一条仍记在 §4.3 的【实现依赖】里 —— 别把"用了 transform"读成"有过渡动画了"。
 // 3. ⚠️ sheet 的高度上限写的是 `max_height: 70%` —— **web 上验过**（内环读到面板高 530px / 视口 900），
 //    **原生（RN）上没验**：那里 `%` 是按父容器还是按屏幕算，今天没有读数。别当它验过。
 //
@@ -65,7 +70,10 @@ fn fab(
 ) -> @html.Html {
   let p = theme.palette
   let open = model.sheet == idx
-  // 两级：贴边（半藏，`-22px`）→ 浮出（`12px`）。硬切 —— 没有 transition（见文件头第 2 条）。
+  // 两级：贴边（半藏，**位移 -22px**）→ 浮出（**位移 +12px**）。
+  // ⚠️ 位移走 `transform`（不参与布局）而不是 `left/right` 的负偏移 —— 见文件头第 2 条：
+  //    负偏移会把横向滚动宽撑出去（实测 768px 下溢出 22px），以前只能靠根上 `overflow: Hidden` 裁。
+  //    硬切 —— **仍然没有 transition**（乙级能力，见文件头）。
   let off = if model.peek == 1 { sp3 } else { -22.0 }
   let mut s = @style.Style::new()
     .position(@style.Position::Absolute)
@@ -83,10 +91,12 @@ fn fab(
   } else {
     s = s.bottom(@style.px(sp4))
   }
+  // 布局位置钉在贴边（0），"半藏在外面/浮出来"全交给位移。
+  // ⚠️ 左右两侧的**符号相反**：左侧要往外 = x 为负；右侧要往外 = x 为正。
   if edge == 0 {
-    s = s.left(@style.px(off))
+    s = s.left(@style.px(0.0)).transform([@style.Transform::Translate(off, 0.0)])
   } else {
-    s = s.right_(@style.px(off))
+    s = s.right_(@style.px(0.0)).transform([@style.Transform::Translate(-off, 0.0)])
   }
   // 同上：按钮，不是挂了 on_click 的 div
   @html.button(attrs=attrs(s), on_click=emit(Tap(idx)), label)
