@@ -16,7 +16,7 @@ fail=0
 ok() { echo "  ✓ $1"; }
 bad() { echo "  ✗ $1"; fail=1; }
 
-echo "① 生成物与内容源一致（`press --check` 覆盖三件产物）"
+echo "① 生成物与内容源一致（\`press --check\` 覆盖三件产物）"
 if node tools/press.mjs --check --app "$APP" > /tmp/agent-exports.log 2>&1; then
   ok "$(grep -c '✓ 一致' /tmp/agent-exports.log) 处一致（内容包 / llms.txt / md 原文）"
 else
@@ -46,7 +46,7 @@ if [ -d "$APP/dist" ]; then
     bad "有地址取不回来"; sed -n '1,4p' /tmp/agent-http.log | sed 's/^/      /'
   fi
 else
-  echo "  · 跳过：还没有 dist/（先 `npm run build`）"
+  echo "  · 跳过：还没有 dist/（先 \`npm run build\`）"
 fi
 
 echo
