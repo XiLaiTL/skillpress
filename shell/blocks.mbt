@@ -23,7 +23,15 @@
 ///|
 /// 一个代码块。**构建期**已经高亮好了（tree-sitter），这里只是照着色号上色：
 /// 外层一个 `Text` 撑字体与行高，片段嵌在它里面、只改颜色（嵌套 Text 上的盒属性会丢，见文件头）。
-fn code_block(theme : Theme, text : String, runs : Array[(String, Int)]) -> @html.Html {
+fn code_block(
+  theme : Theme,
+  lang : String,
+  text : String,
+  runs : Array[(String, Int)],
+  idx : Int,
+  copied : Bool,
+  emit : @cmd.Emit[Msg],
+) -> @html.Html {
   let p = theme.palette
   let kids : Array[@html.Html] = if runs.length() > 0 {
     // `theme.tok(色号)`：色号是引擎在构建期算的（1..9，0 = 正文色），明暗两套各翻各的
@@ -37,6 +45,55 @@ fn code_block(theme : Theme, text : String, runs : Array[(String, Int)]) -> @htm
     .line_height_em(lh_aux)
     .color(p.fg1)
     .white_space(@style.WhiteSpace::PreWrap)
+  // ── 工具条（对标表 #5：语言标签 + 复制）─────────────────────────────────────
+  //
+  // ⚠️ 语言标签**只在引擎给了语言时画**（`lang == ""` ⇒ 留空）：不编一个 "text" 糊上去 ——
+  //    那是"看起来有信息、其实是假的"（§1 反面验收）。
+  // ⚠️ 复制按钮必须是 `@html.button`（`div` 上的 `on_click` 在 web 上是死处理器）。
+  let bar : Array[@html.Html] = []
+  bar.push(
+    @html.div(
+      attrs=attrs(
+        @style.Style::new()
+        .font_family(mono)
+        .font_size(fs_meta)
+        .color(p.fg3),
+      ),
+      lang,
+    ),
+  )
+  bar.push(
+    @html.button(
+      attrs=attrs(
+        @style.Style::new()
+        .font_size(fs_meta)
+        .color(if copied { p.brand } else { p.fg3 })
+        .padding_vertical(@style.px(sp1))
+        .padding_horizontal(@style.px(sp2))
+        .border_width(0.0)
+        .border_radius(r2)
+        .background_color("transparent"),
+      )
+      // 节点名：判据按名字点它（`copy-<第几个代码块>`，与工具条的序号一致）
+      .id("copy-" + idx.to_string()),
+      on_click=emit(CopyCode(idx, text)),
+      if copied { "已复制" } else { "复制" },
+    ),
+  )
+  let toolbar = @html.div(
+    attrs=attrs(
+      @style.Style::new()
+      .flex_direction(@style.FlexDirection::Row)
+      .align_items(@style.Align::Center)
+      .justify_content(@style.Justify::SpaceBetween)
+      .padding_left(@style.px(sp4))
+      .padding_right(@style.px(sp2))
+      .padding_vertical(@style.px(sp1))
+      .border_bottom_width(1.0)
+      .border_bottom_color(p.code_line),
+    ),
+    bar,
+  )
   @html.div(
     attrs=attrs(
       @style.Style::new()
@@ -44,10 +101,16 @@ fn code_block(theme : Theme, text : String, runs : Array[(String, Int)]) -> @htm
       .border_width(1.0)
       .border_color(p.code_line)
       .border_radius(r3)
-      .padding(@style.px(sp4))
+      .overflow(@style.Overflow::Hidden)
       .margin_bottom(@style.px(sp5)),
     ),
-    [@html.span(attrs=attrs(base), kids)],
+    [
+      toolbar,
+      @html.div(
+        attrs=attrs(@style.Style::new().padding(@style.px(sp4))),
+        [@html.span(attrs=attrs(base), kids)],
+      ),
+    ],
   )
 }
 
@@ -220,7 +283,14 @@ fn body_text(theme : Theme) -> @style.Style {
 }
 
 ///| 一个块 → 视图。
-pub fn block_view(theme : Theme, b : Block, anchor : String?) -> @html.Html {
+pub fn block_view(
+  theme : Theme,
+  b : Block,
+  anchor : String?,
+  code_idx : Int,
+  copied : Bool,
+  emit : @cmd.Emit[Msg],
+) -> @html.Html {
   let p = theme.palette
   match b {
     Hr =>
@@ -261,7 +331,7 @@ pub fn block_view(theme : Theme, b : Block, anchor : String?) -> @html.Html {
           ),
         ],
       )
-    Code(_lang, text, runs) => code_block(theme, text, runs)
+    Code(lang, text, runs) => code_block(theme, lang, text, runs, code_idx, copied, emit)
     Ul(items) =>
       @html.div(
         attrs=attrs(@style.Style::new().margin_bottom(@style.px(sp4))),
@@ -273,12 +343,19 @@ pub fn block_view(theme : Theme, b : Block, anchor : String?) -> @html.Html {
 
 ///|
 /// 一串块 → 视图（正文那一栏的内容）。
-pub fn blocks_view(theme : Theme, blocks : Array[Block]) -> @html.Html {
+pub fn blocks_view(
+  theme : Theme,
+  blocks : Array[Block],
+  copied_at : Int,
+  emit : @cmd.Emit[Msg],
+) -> @html.Html {
   // ⚠️ 锚点编号**只数 h2/h3**（h4 不进目录）—— 与 `toc.mbt` 的 `toc_of` 同一口径。
   //    两处各数一遍是刻意的：让"目录第 i 条"与"正文第 i 节"由**同一份 blocks 的顺序**决定，
   //    而不是靠谁记住传给谁。改口径时两边一起改（`heading_anchor` 只有一处实现）。
   let kids : Array[@html.Html] = []
   let mut k = 0
+  // 代码块的序号：工具条上的"复制"按钮靠它认出"上一次复制的是哪一个"
+  let mut code_idx = 0
   for b in blocks {
     let is_section = match b {
       H2(_) => true
@@ -292,7 +369,15 @@ pub fn blocks_view(theme : Theme, blocks : Array[Block]) -> @html.Html {
     } else {
       None
     }
-    kids.push(block_view(theme, b, anchor))
+    let is_code = match b {
+      Code(_, _, _) => true
+      _ => false
+    }
+    let ci = code_idx
+    if is_code {
+      code_idx = code_idx + 1
+    }
+    kids.push(block_view(theme, b, anchor, ci, is_code && ci == copied_at, emit))
   }
   @html.div(
     attrs=attrs(@style.Style::new().flex_direction(@style.FlexDirection::Column)),

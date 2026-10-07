@@ -883,6 +883,33 @@ js 那条路的行为**没变**（`press --check` ×2 + 门 + 29 条 wbtest 全�
 引擎的通用化与迁移（P8）→ 与 P6 的 `shell` 抽包合流 → 打出包 → **内容侧拆分与它同批做**
 （D19：引擎支持之前不动内容）。每个源文件 ≤ 400 行（R9 / D21）贯穿全程。
 
+## 6b. 本轮（2026-10-07）站点侧交了什么 + 三处工具/实例的账
+
+**功能**（对标表 #5 / #12 / #14 与 moobile 侧的甲级能力，逐条都有会自己红的判据）：
+
+| 件 | 读数（命令 + 日期） |
+|---|---|
+| **代码块工具条**（#5：语言标签 + 复制） | `_scratch/code-toolbar-check.mjs`（真鼠标，剪贴板换成记录器）：3 个块都有**非空**语言标签（bash / moonbit / bash）、点一下**剪贴板被调用 1 次**且载荷与那一块正文**长度相同、开头逐字符相同**、按钮变「已复制」而**别的块不受影响**、0 条 JS 错误 |
+| **本地搜索**（#12） | `_scratch/search-check.mjs`：17 条全过（含"点小节命中 ⇒ 目标节**顶到上沿差 0px**"） |
+| **目录可点 + 跟读高亮**（⑤） | `_scratch/toc-click.mjs`：点最后一行 ⇒ sec-7 差 0px、点第一行 ⇒ sec-0；装载后**恰好一条**高亮在第 0 条、滚到第 4 节 ⇒ 高亮换到第 4 条 |
+| **prod 产物档**（#14） | `npm run build` ⇒ **829 KB**（dev 档 2939 KB，3.5 倍）；`dist/artifact.json` 的 `mode: "prod"`；三档回归 `ui-probe` 全过 |
+| 站点三档回归 | `node tools/ui-probe.mjs` ⇒ **全部通过（3 个视口）** |
+
+**三处工具/实例的账（都是本轮实测撞出来的）**：
+
+1. ⚠️ **`npm run press` 在 Windows 上从来跑不通**：模板里是 POSIX 的
+   `"${SKILLPRESS_ENGINE:-{{ENGINE_REL}}}"`，而 npm 在 Windows 上用 `cmd.exe` 跑 script
+   ⇒ 原样传给 node，报 `Cannot find module '…\skillpress}	ools\press.mjs'`。
+   修法：新增 `engine.mjs` 壳子（在 **Node** 里找程序根；`SKILLPRESS_ENGINE` 仍优先，找不到**直接报错不猜**）。
+2. ⚠️ **`press` 的默认 `--app` 指向"别人那份实例"**：它是按"程序根旁边的内容仓"算的 ——
+   在实例里直接跑，改/查的是 `../moobile/skills/skillpress/scripts/.skillpress`。
+   ⇒ 两个 npm script 现在都显式带 `--app .`（npm 的 cwd 就是实例目录）。
+3. ⚠️ **内容仓那份实例落后三处**（`build-web.mjs` 旧版 / `content.generated.mbt` 早于 `Doc.title` 契约 /
+   `app.mbt` 少 `footer`），已一次还清并给了读数（见 moobile `FINDINGS.md` 本轮补记）。
+   ⚠️ 顺带记一条**没有门盯住它**的原因：站点实例在内容仓，而两边各自的门都以为对方会跑它。
+
+---
+
 ## 7. 发布清单（`moon publish` **之前**要过的）
 
 > 这一节是"目标最后一步"的清单。⚠️ **发布是不可逆的对外动作** —— 走到这里要先停下来跟用户确认。

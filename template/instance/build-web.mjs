@@ -1,8 +1,18 @@
 #!/usr/bin/env node
 // build-web.mjs —— 把 MoonBit 产物打成一个静态站点（`dist/`）。
 //
-//   npm run build     # moon build + moobile-host build + 这个脚本
+//   npm run build     # moon build + moobile-host build + 这个脚本（**默认 prod 档**）
+//   npm run build:dev # 同上，但打 **dev 档**（阅读报错/警告用；体积大得多）
 //   npm run serve     # 起静态服务看一眼（零依赖）
+//
+// ## 两个产物档位（对标表 #14：VitePress 那档体积）
+//
+//   · **prod（默认）**：`process.env.NODE_ENV = "production"` + `minify` —— React 走生产构建、
+//     产物压缩。**这是交付形态**。
+//   · **dev**：`"development"` + 不压缩 —— React 的开发版会在控制台说很多话（重复 key、弃用警告…），
+//     排查界面问题时有用，但**别拿它当交付物**（体积差好几倍）。
+//   ⚠️ 这个开关是 **构建期** 的：`NODE_ENV` 在打包时被**替换成字面量**（见下面的 `define`），
+//      运行时再设环境变量**改不动**已经打好的产物。
 //
 // ## 这条流水线里"宿主"是哪几步
 //
@@ -78,6 +88,11 @@ fs.copyFileSync(path.join(HERE, 'index.html'), path.join(DIST, 'index.html'));
   );
 }
 
+// 产物档位：**默认 prod**（交付形态）；只有**明确要 dev**（`--dev` 或 `NODE_ENV=development`）才打 dev。
+// ⚠️ 写成"默认 prod"而不是"默认 dev + 记得加 --prod"：交付物的默认值必须是对的那个
+//    （否则"忘了加参数"这件事会安静地把一个几 MB 的开发版发出去）。
+const DEV = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+const PROD = !DEV;
 const built = await esbuild.build({
   entryPoints: [path.join(HERE, 'index.js')],
   bundle: true,
@@ -88,7 +103,11 @@ const built = await esbuild.build({
   logLevel: 'silent',
   absWorkingDir: HERE,
   alias: { 'react-native': 'react-native-web' },
-  define: { 'process.env.NODE_ENV': '"development"', __ARTIFACT_SHA__: JSON.stringify(sha) },
+  minify: PROD,
+  define: {
+    'process.env.NODE_ENV': PROD ? '"production"' : '"development"',
+    __ARTIFACT_SHA__: JSON.stringify(sha),
+  },
   loader: { '.js': 'jsx' },
 });
 
@@ -100,10 +119,14 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
   path.join(DIST, 'artifact.json'),
-  JSON.stringify({ sha, bytes: bytes.length, builtAt: new Date().toISOString(), host: 'webview' }, null, 2),
+  JSON.stringify(
+    { sha, bytes: bytes.length, builtAt: new Date().toISOString(), host: 'webview', mode: PROD ? 'prod' : 'dev' },
+    null,
+    2,
+  ),
 );
 
 const size = fs.statSync(path.join(DIST, 'bundle.js')).size;
 console.log(
-  `build-web.mjs: dist/bundle.js ${(size / 1024).toFixed(0)} KB · moobile.js ${(bytes.length / 1024).toFixed(0)} KB · sha256 ${sha.slice(0, 16)}…`,
+  `build-web.mjs[${PROD ? 'prod' : 'dev'}]: dist/bundle.js ${(size / 1024).toFixed(0)} KB · moobile.js ${(bytes.length / 1024).toFixed(0)} KB · sha256 ${sha.slice(0, 16)}…`,
 );

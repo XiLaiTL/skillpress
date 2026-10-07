@@ -362,7 +362,7 @@ fn article(theme : Theme, ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @h
   //    页专属的名字在**新页面挂上之前**一定不存在 ⇒ 只有它才能当"渲染好了"的信号。
   @html.div(
     attrs=attrs(@style.Style::new().flex_direction(@style.FlexDirection::Column)),
-    [@html.div(attrs=attrs(@style.Style::new()), head), blocks_view(theme, pv.blocks), @html.div(attrs=attrs(@style.Style::new()), tail)],
+    [@html.div(attrs=attrs(@style.Style::new()), head), blocks_view(theme, pv.blocks, model.copied_at, emit), @html.div(attrs=attrs(@style.Style::new()), tail)],
   )
 }
 

@@ -39,7 +39,7 @@ fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
   } else if page == page_404 {
     notfound_page(theme, emit)
   } else {
-    home_page(theme, ctx, emit)
+    home_page(theme, ctx, model, emit)
   }
   let main : @html.Html = @html.div(
     attrs=attrs(@style.Style::new()).id(page_node(page, model.sel)),

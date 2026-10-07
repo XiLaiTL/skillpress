@@ -67,11 +67,20 @@ const pane = await cdp.eval(`(() => { const el = ${SCROLLER}; if (!el) return nu
 say(!!pane, `内容区容器：${pane ? `${pane.tag} 可见高 ${pane.h} / 内容 ${pane.sh} / 上沿 y=${pane.top}` : '**没找到可滚容器**'}`);
 
 // ③ 右栏（轨）那些目录行：靠屏幕右侧、短文字、可点
+// ⚠️ **只在目录容器里**找行（`#toc-rail` / `#toc-tree`）。
+//    原来用的是"靠右 + 短文字"这条启发式 —— 它会被**别的可点元素**污染：代码块的「复制」
+//    按钮正好也靠右、也是短文字 ⇒ 判据把 3 个「复制」数成了目录行，"点第一行"点到了复制按钮
+//    （读数一塌糊涂，而且**看起来像功能坏了**）。给容器一个节点名，判据就指得准。
 const rows = await cdp.eval(`(() => {
-  const w = document.documentElement.clientWidth;
-  return [...document.querySelectorAll('[tabindex="0"]')]
-    .map((e, i) => { const b = e.getBoundingClientRect(); return { i, text: (e.textContent || '').trim(), x: b.left + b.width / 2, y: b.top + b.height / 2, left: Math.round(b.left) }; })
-    .filter(r => r.left > w * 0.7 && r.text.length > 1 && r.text.length < 40);
+  const boxes = [document.getElementById('toc-rail'), document.getElementById('toc-tree')].filter(Boolean);
+  const out = [];
+  boxes.forEach((box) => {
+    box.querySelectorAll('[tabindex="0"]').forEach((e) => {
+      const b = e.getBoundingClientRect();
+      out.push({ text: (e.textContent || '').trim(), x: b.left + b.width / 2, y: b.top + b.height / 2, left: Math.round(b.left) });
+    });
+  });
+  return out;
 })()`);
 say(!!rows && rows.length >= 2, `右栏目录行 ${rows ? rows.length : 0} 条：${rows ? rows.map((r) => '「' + r.text + '」').join(' ') : ''}`);
 
@@ -122,11 +131,17 @@ const BRAND = 'rgb(79, 70, 229)';
 const readRows = () =>
   cdp.eval(
     '(() => {' +
-      'const w = document.documentElement.clientWidth;' +
-      'return [...document.querySelectorAll("[tabindex]")]' +
-      '.map((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e);' +
-      'return { text: (e.textContent || "").trim(), left: Math.round(b.left), x: b.left + b.width / 2, y: b.top + b.height / 2, color: cs.color, weight: cs.fontWeight }; })' +
-      '.filter(r => r.left > w * 0.7 && r.text.length > 1 && r.text.length < 40);' +
+      // 只在**目录容器**里找行（`#toc-rail` / `#toc-tree`）。
+      // ⚠️ 原来用的是"靠右 + 短文字"这条启发式 —— 它会被**别的可点元素**污染：
+      //    代码块的「复制」按钮正好也靠右、也是短文字，于是被判据数成目录行，
+      //    "点第一行"点到了复制按钮（读数一塌糊涂）。给容器节点名之后，判据指得准。
+      'const boxes = [document.getElementById("toc-rail"), document.getElementById("toc-tree")].filter(Boolean);' +
+      'const out = [];' +
+      'boxes.forEach((box) => { box.querySelectorAll("[tabindex]").forEach((e) => {' +
+      '  const b = e.getBoundingClientRect(); const cs = getComputedStyle(e);' +
+      '  out.push({ text: (e.textContent || "").trim(), left: Math.round(b.left), x: b.left + b.width / 2, y: b.top + b.height / 2, color: cs.color, weight: cs.fontWeight });' +
+      '}); });' +
+      'return out;' +
       '})()',
   );
 const activeOf = (rows) => rows.map((r, i) => (r.color === BRAND ? i : -1)).filter((i) => i >= 0);

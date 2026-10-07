@@ -227,4 +227,7 @@ moobile/tools/skillpress-gates.mjs --gate facts   # 事实来源对账（按 D18
    以及 `PLAN-ui.md` 对标表里的 #5 代码块工具条 / #9 正文链接 / #10 图片 / #14 prod 产物档。
    ✅ 已经还掉的两笔旧账：**窄屏入口**（三个贴边按钮 + 两级交互 + 遮罩互斥，`shell/mobile.mbt`）；
    **URL 路由**（hash ⇄ 状态双向 + 后退 + 深链 + 404 有到达路径，`shell/route.mbt`）。
-6. **打的是 dev 模式 bundle**（约 6 MB，大头是 react-native-web）：上生产要换 `NODE_ENV=production` + `minify`。
+6. ✅ **产物默认就是 prod 档**（2026-10-07 起）：`npm run build` 走 `NODE_ENV=production` + `minify`
+   ⇒ **829 KB**（同一份源码的 dev 档 **2939 KB**，差 3.5 倍；要 dev 档用 `npm run build:dev`）。
+   ⚠️ 档位是**构建期**的（`NODE_ENV` 在打包时被替换成字面量）—— 运行时再设环境变量改不动已打好的产物；
+   `dist/artifact.json` 里的 `mode` 记着这一份是哪个档。

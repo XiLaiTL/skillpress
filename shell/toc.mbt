@@ -203,8 +203,12 @@ pub fn toc_rail(
   for i = 0; i < entries.length(); i = i + 1 {
     rows.push(toc_row(theme, entries[i], i, emit, sp1, sp3, sp5, i == active))
   }
+  // 节点名：判据要能"**只在目录里**"数条目。
+  // ⚠️ 这不是为了判据好看：目录行与别的可点元素（比如代码块的「复制」按钮）在"靠右、短文字"
+  //    这条启发式下**长得一样** —— 试金石第一版就是这么被污染的（把 3 个「复制」当成目录行，
+  //    于是"点第一行"点到了复制按钮，读数一塌糊涂）。给容器一个名字，判据就指得准。
   @html.div(
-    attrs=attrs(@style.Style::new()),
+    attrs=attrs(@style.Style::new()).id("toc-rail"),
     [
       head,
       @html.div(
@@ -262,7 +266,8 @@ fn toc_tree_mount(
       .margin_bottom(@style.px(sp2))
       .border_left_width(1.0)
       .border_left_color(p.line1),
-    ),
+    )
+    .id("toc-tree"),
     toc_tree_rows(theme, entries, emit, active),
   )
 }

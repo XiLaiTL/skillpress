@@ -90,6 +90,11 @@ priv struct Model {
   peek : Int
   /// **跟读高亮**：现在读到第几节（`-1` = 还没量到 / 这一页没有分节）。
   active : Int
+  /// **上一次点"复制"的是第几个代码块**（`-1` = 还没复制过）。
+  /// 用途只有一个：把那个按钮的文案换成「已复制」。⚠️ 这是**乐观显示** ——
+  /// `navigator.clipboard.writeText` 是 Promise、可能被拒，而我们**拿不到回执**
+  /// （`@cmd` 是同步的；`@js.Promise` 在钉住的版本里没有 then/catch）⇒ 失败只打控制台。见 `sub/clipboard_action.mbt`。
+  copied_at : Int
   /// **搜索浮层开着吗**（对标表 #12）。⚠️ 索引只在它开着时才算（`search.mbt` 文件头第 1 条）。
   search_open : Bool
   /// 搜索框里的当前输入（受控 —— `@html.input` 的 `value` 就是它）。
@@ -138,6 +143,9 @@ pub enum Msg {
   HitGo(Int, Int, Int, Int)
   /// **一帧到了** —— 用来兑现 `pending` 那个锚点（跨页滚动必须等新页面渲染出来）
   Frame
+  /// 点了某个代码块的「复制」：`(第几个, 正文)` —— 正文直接跟着载荷走，
+  /// 免得"复制的内容"要去 DOM 里再捞一次（那样就得跟渲染形状绑死）。
+  CopyCode(Int, String)
   /// **点目录某一条**：滚到正文里那一节的锚点（下标 = 目录里的第几条，从 0 数）。
   /// 动作由 `@sub.scroll_to_node` 发 —— 见 `shell/toc.mbt` 的账。
   TocTo(Int)
@@ -196,6 +204,7 @@ fn initial(ctx : Ctx) -> Model {
     // 所以这两格一开始就是空的，不用同步读 DOM（首屏那会儿 DOM 里还没有东西）。
     active: -1,
     offsets: [],
+    copied_at: -1,
     search_open: false,
     query: "",
     pending: NoPending,
@@ -217,11 +226,11 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
     Home => {
       // ⚠️ 换页必须清掉跟读高亮的缓存（`active` / `offsets`）：它们是**按这一页的小节**量的，
       //    留着会拿上一页的偏移表算这一页 —— 症状是"高亮停在一个不存在的小节上"。
-      let next = { ..model, page: page_home, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }
+      let next = { ..model, page: page_home, active: -1, offsets: [], pending: ToTop, pending_frames: 0, copied_at: -1 }
       (next, push_url_cmd(hash_of(next.page, next.sel, ctx.docs)))
     }
     Shelf => {
-      let next = { ..model, page: page_shelf, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }
+      let next = { ..model, page: page_shelf, active: -1, offsets: [], pending: ToTop, pending_frames: 0, copied_at: -1 }
       (next, push_url_cmd(hash_of(next.page, next.sel, ctx.docs)))
     }
     Go(kind, i, k) => {
@@ -231,7 +240,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
       for j = 0; j < model.open.length(); j = j + 1 {
         next.push(if j == i { true } else { model.open[j] })
       }
-      let moved = { ..model, page: page_doc, sel: { kind, i, k }, open: next, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }
+      let moved = { ..model, page: page_doc, sel: { kind, i, k }, open: next, active: -1, offsets: [], pending: ToTop, pending_frames: 0, copied_at: -1 }
       (moved, push_url_cmd(hash_of(moved.page, moved.sel, ctx.docs)))
     }
     UrlChanged(h) => {
@@ -248,7 +257,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
         model.open
       }
       // 地址变了也可能换了页 ⇒ 同样清掉高亮缓存（见 `Home` 那条注释）
-      ({ ..model, page, sel, open: next, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }, @cmd.none)
+      ({ ..model, page, sel, open: next, active: -1, offsets: [], pending: ToTop, pending_frames: 0, copied_at: -1 }, @cmd.none)
     }
     Toggle(i) => {
       let next : Array[Bool] = []
@@ -297,6 +306,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
         ({ ..model, sheet: i, peek: 1 }, @cmd.none)
       }
     CloseSheet => ({ ..model, sheet: -1, peek: 0 }, @cmd.none)
+    CopyCode(idx, text) => ({ ..model, copied_at: idx }, @sub.copy_text(text))
     SearchOpen => ({ ..model, search_open: true }, @cmd.none)
     SearchClose => ({ ..model, search_open: false }, @cmd.none)
     SearchInput(q) => ({ ..model, query: q }, @cmd.none)
