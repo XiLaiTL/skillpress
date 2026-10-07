@@ -29,7 +29,10 @@ fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
   // ⚠️ 这里**不能**写 `match page { page_shelf => … }`：那是**绑定一个新变量**（永远匹配第一条），
   //    后面几条会被判成 unreachable —— 编译器会警告，但要读懂警告才知道"页面对不上"。
   //    `let` 常量不是模式，所以用 if/else 比。
-  let main : @html.Html = if page == page_shelf {
+  // ⚠️ 主内容外面包一层、挂**页专属节点名**：跨页跳锚点要靠它判断"新页面渲染好了没有"。
+  //    四种页面（文档 / 首页 / 书架 / 404）**都要有** —— 只挂文档页的话，"切到书架"这类
+  //    导航的等待永远等不到（然后超时报错），症状看起来像"书架点不开"。
+  let main_inner : @html.Html = if page == page_shelf {
     shelf_page(theme, ctx, emit)
   } else if page == page_doc {
     article(theme, ctx, model, emit)
@@ -38,6 +41,10 @@ fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
   } else {
     home_page(theme, ctx, emit)
   }
+  let main : @html.Html = @html.div(
+    attrs=attrs(@style.Style::new()).id(page_node(page, model.sel)),
+    [main_inner],
+  )
   // 本页目录的条目（今天在渲染期从正文块里现算 —— P3 之后由生成期带锚点一起给出，见 toc.mbt）
   // ⚠️ 用 `toc_for` 而不是在这里再写一遍：**目录算法只能有一处** ——
   //    `state.mbt` 的跟读高亮也要用它（两边数出来的"第 i 节"必须是同一节）。
@@ -60,6 +67,11 @@ fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
     mobile_layer(theme, ctx, model, emit, toc)
   } else {
     []
+  }
+  // 搜索浮层挂在**最后**（DOM 顺序 = 层序 ⇒ 它在窄屏那一层之上）。
+  // ⚠️ 两档都要挂：搜索不是窄屏专属功能（桌面也要 ⌘K）。
+  for h in search_layer(theme, ctx, model, emit) {
+    overlay.push(h)
   }
   shell(theme, top, side, prose_wrap(rail, [main]), toc_side, overlay)
 }

@@ -355,6 +355,11 @@ fn article(theme : Theme, ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @h
       ],
     ),
   )
+  // ⚠️ 根上挂一个**页专属**的节点名（`page-<kind>-<i>-<k>`）：跨页跳锚点要靠它。
+  //    为什么不能用锚点本身（`sec-<i>`）来判断"新页面渲染好了没有"：**锚点 id 每页都一样**
+  //    （第 1 节在每一页都叫 `sec-0`）⇒ 切页那一瞬间它**在旧页面上也存在**，
+  //    于是"等它出现"会等到旧页面的同号节点，滚动发生在旧内容上（看起来像"跳错一节"，且是静默的）。
+  //    页专属的名字在**新页面挂上之前**一定不存在 ⇒ 只有它才能当"渲染好了"的信号。
   @html.div(
     attrs=attrs(@style.Style::new().flex_direction(@style.FlexDirection::Column)),
     [@html.div(attrs=attrs(@style.Style::new()), head), blocks_view(theme, pv.blocks), @html.div(attrs=attrs(@style.Style::new()), tail)],

@@ -60,6 +60,19 @@ fn sel_valid(sel : Sel, docs : Array[Doc]) -> Bool {
 /// `page`：四类页面里的哪一类（`page_home` / `page_shelf` / `page_doc` / `page_404`）。
 /// `sel`：文档页里选中的是哪一页（`page != page_doc` 时不用它）。
 /// `open`：侧栏哪些 skill 展开着。
+///|
+/// **待兑现的滚动**（跨页导航用）：切页与渲染之间隔着一次 React 提交 ⇒ 不能在同一次 update 里滚
+/// （会滚到旧页面的同号锚点上）。做法：记下"要去哪"，由 `Frame` 一帧一帧地问"新页面挂上了吗"。
+priv enum Pending {
+  /// 没有待办
+  NoPending
+  /// 切页之后**回到顶部**（任何一次换页都该这样 —— 否则新页面停在上一页滚到的位置）
+  ToTop
+  /// 切页之后跳到**第几节**（`heading_anchor(i)`）
+  ToSection(Int)
+} derive(Eq)
+
+///|
 priv struct Model {
   page : Int
   sel : Sel
@@ -77,6 +90,15 @@ priv struct Model {
   peek : Int
   /// **跟读高亮**：现在读到第几节（`-1` = 还没量到 / 这一页没有分节）。
   active : Int
+  /// **搜索浮层开着吗**（对标表 #12）。⚠️ 索引只在它开着时才算（`search.mbt` 文件头第 1 条）。
+  search_open : Bool
+  /// 搜索框里的当前输入（受控 —— `@html.input` 的 `value` 就是它）。
+  query : String
+  /// **待兑现的滚动**（见 `Pending`）
+  pending : Pending
+  /// 为兑现上面那个锚点**已经等了几帧**（`pending = -1` 时无意义）。
+  /// 有上限：等不到就让**它报错**，而不是无限等下去（见 `Frame`）。
+  pending_frames : Int
   /// 每一节的**绝对偏移**（相对内容区的内容坐标系，见 `toc.mbt` 的 `section_offsets`）。
   /// ⚠️ 它只是一个**缓存**：只在"第一次 / 跨节 / 换了页"时重锚，滚动时用纯算术（不碰 DOM）。
   offsets : Array[Double]
@@ -103,8 +125,19 @@ pub enum Msg {
   Tap(Int)
   /// 关掉窄屏浮层（点遮罩 / Esc）
   CloseSheet
-  /// 键盘按下（今天只用它认 Esc）
-  Key(String)
+  /// 键盘按下：`(键名, ctrl 或 meta 按着)` —— 后者用来认 ⌘K / Ctrl+K（打开搜索）。
+  /// ⚠️ 载荷里**必须带上修饰键**：只给键名的话 `k` 与 `⌘K` 分不开。
+  Key(String, Bool)
+  /// 打开搜索浮层（顶栏那条 nav 点它）
+  SearchOpen
+  /// 关掉搜索浮层（遮罩 / Esc）
+  SearchClose
+  /// 搜索框的输入变了
+  SearchInput(String)
+  /// 点了一条搜索结果：`(kind, i, k, 锚点下标)` —— 锚点 `-1` = 只切页不跳节
+  HitGo(Int, Int, Int, Int)
+  /// **一帧到了** —— 用来兑现 `pending` 那个锚点（跨页滚动必须等新页面渲染出来）
+  Frame
   /// **点目录某一条**：滚到正文里那一节的锚点（下标 = 目录里的第几条，从 0 数）。
   /// 动作由 `@sub.scroll_to_node` 发 —— 见 `shell/toc.mbt` 的账。
   TocTo(Int)
@@ -163,6 +196,10 @@ fn initial(ctx : Ctx) -> Model {
     // 所以这两格一开始就是空的，不用同步读 DOM（首屏那会儿 DOM 里还没有东西）。
     active: -1,
     offsets: [],
+    search_open: false,
+    query: "",
+    pending: NoPending,
+    pending_frames: 0,
   }
 }
 
@@ -180,11 +217,11 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
     Home => {
       // ⚠️ 换页必须清掉跟读高亮的缓存（`active` / `offsets`）：它们是**按这一页的小节**量的，
       //    留着会拿上一页的偏移表算这一页 —— 症状是"高亮停在一个不存在的小节上"。
-      let next = { ..model, page: page_home, active: -1, offsets: [] }
+      let next = { ..model, page: page_home, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }
       (next, push_url_cmd(hash_of(next.page, next.sel, ctx.docs)))
     }
     Shelf => {
-      let next = { ..model, page: page_shelf, active: -1, offsets: [] }
+      let next = { ..model, page: page_shelf, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }
       (next, push_url_cmd(hash_of(next.page, next.sel, ctx.docs)))
     }
     Go(kind, i, k) => {
@@ -194,7 +231,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
       for j = 0; j < model.open.length(); j = j + 1 {
         next.push(if j == i { true } else { model.open[j] })
       }
-      let moved = { ..model, page: page_doc, sel: { kind, i, k }, open: next, active: -1, offsets: [] }
+      let moved = { ..model, page: page_doc, sel: { kind, i, k }, open: next, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }
       (moved, push_url_cmd(hash_of(moved.page, moved.sel, ctx.docs)))
     }
     UrlChanged(h) => {
@@ -211,7 +248,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
         model.open
       }
       // 地址变了也可能换了页 ⇒ 同样清掉高亮缓存（见 `Home` 那条注释）
-      ({ ..model, page, sel, open: next, active: -1, offsets: [] }, @cmd.none)
+      ({ ..model, page, sel, open: next, active: -1, offsets: [], pending: ToTop, pending_frames: 0 }, @cmd.none)
     }
     Toggle(i) => {
       let next : Array[Bool] = []
@@ -260,9 +297,74 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
         ({ ..model, sheet: i, peek: 1 }, @cmd.none)
       }
     CloseSheet => ({ ..model, sheet: -1, peek: 0 }, @cmd.none)
-    Key(k) =>
+    SearchOpen => ({ ..model, search_open: true }, @cmd.none)
+    SearchClose => ({ ..model, search_open: false }, @cmd.none)
+    SearchInput(q) => ({ ..model, query: q }, @cmd.none)
+    HitGo(kind, i, k, anchor) => {
+      // 与 `Go` 同一套：进某一页 ⇒ 那一份自动展开；同时**关掉浮层**并把锚点记成待办。
+      let next : Array[Bool] = []
+      for j = 0; j < model.open.length(); j = j + 1 {
+        next.push(if j == i { true } else { model.open[j] })
+      }
+      let moved = {
+        ..model,
+        page: page_doc,
+        sel: { kind, i, k },
+        open: next,
+        search_open: false,
+        pending: if anchor >= 0 { ToSection(anchor) } else { ToTop },
+        pending_frames: 0,
+        active: -1,
+        offsets: [],
+      }
+      (moved, push_url_cmd(hash_of(moved.page, moved.sel, ctx.docs)))
+    }
+    Frame =>
+      // ⚠️ **为什么不能"切页那次 update 里顺手滚一下"**：滚动命令跑的时候新页面**还没被 React 提交**
+      //    ⇒ 会滚到**旧页面的同号锚点**上（锚点 id `sec-<i>` 每页都重名），而且是**静默**的。
+      //    ⚠️ 也**不能**用"锚点出现没有"当信号（同理：它在旧页面上也存在）⇒ 用**页专属**的节点名。
+      //    做法：一帧一帧地问"目标页挂上了吗"，挂上才滚；等够帧数还没挂上 ⇒ **报错**（不无限等）。
+      if model.pending is NoPending {
+        (model, @cmd.none)
+      } else if @sub.node_exists(page_node(model.page, model.sel)) {
+        // 新页面**挂上了** ⇒ 兑现：回顶 or 跳到某一节（都靠 `scroll_to_node`；
+        // 回顶就是"把这一页的根滚到容器上沿"，等价于 scrollTop = 0）
+        let cmd = match model.pending {
+          ToTop => @sub.scroll_to_node(page_node(model.page, model.sel), block="start")
+          ToSection(a) => @sub.scroll_to_node(heading_anchor(a), block="start")
+          NoPending => @cmd.none
+        }
+        ({ ..model, pending: NoPending, pending_frames: 0 }, cmd)
+      } else if model.pending_frames >= 60 {
+        let what = match model.pending {
+          ToTop => "回顶部"
+          ToSection(a) => "第 " + a.to_string() + " 节"
+          NoPending => "（无）"
+        }
+        ({ ..model, pending: NoPending, pending_frames: 0 }, @cmd.custom_cmd(fn(_) {
+          abort(
+            "shell: 等新页面（" +
+            page_node(model.page, model.sel) +
+            "）挂上，等了 60 帧（约 1 秒）还没出现 ⇒ 不滚了（本来要去：" +
+            what +
+            "）。" +
+            "要么这一页渲染不出来，要么页面根上的节点名没跟上（见 toc.mbt 的 page_node）。",
+          )
+        }))
+      } else {
+        ({ ..model, pending_frames: model.pending_frames + 1 }, @cmd.none)
+      }
+    Key(k, mod_) =>
       if k == "Escape" {
-        ({ ..model, sheet: -1, peek: 0 }, @cmd.none)
+        // Esc 一次关一层：**先搜索浮层、再窄屏 sheet**（搜索是后画的，按"最上面那层先关"来）。
+        if model.search_open {
+          ({ ..model, search_open: false }, @cmd.none)
+        } else {
+          ({ ..model, sheet: -1, peek: 0 }, @cmd.none)
+        }
+      } else if mod_ && (k == "k" || k == "K") {
+        // ⌘K / Ctrl+K（`mod_` = ctrl 或 meta 按着 —— 载荷里带了修饰键才认得出，见 Msg::Key）
+        ({ ..model, search_open: true }, @cmd.none)
       } else {
         (model, @cmd.none)
       }
@@ -282,12 +384,12 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
 ///
 /// ⚠️ "跟随系统亮暗"今天走**轮询**（`@sub.every`）而不是事件 —— 事件通道要动 vendored rabbita（跨仓），
 ///    本仓先给一条**真的有效**的权宜通道，代价（2 秒粒度）写在那一行旁边。
-fn subs(_model : Model, emit : @cmd.Emit[Msg]) -> @sub.Sub {
-  @sub.batch([
+fn subs(model : Model, emit : @cmd.Emit[Msg]) -> @sub.Sub {
+  let all : Array[@sub.Sub] = [
     @sub.on_resize(fn (v) { emit(Resized(v.width)) }),
     // Esc 关浮层（§4.3）。键盘走**订阅**（不是元素级监听）：浮层没有焦点，
     // 而 `on_key_down` 是文档级的 —— 今天唯一够得着 Esc 的通道。
-    @sub.on_key_down(fn (k) { emit(Key(k.key())) }),
+    @sub.on_key_down(fn (k) { emit(Key(k.key(), k.ctrl_key() || k.meta_key())) }),
     // 地址变了 ⇒ 交给 `update` 解析（它**不写回地址**，见 update 的注释）。
     // ⚠️ 这条**只在 popstate 那一档推**（见 route.mbt 的文件头），首屏那一次靠 `initial` 同步读。
     @sub.on_url_changed(fn (u) { emit(UrlChanged(hash_of_url(u))) }),
@@ -299,7 +401,13 @@ fn subs(_model : Model, emit : @cmd.Emit[Msg]) -> @sub.Sub {
     // ⚠️ 它是**订阅**，不是轮询 —— 而且装载后会**先补一次当前值**（moobile 那边特意做的），
     //    所以首屏就有高亮，不必等用户先滚一下。
     @sub.on_node_scroll(prose_node(), fn (v) { emit(ProseScrolled(v)) }),
-  ])
+  ]
+  // **只在有待兑现的锚点时**才订"一帧" —— 常驻的 60fps 订阅是白花的（那正是本仓会记的代价）。
+  // 它的用途只有一个：跨页跳节时等新页面渲染出来（见 `HitGo` / `Frame`）。
+  if not(model.pending is NoPending) {
+    all.push(@sub.on_animation_frame(fn (_t) { emit(Frame) }))
+  }
+  @sub.batch(all)
 }
 
 // ── 外观 ──────────────────────────────────────────────────────────────────────

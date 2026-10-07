@@ -46,6 +46,24 @@ pub fn heading_anchor(i : Int) -> String {
 }
 
 ///|
+/// **一页的节点名**：`page-<页面种类>-<kind>-<i>-<k>`。
+///
+/// 用途只有一个，但很关键：**判断"新页面渲染好了没有"**。
+/// 跨页跳锚点（搜索命中那种）在切页与渲染之间隔着一次 React 提交，而锚点名（`sec-<i>`）
+/// **每页都重名** ⇒ 拿它当信号会等到**旧页面**的同号节点上（静默滚错）。
+/// 页专属的名字在新页面挂上之前一定不存在。
+fn page_node(page : Int, sel : Sel) -> String {
+  "page-" +
+  page.to_string() +
+  "-" +
+  sel.kind.to_string() +
+  "-" +
+  sel.i.to_string() +
+  "-" +
+  sel.k.to_string()
+}
+
+///|
 /// **内容区那个滚动容器的节点名**（`shell/layout.mbt` 的 `column(...)` 用的同一个字面量）。
 /// 做成函数是为了只有一个地方能改它 —— 名字对不上时症状是"高亮永远不动"。
 pub fn prose_node() -> String {

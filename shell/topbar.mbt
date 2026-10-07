@@ -47,6 +47,8 @@ fn nav_items(ctx : Ctx) -> Array[(String, Msg)] {
   let out : Array[(String, Msg)] = []
   out.push(("首页", Home))
   out.push(("书架", Shelf))
+  // 搜索（对标表 #2 的"顶栏要有搜索"）：它是一个**入口**，不是一个页面 ⇒ 走浮层。
+  out.push(("搜索", SearchOpen))
   for i = 0; i < ctx.home.sections.length(); i = i + 1 {
     let s = ctx.home.sections[i]
     if s.link != "" {
