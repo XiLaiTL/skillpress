@@ -1,0 +1,289 @@
+// engine/site/probe.mbt —— **新 IA 的量法**：一次 eval 取一张"页面快照"，各判据组读它。
+//
+// ## 为什么是"一张快照"而不是一堆小查询
+//
+// 判据要的是**同一刻**的一组读数（栏数、栏宽、字号、片段宽度、顶栏高……）。
+// 拆成十几次 `eval` 的话，中间任何一次重渲都会让"栏数"与"栏宽"来自两帧 —— 那种错**查不出来**
+// （数字都合理，只是不属于同一刻）。所以：一次 eval 交回一个 JSON，全部判据读它。
+//
+// ## 三条硬规矩（都是踩过的）
+//
+// 1. **探针不许往页面里加任何节点**。内环 `tools/ui-probe.mjs` 第一版把读数用的 `<pre>` 在量之前
+//    append 进 `body`，于是"页面本身不滚"这条**恒红**（探针自己的输出把页面撑高了）。
+//    这里从头到尾**只读**，所以不需要 `display:none` 那一步 —— 但"怎么进文档页/怎么换页"那几步
+//    会真的派发点击，那些**动作**是页面自己的（见下）。
+// 2. **进文档页 = 点侧栏的"标题区"**（与内环同口径）：那才是"跳页"那个可点区；
+//    雪佛龙只展开、不跳页。判"哪些东西真的可点"用 `[tabindex="0"]`（`Pressable` 渲出来就是这一层），
+//    不是"整页找含某个字的叶子"——那样会点到一段普通正文上，点了什么都不会发生。
+// 3. **RNW 不产语义标签**：整页零个 `p` / `h1`（Text 渲成 `div`/`span`）。所以"正文段落"要按
+//    **字号 15.5 的叶子文字元素**认，且**筛不到就报没量到**，不许回落到"最宽的那个"（那正是内环
+//    报过"62.6 字"假读数的那条路）。
+
+///|
+/// 一次 eval 拿到的页面快照（原始 JSON；各判据组用 `j_get` / `j_int` 取字段）。
+///
+/// 字段（缺 = `null`，判据自己判"没量到"）：
+/// ```text
+/// vw            视口宽（CSS px）
+/// shellBg       壳的底色（主题判据看它）
+/// topbar        { h, bg }                    顶栏高与底色
+/// cols          [ { w, oy, bg, br, bl } ]    三栏（`oy` 是 overflow-y）
+/// pageScrolls   html 是否比视口高（"页面本身不滚"看它）
+/// overflowX     横向溢出
+/// prose         { w, fs, chars }             正文字号筛出来的最宽叶子文字
+/// side          { rows, titles, machine, bars, heights, indent }
+/// tocRail       { rows }                     右栏那条轨上的目录行数
+/// tocTree       { rows, underCurrent }       树里那份：行数 + 是否挂在当前文件节点下
+/// doc           { h1, kicker, crumbs, pager, bodyParas }
+/// ```
+pub async fn snapshot(cdp : Cdp) -> Json raise {
+  let js = SNAPSHOT_JS
+  cdp.eval_json(js)
+}
+
+///|
+/// 页面快照的 JS。**只读**（不 append、不改样式）—— 见文件头第 1 条。
+const SNAPSHOT_JS : String =
+  #|(() => {
+  #|  const cs = (e, p) => e ? getComputedStyle(e)[p] : null;
+  #|  const box = (e) => { const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.left), y: Math.round(r.top) }; };
+  #|  const root = document.getElementById('root');
+  #|  if (!root || !root.firstElementChild) return { why: '没有 #root' };
+  #|  // moobile 会在应用根外面套几层 View（实测 3 层）⇒ "单子下降"到真正的壳
+  #|  let shell = root.firstElementChild, guard = 0;
+  #|  while (shell && shell.children.length === 1 && guard++ < 8) shell = shell.children[0];
+  #|  if (!shell || shell.children.length < 2) return { why: '壳的形状不对（顶栏 + 三栏行）' };
+  #|  const topbar = shell.children[0], row = shell.children[1];
+  #|  const cols = [...row.children];
+  #|  // 正文：按**字号 15.5** 筛叶子文字（见文件头第 3 条）
+  #|  let prose = null;
+  #|  [...document.querySelectorAll('div,span')].forEach((el) => {
+  #|    if (el.children.length || !el.textContent.trim()) return;
+  #|    if (parseFloat(cs(el, 'fontSize')) !== 15.5) return;
+  #|    const b = box(el);
+  #|    if (!prose || b.w > prose.w) prose = { w: b.w, fs: 15.5 };
+  #|  });
+  #|  if (prose) prose.chars = Math.round((prose.w / prose.fs) * 10) / 10;
+  #|  // 侧栏：行（13.5）、目录那一层（12.5 且缩进 ≥40）、当前项左条（2px 宽的实心块）、机器名（全小写 ASCII）
+  #|  let side = null;
+  #|  if (cols.length >= 2) {
+  #|    const sb = cols[0], sbLeft = Math.round(sb.getBoundingClientRect().left);
+  #|    const rows = [], toc = [], bars = [], machine = [], heights = [];
+  #|    [...sb.querySelectorAll('div,span')].forEach((el) => {
+  #|      const b = box(el);
+  #|      if (Math.round(b.w) === 2 && b.h > 8 && cs(el, 'backgroundColor') !== 'rgba(0, 0, 0, 0)') bars.push(cs(el, 'backgroundColor'));
+  #|    });
+  #|    [...sb.querySelectorAll('div,span')].forEach((el) => {
+  #|      if (el.children.length || !el.textContent.trim()) return;
+  #|      const t = el.textContent.trim(), fs = parseFloat(cs(el, 'fontSize')), left = box(el).x;
+  #|      if (fs === 13.5) { rows.push(t); heights.push(box(el).h); }
+  #|      if (fs === 12.5 && left - sbLeft >= 40) toc.push(t);
+  #|      if (/^[a-z][a-z0-9-]+$/.test(t)) machine.push(t);
+  #|    });
+  #|    side = { rows: rows.length, titles: rows.slice(0, 6), machine: machine, bars: bars, heights: heights, toc: toc.length };
+  #|  }
+  #|  // 目录：右栏那条轨 / 树里那份（树里那份必须挂在"当前文件"那个节点下面）
+  #|  const railRows = (cols.length >= 3 ? [...cols[cols.length - 1].querySelectorAll('div,span')] : [])
+  #|    .filter((el) => !el.children.length && el.textContent.trim() && parseFloat(cs(el, 'fontSize')) === 12.5).length;
+  #|  let tocTree = null;
+  #|  // 树里那份目录：**按结构认**（12.5px 且缩进 ≥40 的叶子），再从它往上爬到
+  #|  // "同时装着当前项（aria-current=page）"的那个祖先 —— 那就是它的挂载节点。
+  #|  // ⚠️ 不靠 class / data-* 属性：RNW 不一定把它们透传到 DOM（也不该把判据绑在类名上）。
+  #|  if (side && side.toc > 0) {
+  #|    const sb = cols[0], sbLeft = Math.round(sb.getBoundingClientRect().left);
+  #|    const leaf = [...sb.querySelectorAll('div,span')].find((el) =>
+  #|      !el.children.length && el.textContent.trim() && parseFloat(cs(el, 'fontSize')) === 12.5 &&
+  #|      Math.round(box(el).x) - sbLeft >= 40);
+  #|    if (leaf) {
+  #|      let host = leaf.parentElement, holder = null;
+  #|      while (host && host !== sb) {
+  #|        if (host.querySelector('[aria-current="page"]')) { holder = host; break; }
+  #|        host = host.parentElement;
+  #|      }
+  #|      tocTree = {
+  #|        rows: [...sb.querySelectorAll('div,span')].filter((el) => !el.children.length && el.textContent.trim() &&
+  #|          parseFloat(cs(el, 'fontSize')) === 12.5 && Math.round(box(el).x) - sbLeft >= 40).length,
+  #|        underCurrent: !!holder,
+  #|      };
+  #|    }
+  #|  }
+  #|  // 文档页骨架（字号 30 = H1；kicker/面包屑/上下页按字号 11.5 / 12.5 认）
+  #|  const leaves = [...document.querySelectorAll('div,span')].filter((el) => !el.children.length && el.textContent.trim());
+  #|  const byFs = (f) => leaves.filter((el) => parseFloat(cs(el, 'fontSize')) === f).map((el) => el.textContent.trim());
+  #|  const h1 = byFs(30)[0] || null;
+  #|  const doc = {
+  #|    h1: h1,
+  #|    kicker: byFs(11.5).find((t) => /[\/.]/.test(t)) || null,
+  #|    crumbs: (byFs(12.5).length),
+  #|    pager: leaves.filter((el) => /上一页|下一页/.test(el.textContent)).map((el) => el.textContent.trim().slice(0, 8)),
+  #|    paras: leaves.filter((el) => parseFloat(cs(el, 'fontSize')) === 15.5).length,
+  #|  };
+  #|  return {
+  #|    vw: innerWidth,
+  #|    shellBg: cs(shell, 'backgroundColor'),
+  #|    topbar: { h: box(topbar).h, bg: cs(topbar, 'backgroundColor') },
+  #|    cols: cols.map((c) => ({ w: box(c).w, oy: cs(c, 'overflowY'), bg: cs(c, 'backgroundColor'),
+  #|                             br: parseFloat(cs(c, 'borderRightWidth') || 0), bl: parseFloat(cs(c, 'borderLeftWidth') || 0) })),
+  #|    pageScrolls: document.documentElement.scrollHeight > document.documentElement.clientHeight + 1,
+  #|    overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  #|    prose: prose,
+  #|    side: side,
+  #|    tocRail: { rows: railRows },
+  #|    tocTree: tocTree,
+  #|    doc: doc,
+  #|  };
+  #|})()
+  #|
+
+///|
+/// 把视口改成 `w × h`（**阶梯的判据要在不同宽度下量**）。
+///
+/// 用 CDP 的 `Emulation.setDeviceMetricsOverride`（不是拖窗口）：它给的是**真的 CSS 视口宽度**，
+/// 而窗口宽度在无头 Chrome 里有最小宽（内环实测请求 420 拿到 512）——那一笔账内环文件头记着。
+pub async fn set_width(cdp : Cdp, w : Int, h : Int) -> Unit raise {
+  let _ = cdp.call(
+    "Emulation.setDeviceMetricsOverride",
+    "{\"width\":" + w.to_string() + ",\"height\":" + h.to_string() +
+    ",\"deviceScaleFactor\":1,\"mobile\":false}",
+  )
+  @async.sleep(500)
+}
+
+///|
+/// 取掉视口覆盖（量完还原，别把它留在后面那几条判据上）。
+pub async fn clear_width(cdp : Cdp) -> Unit raise {
+  try {
+    let _ = cdp.call("Emulation.clearDeviceMetricsOverride", "{}")
+  } catch {
+    _ => ()
+  }
+  @async.sleep(300)
+}
+
+///|
+/// 壳的定位片段（**每个动作都要用**）—— 与快照里同一套"单子下降"。
+///
+/// ⚠️ 别用 `header` / `aside` / `nav` 这类**语义标签**找位置：**RNW 不产语义标签**（整页零个
+///    `p`/`h1`，实测），顶栏与侧栏都是普通 `div`。位置只能按**结构**认（壳的第几个孩子）。
+const SHELL_JS : String =
+  #|const rootEl = document.getElementById('root');
+  #|let shellEl = rootEl && rootEl.firstElementChild, g = 0;
+  #|while (shellEl && shellEl.children.length === 1 && g++ < 8) shellEl = shellEl.children[0];
+  #|const topEl = shellEl && shellEl.children[0];
+  #|const sideEl = shellEl && shellEl.children[1] && shellEl.children[1].children[0];
+  #|
+
+///|
+/// 在 `scope` 里挑出可点元素，派发一次**真点击**（与内环同口径：`dispatchEvent` + `[tabindex="0"]`）。
+///
+/// 为什么判"可点"要用 `[tabindex="0"]`：那是 `Pressable` 渲出来的那一层；
+/// "整页找含某个字的叶子"会点到一段普通正文上，点了什么都不会发生（内环踩过）。
+async fn click_in(cdp : Cdp, scope : String, pick : String) -> Bool raise {
+  let js = "(() => {" + SHELL_JS +
+    " const host = " + scope + ";" +
+    " if (!host) return false;" +
+    " const cands = [...host.querySelectorAll('[tabindex=\"0\"]')].filter((el) => {" +
+    "   const t = (el.textContent || '').trim();" +
+    "   return " + pick + ";" +
+    " });" +
+    " if (!cands.length) return false;" +
+    " cands[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));" +
+    " return true;" +
+    " })()"
+  cdp.eval_bool(js)
+}
+
+///|
+/// **进文档页**：点侧栏第一条"条目"（标题区）—— 与内环同一套判据
+/// （`[tabindex="0"]` + 文本长度 > 6 + 不是 `▸`/`▾` 那种记号）。雪佛龙只展开、不跳页。
+pub async fn enter_doc(cdp : Cdp) -> Bool raise {
+  let ok = click_in(cdp, "sideEl", "t.length > 6 && !/^[▸▾§·]/.test(t)")
+  if !ok {
+    return false
+  }
+  @async.sleep(600)
+  // 就绪信号：出现 30px 的 H1（= 文档页画出来了）。与内环同一个信号。
+  let mut i = 0
+  let mut ready = false
+  while i < 40 && !ready {
+    ready = try {
+      has_h1(cdp)
+    } catch {
+      _ => false
+    }
+    if !ready {
+      @async.sleep(150)
+    }
+    i = i + 1
+  }
+  ready
+}
+
+///|
+/// 页面上有没有 30px 的叶子文字（= H1 画出来了）。
+///
+/// ⚠️ 别用 `document.querySelector('h1')`：**RNW 不产语义标签**（整页零个 `h1`，实测）。
+async fn has_h1(cdp : Cdp) -> Bool raise {
+  let js = "(() => { const L = [...document.querySelectorAll('div,span')].filter((e) =>" +
+    " !e.children.length && e.textContent.trim());" +
+    " return L.some((e) => parseFloat(getComputedStyle(e).fontSize) === 30); })()"
+  cdp.eval_bool(js)
+}
+
+///| 点"下一页"那一格（与内环同一个动作）。
+pub async fn click_next_page(cdp : Cdp) -> Bool raise {
+  click_in(cdp, "shellEl", "/下一页/.test(t)")
+}
+
+///| 点顶栏的**站名**（= 回首页）—— 顶栏里第一个可点元素就是它（品牌在最左）。
+pub async fn click_brand(cdp : Cdp) -> Bool raise {
+  click_in(cdp, "topEl", "true")
+}
+
+///| 点顶栏右端的**主题开关**（三态轮换）—— 顶栏里最后一个可点元素就是它。
+pub async fn click_theme(cdp : Cdp) -> Bool raise {
+  let js = "(() => {" + SHELL_JS +
+    " if (!topEl) return false;" +
+    " const cands = [...topEl.querySelectorAll('[tabindex=\"0\"]')];" +
+    " if (!cands.length) return false;" +
+    " cands[cands.length - 1].dispatchEvent(new MouseEvent('click', { bubbles: true }));" +
+    " return true;" +
+    " })()"
+  cdp.eval_bool(js)
+}
+
+///| 读一格数字（读不到给 `None`，判据自己判"没量到"）。
+pub fn num_of(j : Json, path : Array[String]) -> Int? {
+  let mut cur = j
+  for k in path {
+    match j_get(cur, k) {
+      Some(v) => cur = v
+      None => return None
+    }
+  }
+  j_int(cur)
+}
+
+///| 读一格字符串。
+pub fn str_of(j : Json, path : Array[String]) -> String? {
+  let mut cur = j
+  for k in path {
+    match j_get(cur, k) {
+      Some(v) => cur = v
+      None => return None
+    }
+  }
+  j_str(cur)
+}
+
+///| 读一格布尔。
+pub fn bool_of(j : Json, path : Array[String]) -> Bool? {
+  let mut cur = j
+  for k in path {
+    match j_get(cur, k) {
+      Some(v) => cur = v
+      None => return None
+    }
+  }
+  j_bool(cur)
+}

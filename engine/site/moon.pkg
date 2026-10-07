@@ -1,0 +1,39 @@
+// **站点判据（P8.3）** —— 自起静态服务 + 起无头 Chrome + 走 CDP 跑断言。
+//
+// ⚠️ **只能 native**：这一步要的三样东西在 **js 上没有实现**
+//    —— `moonbitlang/async` 的 `websocket`（`client.mbt` 只编 native/wasm）、
+//    `http` 的 **server**（`server.mbt` 只编 native/wasm；js 只有 http *client*）、
+//    以及 `process`（编 native/wasm）。实测过 `.mooncakes/moonbitlang/async/src/*/moon.pkg`
+//    的 `targets:` 那张表，不是猜的。
+//    ⇒ 站点判据要 C 工具链；这与"js 那条路只要 Node"是两回事。
+//
+// ⚠️ `win_compat.c` 是**必须的**：`moonbitlang/async` 的 native fs 桩引用 `GetTempPath2W`，
+//    那是 SDK 10.0.20348+ 才有的导入符号，本机只到 10.0.19041.0 ⇒ LNK2019。
+//    详见那个文件的文件头。
+//
+// ⚠️ 现在这一版**还没有 22 条断言**（`checks.mbt` 是下一步）：先把"服务能起、Chrome 能起、
+//    CDP 能连、能 eval、能读回真页面"这条链证出来 —— 探针跑通之前写断言等于在沙子上盖楼。
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/socket",
+  "moonbitlang/async/http",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/async/websocket",
+  "moonbitlang/async/io",
+  "moonbitlang/core/json",
+  "moonbitlang/core/env" @env,
+  "moonbitlang/x/sys" @sys,
+  "XiLaiTL/skillpress/engine/gates" @gates,
+  "XiLaiTL/skillpress/engine/gates/native" @gnative,
+  "XiLaiTL/skillpress/engine/content" @content,
+  "XiLaiTL/skillpress/engine/ignore" @ig,
+}
+
+// ⚠️ 这是**库**（不是可执行件）：`verify` 那个子命令由 `cmd/skillpress-native` 接线
+//    （分发必须落在可执行件那一层 —— moon 没有条件 import，js 那份 CLI 连这个包都不能 import）。
+supported_targets = "+native"
+
+options(
+  "native-stub": [ "win_compat.c" ],
+)

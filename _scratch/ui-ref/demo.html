@@ -1,0 +1,1162 @@
+<!doctype html>
+<!--
+  skillpress · 理想形态 demo（单文件，零依赖，不基于 moobile）
+
+  这份 demo 要证明一件事：**同一份内容，人和 Agent 各读各的、但读的是同一份**。
+  所以它不是"好看一点的文档站"，它把这句话做成了能点的东西：
+
+    · 一页三种读法：**渲染**（人看）/ **原文**（Agent 看，就是 .md 本体）/ **llms.txt**（机器的索引）
+    · 每个标题、每个代码块、每个页面都有"可复制的机器入口"（锚点 URL / 文件路径 / 原始链接）
+    · 机器名（slug / 文件名）只出现在 **kicker、面包屑末位、Agent 面板、URL** 四处 —— 正文里一律中文
+    · 页脚交代出处：源文件、许可、生成时间、内容根指纹
+
+  其它按 `DESIGN-site.md` v0.1：
+    白底顶栏 + 1px 线 / 中性灰 + 靛紫 / 正文 15.5px·行高 1.75·行宽 720 / 三栏各自独立滚动
+    阶梯（三档，视口宽度写进 <html data-rail>，不是 CSS 媒体查询）：
+      rail=3 ≥1280  三栏（书架 / 正文 / 目录轨）
+      rail=2 1024–1279  两栏 —— **目录第一步是"塞进侧栏"**：挂在**正在读的那个文件**节点下面（树的第三级，
+                        缩进再进一格），跟侧栏一起滚、仍跟读高亮 —— 不是塞到侧栏底部（那是 IA 错误）
+      rail=1 <1024  一栏 + 三个贴边按钮（两级浮出 + 下往上 sheet；书架 sheet 里也带着本页目录）
+    hash 路由（可分享、可后退、可刷新）+ ⌘K 搜索 + 明暗三态（跟随系统/亮/暗）
+
+  ⚠️ 它**不是**待落地的代码：这是设计原型，用来"先看、再改设计"。
+-->
+<html lang="zh-CN" data-theme="light" data-theme-pref="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>skillpress · 人机共读的文档站</title>
+<meta name="description" content="把 skills 目录印成站点：同一份内容，人和 Agent 一起读。">
+<!-- Agent 侧入口：声明"这一页的原文在哪"（真实站点按页生成） -->
+<link rel="alternate" type="text/markdown" href="skills/skillpress/WEBSITE.md">
+<link rel="llms" href="/llms.txt">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%234f46e5'/><text x='16' y='23' font-size='19' font-family='monospace' fill='white' text-anchor='middle'>s</text></svg>">
+<script>
+/* 防闪：首次绘制之前定下主题（真源是 <html data-theme>，localStorage 只存"偏好"） */
+(function () {
+  var r = document.documentElement;
+  try {
+    var p = localStorage.getItem('sp-theme') || 'auto';
+    var dark = p === 'dark' || (p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    r.dataset.themePref = p; r.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) { r.dataset.theme = 'light'; }
+})();
+</script>
+<style>
+/* ═══ 1. token：原语 → 语义（组件只准引用语义名） ═════════════════════════ */
+:root {
+  /* 尺度（明暗不变量） */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px;
+  --fs-meta:11.5px; --fs-aux:12.5px; --fs-sm:13.5px; --fs-base:15.5px; --fs-h3:17px; --fs-h2:22px; --fs-h1:30px;
+  --lh-tight:1.45; --lh-aux:1.6; --lh-base:1.75;
+  --r-1:4px; --r-2:6px; --r-3:10px; --r-4:14px; --r-full:999px;
+  --w-side:272px; --w-toc:220px; --w-prose:720px; --h-top:56px; --w-max:1440px;
+  --dur-1:120ms; --dur-2:200ms;
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --font-sans:system-ui,-apple-system,"Segoe UI","PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --shadow-1:0 1px 2px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06);
+  --shadow-2:0 3px 12px rgba(0,0,0,.07),0 1px 4px rgba(0,0,0,.07);
+  --shadow-3:0 12px 32px rgba(0,0,0,.10),0 2px 6px rgba(0,0,0,.08);
+  --shadow-4:0 14px 44px rgba(0,0,0,.12),0 3px 9px rgba(0,0,0,.12);
+}
+:root, :root[data-theme="light"] {
+  --canvas:#ffffff; --surface:#ffffff; --surface-2:#f7f7f8; --overlay:#ffffff;
+  --inset:rgba(120,124,150,.14); --scrim:rgba(24,24,27,.42);
+  --fg-1:#35363b; --fg-2:#64656c; --fg-3:#8f9096;
+  --line-1:#e5e5e8; --line-2:#c8c9ce;
+  --brand:#4f46e5; --brand-hover:#4338ca; --brand-soft:rgba(79,70,229,.12); --brand-ring:rgba(79,70,229,.35);
+  --state-hover:rgba(24,24,27,.045); --state-active:rgba(24,24,27,.08);
+  --state-hover-side:rgba(24,24,27,.07);   /* 侧栏底比画布暗一档，同样的叠色在那里会被"吃掉"⇒ 单独一档 */
+  --code-bg:#f7f7f8; --code-line:#e5e5e8;
+  --tip:#15803d; --warn:#9a6a10; --danger:#b3261e;
+  --tok-kw:#4f46e5; --tok-ty:#0e7490; --tok-st:#15803d; --tok-num:#b45309; --tok-fn:#2563eb; --tok-cm:#8f9096; --tok-op:#64656c;
+}
+:root[data-theme="dark"] {
+  --canvas:#18181b; --surface:#18181b; --surface-2:#131316; --overlay:#1f1f23;
+  --inset:rgba(113,113,122,.18); --scrim:rgba(0,0,0,.6);
+  --fg-1:#e4e4e7; --fg-2:#a1a1aa; --fg-3:#71717a;
+  --line-1:#27272a; --line-2:#3f3f46;
+  --brand:#a5b4fc; --brand-hover:#c7d2fe; --brand-soft:rgba(79,70,229,.20); --brand-ring:rgba(165,180,252,.45);
+  --state-hover:rgba(255,255,255,.055); --state-active:rgba(255,255,255,.09);
+  --state-hover-side:rgba(255,255,255,.085);
+  --code-bg:#131316; --code-line:#27272a;
+  --tip:#6ddba0; --warn:#e8c06a; --danger:#f2938c;
+  --tok-kw:#a5b4fc; --tok-ty:#67e8f9; --tok-st:#86efac; --tok-num:#fcd34d; --tok-fn:#93c5fd; --tok-cm:#71717a; --tok-op:#a1a1aa;
+}
+
+/* ═══ 2. 基础 ═══════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  display:flex;flex-direction:column;overflow:hidden;
+  font-family:var(--font-sans);font-size:var(--fs-base);line-height:var(--lh-base);
+  color:var(--fg-1);background:var(--canvas);-webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--brand-soft);color:var(--fg-1)}
+a{color:var(--brand);text-decoration:none}
+a:hover{color:var(--brand-hover);text-decoration:underline;text-underline-offset:2px}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:var(--r-1)}
+kbd{font-family:var(--font-mono);font-size:var(--fs-meta);padding:1px 5px;border:1px solid var(--line-1);border-radius:var(--r-1);background:var(--inset);color:var(--fg-2)}
+.skip{position:absolute;left:var(--sp-4);top:-60px;z-index:90;padding:var(--sp-2) var(--sp-4);background:var(--brand);color:#fff;border-radius:var(--r-2);font-size:var(--fs-sm);transition:top var(--dur-2) var(--ease)}
+.skip:focus{top:var(--sp-3)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.mono{font-family:var(--font-mono)}
+
+/* ═══ 3. 顶栏（白底 + 1px 线） ══════════════════════════════════════════ */
+.topbar{
+  flex:0 0 auto;height:var(--h-top);display:flex;align-items:center;gap:var(--sp-3);
+  padding:0 var(--sp-5);background:var(--canvas);border-bottom:1px solid var(--line-1);z-index:30;
+}
+.brand{display:flex;align-items:center;gap:var(--sp-2);font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--fg-1)}
+.brand:hover{text-decoration:none;color:var(--fg-1)}
+.brand .mark{width:20px;height:20px;border-radius:6px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:12px}
+.topnav{display:flex;gap:var(--sp-1);margin-left:var(--sp-2)}
+.topnav a{padding:6px var(--sp-3);font-size:var(--fs-sm);color:var(--fg-2);border-radius:var(--r-2);transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+.topnav a:hover{background:var(--state-hover);color:var(--fg-1);text-decoration:none}
+.topnav a[aria-current="page"]{color:var(--fg-1);font-weight:600;background:var(--brand-soft)}
+.spacer{flex:1}
+.searchbtn{display:flex;align-items:center;gap:var(--sp-2);height:34px;padding:0 var(--sp-2) 0 var(--sp-3);min-width:200px;
+  border:1px solid var(--line-1);border-radius:var(--r-2);background:var(--surface-2);color:var(--fg-3);font:inherit;font-size:var(--fs-sm);cursor:pointer;
+  transition:border-color var(--dur-1) var(--ease)}
+.searchbtn:hover{border-color:var(--line-2);color:var(--fg-2)}
+.searchbtn .keys{margin-left:auto;display:flex;gap:3px}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;border:1px solid transparent;border-radius:var(--r-2);
+  background:transparent;color:var(--fg-2);cursor:pointer;transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+.iconbtn:hover{background:var(--state-hover);color:var(--fg-1)}
+.iconbtn svg{width:17px;height:17px}
+.i-auto,.i-sun,.i-moon{display:none}
+:root[data-theme-pref="auto"] .i-auto{display:block}
+:root[data-theme-pref="light"] .i-sun{display:block}
+:root[data-theme-pref="dark"] .i-moon{display:block}
+
+/* ═══ 4. 三栏骨架：各自独立滚动（不用 sticky） ══════════════════════════ */
+.layout{flex:1;min-height:0;display:grid;grid-template-columns:var(--w-side) minmax(0,1fr) var(--w-toc);
+  max-width:var(--w-max);width:100%;margin:0 auto}
+.col{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.sidebar{border-right:1px solid var(--line-1);padding:var(--sp-6) var(--sp-3) var(--sp-7);background:var(--surface-2)}
+.toc{border-left:1px solid var(--line-1);padding:var(--sp-5) var(--sp-3) var(--sp-6)}
+.main{padding:var(--sp-6) var(--sp-6) var(--sp-7)}
+.prose{max-width:var(--w-prose);margin:0 auto}
+
+/* ── 4b. 阶梯：三档由 <html data-rail> 决定（视口宽度写进去 —— moobile 没有媒体查询） ── */
+:root[data-rail="2"] .layout{grid-template-columns:var(--w-side) minmax(0,1fr)}
+:root[data-rail="2"] .toc,
+:root[data-rail="1"] .toc{display:none}
+:root[data-rail="1"] .layout{grid-template-columns:minmax(0,1fr)}
+:root[data-rail="1"] .sidebar{display:none}
+:root[data-rail="1"] .main{padding:var(--sp-5) var(--sp-4) var(--sp-7)}
+
+/* ── 4c. 侧栏：一行一个链接。层级靠"缩进 + 引导线"，状态靠"左条"，机器名不进侧栏 ── */
+.grp{font-size:var(--fs-aux);font-weight:600;letter-spacing:0;color:var(--fg-2);padding:0 var(--sp-3) var(--sp-2)}
+.tree{list-style:none;margin:0;padding:0}
+.tree ul{list-style:none;margin:0;padding:0}
+.snode{position:relative}
+/* 行：整行是一个可点区域，但只有链接跳转、雪佛龙只展开 —— 不假装（点雪佛龙不该跳页） */
+.srow{position:relative;display:flex;align-items:center;gap:var(--sp-1);padding:0 var(--sp-3);border-radius:var(--r-2)}
+/* 状态通道：左条（hover 灰 → 当前靛紫）。底色叠在侧栏底上很弱，所以状态主要靠这条认 */
+.srow::before{content:"";position:absolute;left:0;top:var(--sp-2);bottom:var(--sp-2);width:2px;
+  border-radius:var(--r-full);background:transparent}
+.srow:hover{background:var(--state-hover-side)}
+.srow:hover::before{background:var(--line-2)}
+.srow[data-current="1"]{background:var(--brand-soft)}
+.srow[data-current="1"]::before{background:var(--brand)}
+.schev{flex:0 0 12px;height:12px;display:grid;place-items:center;padding:0;border:0;background:none;
+  color:var(--fg-2);cursor:pointer}
+.schev svg{width:12px;height:12px;transition:transform var(--dur-1) var(--ease)}
+.schev[aria-expanded="true"] svg{transform:rotate(90deg)}
+.schev:hover{color:var(--fg-1)}
+.schev[data-leaf="1"]{visibility:hidden}                 /* 没有子页 ⇒ 留空位，不画一个点不动的箭头 */
+.slnk{flex:1;min-width:0;padding:var(--sp-2) 0;font-size:var(--fs-sm);line-height:var(--lh-tight);color:var(--fg-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 单行省略 ⇒ 每一行一样高，不参差 */
+.slnk:hover{color:var(--fg-1);text-decoration:none}
+.srow[data-current="1"] .slnk{color:var(--brand);font-weight:600}
+/* 二级：标题与一级**同一列**（引导线占掉那个雪佛龙位），左条仍与父级同一条通道 */
+.ssub{position:relative;margin:0 0 var(--sp-2)}
+.ssub::before{content:"";position:absolute;left:calc(var(--sp-3) + 6px);top:0;bottom:0;width:1px;background:var(--line-1)}
+.ssub[hidden]{display:none}
+.ssub .srow{padding-left:calc(var(--sp-3) + var(--sp-4))}
+/* 三级 = **本页目录**：挂在"正在读的那个文件"节点下面（不是塞在侧栏底部）——
+   缩进再进一格、字号小一档、颜色仍是可读的 --fg-2；引导线各自一条，一眼看得出是它的子项 */
+.stoc{position:relative;list-style:none;margin:0 0 var(--sp-2);padding:0}
+.stoc::before{content:"";position:absolute;left:calc(var(--sp-3) + var(--sp-4) + 6px);top:0;bottom:0;width:1px;background:var(--line-1)}
+.stoc a{position:relative;display:block;padding:var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + var(--sp-4) + var(--sp-4));
+  border-radius:var(--r-2);font-size:var(--fs-aux);line-height:var(--lh-aux);color:var(--fg-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stoc a::before{content:"";position:absolute;left:0;top:var(--sp-2);bottom:var(--sp-2);width:2px;
+  border-radius:var(--r-full);background:transparent}
+.stoc a:hover{background:var(--state-hover-side);color:var(--fg-1);text-decoration:none}
+.stoc a:hover::before{background:var(--line-2)}
+.stoc a[aria-current="true"]{color:var(--brand);font-weight:600}
+.stoc a[aria-current="true"]::before{background:var(--brand)}
+.stoc a.lv3{padding-left:calc(var(--sp-3) + var(--sp-4) + var(--sp-4) + var(--sp-4))}
+.stoc .tocnone{padding:var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + var(--sp-4) + var(--sp-4));
+  font-size:var(--fs-aux);color:var(--fg-2)}
+.sb-foot{border-top:1px solid var(--line-1);margin-top:var(--sp-4);padding:var(--sp-3);display:grid;gap:var(--sp-1);
+  font-size:var(--fs-aux)}
+.sb-foot a{color:var(--fg-2)}
+.sb-foot a:hover{color:var(--fg-1)}
+/* 唯一允许用 --fg-3 的地方：一条"给人复制、不给人读"的机器串（它落在这块底上只有 2.97，故意的） */
+.sb-foot .fp{font-family:var(--font-mono);font-size:var(--fs-meta);color:var(--fg-3)}
+
+/* ── 本页目录的两副样子：右栏那条"轨"（.tocbox）与树里的第三级（.stoc，见上） ──
+   两处共用同一份标记（<a data-sec class="lv2/lv3">），换的只是外壳 —— 所以"当前节高亮"两边都成立 */
+.tocbox nav{border-left:1px solid var(--line-1)}
+.tocbox .grp{padding-left:var(--sp-3)}
+.tocbox a{display:block;padding:4px var(--sp-3);margin-left:-1px;font-size:var(--fs-aux);line-height:1.5;color:var(--fg-2);border-left:2px solid transparent}
+.tocbox a:hover{color:var(--fg-1);text-decoration:none}
+.tocbox a.lv3{padding-left:var(--sp-5)}
+.tocbox a[aria-current="true"]{color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.tocbox .tocpage{margin-top:var(--sp-4);padding:var(--sp-3);border-top:1px solid var(--line-1);display:grid;gap:6px;font-size:var(--fs-meta);color:var(--fg-2)}
+.tocnone{padding:0 var(--sp-3);font-size:var(--fs-aux);color:var(--fg-2)}
+/* 目录塞进树里时就是上面的 .stoc；这行只留给"页面不在树里"的兜底（首页/书架/llms/404） */
+.stocwrap{position:relative;margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line-1)}
+
+/* ═══ 5. 正文 ═══════════════════════════════════════════════════════════ */
+.crumb{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-aux);color:var(--fg-3);margin-bottom:var(--sp-2);flex-wrap:wrap}
+.crumb a{color:var(--fg-2)}
+.crumb .sep{opacity:.5}
+.crumb .here{font-family:var(--font-mono);font-size:var(--fs-meta);color:var(--fg-3)}
+h1{font-size:var(--fs-h1);line-height:1.2;letter-spacing:-.02em;margin:0 0 var(--sp-3);color:var(--fg-1);font-weight:700;text-wrap:balance}
+.lede{font-size:17px;line-height:1.65;color:var(--fg-2);margin:0 0 var(--sp-5)}
+.viewbar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;padding:0 0 var(--sp-4);margin-bottom:var(--sp-5);border-bottom:1px solid var(--line-1)}
+.seg{display:inline-flex;border:1px solid var(--line-1);border-radius:var(--r-2);overflow:hidden}
+.seg button{font:inherit;font-size:var(--fs-aux);padding:5px var(--sp-3);background:transparent;color:var(--fg-2);border:0;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.viewbar .hint{font-size:var(--fs-meta);color:var(--fg-3)}
+.viewbar .grow{flex:1}
+
+/* Agent 面板 —— 这份 demo 的核心差异点 */
+.agent{border:1px solid var(--line-1);border-radius:var(--r-3);background:var(--surface-2);padding:var(--sp-3) var(--sp-4);margin:0 0 var(--sp-5)}
+.agent .h{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-aux);font-weight:600;color:var(--fg-2);margin-bottom:var(--sp-2)}
+.agent .dot{width:7px;height:7px;border-radius:var(--r-full);background:var(--tip)}
+.agent .row{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--fs-aux);color:var(--fg-2)}
+.agent .row+.row{margin-top:6px}
+.agent .row .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent button.copy{font:inherit;font-family:var(--font-sans);font-size:var(--fs-meta);padding:3px var(--sp-2);border:1px solid var(--line-1);border-radius:var(--r-1);background:var(--surface);color:var(--fg-2);cursor:pointer}
+.agent button.copy:hover{background:var(--state-hover);color:var(--fg-1)}
+.agent button.copy[data-done="1"]{color:var(--tip);border-color:var(--tip)}
+
+h2,h3,h4{color:var(--fg-1); scroll-margin-top:var(--sp-4)}
+h2{font-size:var(--fs-h2);line-height:1.3;letter-spacing:-.01em;margin:var(--sp-7) 0 var(--sp-4);position:relative;text-wrap:balance}
+h3{font-size:var(--fs-h3);margin:var(--sp-6) 0 var(--sp-3);position:relative}
+.anch{position:absolute;left:-.75em;width:.7em;color:var(--fg-3);opacity:0;font-weight:400;text-decoration:none}
+h2:hover .anch,h3:hover .anch,h2:focus-within .anch{opacity:1}
+p{margin:0 0 var(--sp-4)}
+ul,ol{margin:0 0 var(--sp-4);padding-left:1.4em}
+li{margin:0 0 var(--sp-2)}
+li::marker{color:var(--fg-3)}
+blockquote{margin:0 0 var(--sp-4);padding:var(--sp-2) var(--sp-4);border-left:2px solid var(--line-2);color:var(--fg-2)}
+code{font-family:var(--font-mono);font-size:.88em;background:var(--inset);border-radius:var(--r-1);padding:.1em .34em;color:var(--fg-1)}
+
+.code{margin:0 0 var(--sp-5);border:1px solid var(--line-1);border-radius:var(--r-3);background:var(--code-bg);overflow:hidden}
+.code .head{display:flex;align-items:center;gap:var(--sp-2);padding:4px var(--sp-2) 4px var(--sp-3);border-bottom:1px solid var(--code-line);background:var(--surface-2);
+  font-family:var(--font-mono);font-size:var(--fs-meta);color:var(--fg-3)}
+.code .head .name{color:var(--fg-2)}
+.code .head .grow{flex:1}
+.code .head button{font:inherit;font-family:var(--font-sans);font-size:var(--fs-meta);padding:2px var(--sp-2);border:1px solid transparent;border-radius:var(--r-1);background:transparent;color:var(--fg-3);cursor:pointer}
+.code .head button:hover{background:var(--state-hover);color:var(--fg-1)}
+.code .head button[data-done="1"]{color:var(--tip)}
+.code pre{margin:0;padding:var(--sp-4);overflow-x:auto;font-family:var(--font-mono);font-size:var(--fs-sm);line-height:1.7;color:var(--fg-1)}
+.tb{border:1px solid var(--line-1);border-radius:var(--r-3);overflow-x:auto;margin:0 0 var(--sp-5)}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-sm)}
+th,td{text-align:left;padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--line-1);vertical-align:top}
+th{background:var(--surface-2);color:var(--fg-2);font-size:var(--fs-meta);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--state-hover)}
+td:first-child{font-family:var(--font-mono);color:var(--fg-1);white-space:nowrap}
+.raw{margin:0;padding:var(--sp-5);border:1px solid var(--line-1);border-radius:var(--r-3);background:var(--code-bg);
+  font-family:var(--font-mono);font-size:var(--fs-sm);line-height:1.7;color:var(--fg-1);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+.rawbar{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-3);font-size:var(--fs-aux);color:var(--fg-3)}
+.pager{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin:var(--sp-7) 0 0}
+.pager a{display:block;min-width:0;padding:var(--sp-3) var(--sp-4);border:1px solid var(--line-1);border-radius:var(--r-3);color:var(--fg-1);background:var(--surface)}
+.pager a:hover{border-color:var(--brand);background:var(--brand-soft);text-decoration:none}
+.pager .k{font-size:var(--fs-meta);color:var(--fg-3)}
+.pager .t{font-weight:600;font-size:var(--fs-sm)}
+.pager .next{text-align:right}
+footer.doc{margin-top:var(--sp-6);padding-top:var(--sp-4);border-top:1px solid var(--line-1);display:grid;gap:6px;font-size:var(--fs-meta);color:var(--fg-3)}
+footer.doc .row{display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center}
+footer.doc code{background:none;padding:0;color:var(--fg-2)}
+
+/* ═══ 6. 搜索浮层 ═══════════════════════════════════════════════════════ */
+.overlay{position:fixed;inset:0;z-index:70;background:var(--scrim);display:none;padding-top:10vh}
+.overlay[data-open="1"]{display:block}
+.palette{width:min(640px,calc(100vw - 32px));margin:0 auto;background:var(--overlay);border:1px solid var(--line-2);border-radius:var(--r-4);box-shadow:var(--shadow-4);overflow:hidden}
+.palette input{width:100%;border:0;border-bottom:1px solid var(--line-1);padding:var(--sp-4) var(--sp-5);font:inherit;font-size:17px;background:transparent;color:var(--fg-1);outline:none}
+.hits{max-height:52vh;overflow-y:auto;padding:var(--sp-2)}
+.hit{display:flex;align-items:center;gap:var(--sp-3);width:100%;padding:var(--sp-2) var(--sp-3);border:0;border-radius:var(--r-2);background:transparent;font:inherit;text-align:left;color:var(--fg-2);cursor:pointer}
+.hit[aria-selected="true"]{background:var(--brand-soft);color:var(--fg-1)}
+.hit .t{flex:1;color:var(--fg-1);font-size:var(--fs-sm)}
+.hit .w{font-size:var(--fs-meta);color:var(--fg-3);font-family:var(--font-mono)}
+.hits .empty{padding:var(--sp-5);text-align:center;color:var(--fg-3);font-size:var(--fs-sm)}
+.pfoot{display:flex;gap:var(--sp-4);padding:var(--sp-2) var(--sp-4);border-top:1px solid var(--line-1);background:var(--surface-2);font-size:var(--fs-meta);color:var(--fg-3)}
+.pfoot span:last-child{margin-left:auto}
+
+/* ═══ 7. rail=1：三个贴边按钮 + 两级浮出 + 下往上 sheet ═══════════════ */
+.fabs{display:none}
+:root[data-rail="1"] .fabs{display:block}
+/* 窄顶栏（与阶梯分开一条：data-top=narrow 是"这一排排不下"，不是"版面换了"） */
+:root[data-top="narrow"] .topnav{display:none}
+:root[data-top="narrow"] .searchbtn{min-width:0;padding:0 var(--sp-2)}
+:root[data-top="narrow"] .searchbtn span:not(.keys){display:none}
+:root[data-top="narrow"] .searchbtn .keys{display:none}
+:root[data-top="narrow"] .pager{grid-template-columns:1fr}
+:root[data-top="narrow"] .pager .next{text-align:left}
+:root[data-top="narrow"] .crumb .here{overflow-wrap:anywhere}
+:root[data-top="narrow"] h1{font-size:26px}
+:root[data-rail="1"] .fab{position:fixed;z-index:50;display:flex;align-items:center;gap:6px;height:40px;padding:0 var(--sp-3);
+  border:1px solid var(--line-2);border-radius:var(--r-full);background:var(--overlay);color:var(--fg-2);
+  box-shadow:var(--shadow-3);font:inherit;font-size:var(--fs-aux);cursor:pointer;
+  transition:transform var(--dur-2) var(--ease),left var(--dur-2) var(--ease),right var(--dur-2) var(--ease),color var(--dur-1) var(--ease)}
+:root[data-rail="1"] .fab svg{width:15px;height:15px}
+:root[data-rail="1"] .fab:hover{color:var(--fg-1)}
+/* 贴边停靠 = 半藏；第一次点 ⇒ 浮出（transform 归零）；第二次点 ⇒ 弹 sheet */
+:root[data-rail="1"] .fab[data-peek="0"][data-edge="left"]{transform:translateX(-22px)}
+:root[data-rail="1"] .fab[data-peek="0"][data-edge="right"]{transform:translateX(22px)}
+:root[data-rail="1"] .fab[data-open="1"]{background:var(--brand);border-color:var(--brand);color:#fff}
+:root[data-rail="1"] #fab-nav{left:var(--sp-3);top:calc(var(--h-top) + var(--sp-3))}
+:root[data-rail="1"] #fab-shelf{left:var(--sp-3);bottom:var(--sp-4)}
+:root[data-rail="1"] #fab-toc{right:var(--sp-3);bottom:var(--sp-4)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:65;max-height:70vh;overflow-y:auto;
+  background:var(--overlay);border-top:1px solid var(--line-2);border-radius:var(--r-4) var(--r-4) 0 0;
+  box-shadow:var(--shadow-4);padding:var(--sp-3) var(--sp-4) var(--sp-6);
+  transform:translateY(101%);transition:transform var(--dur-2) var(--ease);visibility:hidden}
+.sheet[data-open="1"]{transform:translateY(0);visibility:visible}
+.sheet .grab{width:36px;height:4px;border-radius:var(--r-full);background:var(--line-2);margin:0 auto var(--sp-3)}
+.sheet h4{margin:0 0 var(--sp-2);font-size:var(--fs-h3)}
+/* sheet 里的行：与侧栏同一套行语言（有底、有左条通道），不是一坨内联样式 */
+.sheetnav{display:grid;gap:var(--sp-1)}
+.sheetnav a{position:relative;display:block;padding:var(--sp-3);border-radius:var(--r-2);background:var(--surface-2);color:var(--fg-1);font-size:var(--fs-sm)}
+.sheetnav a:hover{background:var(--state-hover-side);text-decoration:none}
+.sheetnav a.flat{background:transparent;color:var(--fg-2);padding:var(--sp-2) var(--sp-3)}
+.sheetnav .grp{margin:var(--sp-3) 0 var(--sp-1);padding:0 var(--sp-3)}
+.sheet .tocnone{padding:0 var(--sp-3)}
+.sheet .sb-foot{margin-top:var(--sp-3)}
+.scrim{position:fixed;inset:0;z-index:60;background:var(--scrim);display:none}
+.scrim[data-open="1"]{display:block}
+
+/* ═══ 8. 无障碍 / 打印 ══════════════════════════════════════════════════ */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important}}
+@media print{
+  .topbar,.sidebar,.toc,.fabs,.sheet,.scrim,.overlay,.pager,.viewbar{display:none!important}
+  body{display:block;overflow:visible;height:auto}
+  .layout{display:block;max-width:none}
+  .col{overflow:visible;height:auto;border:0;padding:0}
+  .prose{max-width:none}
+  /* 打印一律白纸黑字：与当前主题无关（深色用户不会打出一张黑纸） */
+  :root{--canvas:#fff;--fg-1:#000;--fg-2:#333;--fg-3:#555;--line-1:#ccc;--code-bg:#f6f6f6;--inset:#f0f0f0}
+  .code,.tb,.raw{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="topbar">
+  <a class="brand" href="#/"><span class="mark" aria-hidden="true">s</span>skillpress</a>
+  <nav class="topnav" id="topnav" aria-label="站点导航"></nav>
+  <span class="spacer"></span>
+  <button class="searchbtn" id="searchBtn" aria-label="搜索">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <span>搜索</span><span class="keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+  </button>
+  <button class="iconbtn" id="themeBtn" aria-label="切换主题" title="主题：跟随系统 / 亮 / 暗">
+    <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/></svg>
+    <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M5 5l1.8 1.8M17.2 17.2 19 19M19 5l-1.8 1.8M6.8 17.2 5 19"/></svg>
+    <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
+  </button>
+  <a class="iconbtn" href="#/llms" aria-label="llms.txt（给 Agent 的索引）" title="llms.txt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+  </a>
+</header>
+
+<div class="layout">
+  <aside class="sidebar col" id="sidebar" aria-label="书架"></aside>
+  <main class="main col" id="main"><article class="prose" id="article"></article></main>
+  <aside class="toc tocbox col" id="toc" data-toc aria-label="本页目录"></aside>
+</div>
+
+<!-- 移动端三个贴边按钮 -->
+<div class="fabs">
+  <button class="fab" id="fab-nav" data-edge="left" data-peek="0" data-sheet="nav" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>导航</span>
+  </button>
+  <button class="fab" id="fab-shelf" data-edge="left" data-peek="0" data-sheet="shelf" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h6v14H4zM14 5h6v14h-6z"/></svg><span>书架</span>
+  </button>
+  <button class="fab" id="fab-toc" data-edge="right" data-peek="0" data-sheet="toc" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 6h14M5 12h9M5 18h5"/></svg><span>目录</span>
+  </button>
+</div>
+<div class="scrim" id="scrim" data-open="0"></div>
+<section class="sheet" id="sheet-nav" data-open="0" aria-label="导航"></section>
+<section class="sheet" id="sheet-shelf" data-open="0" aria-label="书架"></section>
+<section class="sheet" id="sheet-toc" data-open="0" aria-label="本页目录"></section>
+
+<!-- ⌘K -->
+<div class="overlay" id="overlay" data-open="0" role="dialog" aria-modal="true" aria-label="搜索">
+  <div class="palette">
+    <input id="q" type="search" placeholder="搜 skill / 子页 / 标题…" autocomplete="off" spellcheck="false" aria-label="搜索关键词">
+    <div class="hits" id="hits"></div>
+    <div class="pfoot"><span><kbd>↑</kbd><kbd>↓</kbd> 选</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Esc</kbd> 关</span><span>索引在构建期生成</span></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ══════════════════════════════════════════════════════════════════════════
+   0. 站点数据（真站的这一份来自 `press` 的生成物；这里内联，只为让 demo 能跑）
+   ══════════════════════════════════════════════════════════════════════════ */
+const SITE = {
+  title: 'skillpress',
+  nav: [ {label:'文档', href:'#/shelf/'}, {label:'规矩', href:'#/rules/'}, {label:'关于', href:'#/about/'} ],
+  fingerprint: 'sha256:9f2c…41ab',
+  generated: '2026-10-07 14:22',
+  license: 'Apache-2.0',
+};
+
+const SKILLS = [
+  {
+    slug: 'moobile-app-development', title: '应用开发',
+    desc: '用 moobile 写应用侧代码的入口：TEA 四件套、首帧入口、事件通道、Cmd/Sub。',
+    kids: [
+      { name:'structure', title:'应用骨架', desc:'模块、出口、首帧之前的事' },
+      { name:'styles', title:'样式', desc:'唯一通道是 @style，没有 CSS' },
+      { name:'events-and-subs', title:'事件与订阅', desc:'点按 / 输入 / 手势各走哪条通道' },
+      { name:'pages-and-lists', title:'页面与长列表', desc:'没有路由库时怎么加一页' },
+      { name:'host-and-capabilities', title:'宿主与能力边界', desc:'接入、搬运、能力边界' },
+    ],
+  },
+  {
+    slug: 'moobile-pitfalls', title: '踩坑记录',
+    desc: '反复栽的那些坑与真因：静默失效、平台差异、看起来能跑。',
+    kids: [
+      { name:'silent-failures', title:'静默失效', desc:'写了没效果、不报错的那一类' },
+      { name:'platform-diff', title:'平台差异', desc:'web 绿、真机红' },
+    ],
+  },
+  {
+    slug: 'harness', title: '扫根与加载',
+    desc: '内容根怎么扫、加载顺序、名字冲突怎么办。',
+    kids: [ { name:'order', title:'加载顺序', desc:'谁先谁后、冲突如何解决' } ],
+  },
+  {
+    slug: 'moobile-library-development', title: '库开发',
+    desc: '改库与发版：契约、兼容、发布清单。',
+    kids: [ { name:'contracts', title:'契约与版本', desc:'契约版本怎么走' } ],
+  },
+  {
+    slug: 'skillpress', title: '把 skills 印成站点',
+    desc: '这份工具自己：内容管线、门、脚手架。',
+    kids: [ { name:'gates', title:'门与判据', desc:'八道门各守什么' } ],
+  },
+];
+
+/* 每页的正文 = **一份 markdown**。渲染视图与"原文"视图读的是同一个字符串 ——
+   这就是"同一份内容两种读法"的字面实现。 */
+const PAGES = {
+  'moobile-app-development/SKILL.md': `# 应用开发
+
+用 moobile 写应用侧代码的入口：TEA 四件套、首帧入口、事件通道、Cmd/Sub。
+
+> 何时用它：你要新建或改写一个 moobile 应用的界面层。
+
+## 四条规矩
+
+| 规矩 | 为什么 | 坏掉的样子 |
+| --- | --- | --- |
+| 样式只走 @style | 字符串通道让 \`fontWeight\` 与 \`fontSize\` 在编译期分不开 | 编译过、运行静默不生效 |
+| 子节点是 \`Array[Html]\` | RN 侧按数组 diff | 只渲染第一个孩子 |
+| 事件挂在发起的那一层 | 宿主层不做冒泡补齐 | 点空白处没反应 |
+| 列表要给 key | 无 key 时复用错误的行 | 输入框内容串行 |
+
+## 最小形状
+
+\`\`\`moonbit title="card.mbt"
+/// 一张卡片：标题 + 任意子节点。
+pub fn card(title : String, kids : Array[@html.Html]) -> @html.Html {
+  @html.div(
+    attrs=@html.Attrs::build().styles(
+      @style.Style::new()
+        .padding(@style.px(12.0))
+        .background_color(theme.surface),
+    ),
+    [ @html.span(attrs=@html.Attrs::build(), title), ..kids ],
+  )
+}
+\`\`\`
+
+## 三个容易踩的坑
+
+- 样式表是**扁平**的：\`styles()\` 只收 \`Style\`，拼字符串会得到一个"看起来对"的 props。
+- \`flex: 1\` 会**平分**：一排里放三个弹性项，空隙会跟控件各拿一半。
+- **负号有语义**：\`i < 0\` 曾经同时盖住"首页"和"换模式"，顶栏出现两条一样的项。
+
+## 子页
+
+长表格与逐条清单进 \`references/\`；主文档只留"进得去"的信息。
+`,
+
+  'moobile-app-development/references/styles.md': `# 样式
+
+唯一通道是 \`@style\`：类型化、封闭、可移植。没有 CSS，也没有字符串样式。
+
+## 为什么是封闭的
+
+属性集**故意**只有那么多：\`display:grid\`、\`position:sticky\`、\`::before\` 这些根本没有构造器，
+所以"web 能跑、移动端不能"在**编译期就不可能发生**。
+
+## 一条数据、两个后端
+
+\`\`\`moonbit
+let s = @style.Style::new()
+  .font_size(15.5)
+  .line_height_em(1.75)
+  .color(theme.fg_1)
+\`\`\`
+
+长度的单位由**值的类型**决定（\`Px\` / \`Pct\` / \`Em\`），于是 RN 侧产出数字、CSS 侧产出 \`"16px"\`。
+
+> \`line_height\` 的无单位值在两边语义不同：CSS 是倍数、RN 是点数。用 \`line_height_em()\`。
+`,
+
+  'moobile-app-development/references/events-and-subs.md': `# 事件与订阅
+
+点按 / 输入 / 手势各走哪条通道，以及 \`Sub\` 的写法。
+
+## 三条通道
+
+| 来源 | 通道 | 真实值 |
+| --- | --- | --- |
+| 点按 | \`on_click\` | 无载荷 |
+| 输入 | \`on_input\` + \`Payload::text\` | 字符串 |
+| 手势 | \`@gesture.pan\` | 坐标与位移 |
+
+## 订阅
+
+\`\`\`moonbit
+fn subscriptions(_ : Model, _ : @cmd.Emit[Msg]) -> @sub.Sub {
+  @sub.batch([ @sub.on_resize(_ => Resized), @sub.every(1000, _ => Tick) ])
+}
+\`\`\`
+`,
+
+  'moobile-pitfalls/SKILL.md': `# 踩坑记录
+
+反复栽的那些坑与真因。这一页的写法是"现象 → 真因 → 处置"。
+
+## 静默失效
+
+| 现象 | 真因 | 处置 |
+| --- | --- | --- |
+| \`class=\` / \`style="…"\` 写了没效果 | 宿主用**严格 props 白名单**，白名单外**连警告都没有** | 一律走类型化样式通道 |
+| \`white_space\` 在真机上不生效 | 它在原生 RN 的登记表里**不存在** | 换 \`number_of_lines\` |
+| 按下态没有任何反馈 | 那一层**零消费方** | 宿主侧接上，或干脆不做 |
+
+## 一条经验
+
+**"没有任何报错 + 界面上少了东西"** 这个组合本身就是信号 —— 它比崩溃难查得多。
+`,
+
+  'harness/SKILL.md': `# 扫根与加载
+
+内容根怎么扫、加载顺序如何决定、重名如何处置。
+
+## 扫根
+
+- 扫的是**目录下有 \`SKILL.md\`** 的那些目录；
+- 忽略清单里列出的**站点不上桌、门也跳过**，且每条必须带理由；
+- 首页源单独一份，且**不许被忽略**。
+
+## 重名
+
+同名 skill 来自两个根时，**按 rank 高的那个**取；冲突要打印出来，不许静默。
+`,
+};
+
+/* 站点级页面（首页 / 书架 / 规矩 / 关于 / llms） */
+const SYS = {
+  '/': { kind:'home' },
+  '/shelf/': { kind:'shelf' },
+  '/rules/': {
+    kind:'doc', title:'写作规矩', lede:'这份内容源怎么写才不会被门拦下。',
+    md:`# 写作规矩
+
+内容源的写法：密度优先、带证据、状态符号、中文。
+
+## 四条
+
+- **能写成表就不写成段**，一句话能说完不写两句；
+- **每条硬事实带证据**（命令 / 路径 / "实测"）；
+- **状态符号统一**：已实测 / 部分 / 试过不行；
+- **开头五行内说清**"这份 skill 解决什么 + 先跑什么"。
+
+> 门存在的理由只有一条：**一个说谎的 skill 比没有 skill 更糟。**
+`,
+  },
+  '/about/': {
+    kind:'doc', title:'关于', lede:'这份内容源从哪来、怎么生成、怎么用。',
+    md:`# 关于
+
+站点只是**投影**：内容与 Agent 读到的**逐字节同一份**。
+
+## 三条约定
+
+| 约定 | 含义 |
+| --- | --- |
+| 一份事实一个家 | skill 是投影，不是新家 |
+| 不改内容 | 生成只读内容源，产物与源逐字节对账 |
+| 人机同源 | 同一份 \`SKILL.md\`：人看渲染、Agent 看原文 |
+`,
+  },
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1. 工具
+   ══════════════════════════════════════════════════════════════════════════ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+/** 把一棵子树搬进浮层时的快照：摘掉 id（id 全站唯一，浮层里那份只是复制品） */
+const snapshot = (el) => { const c = el.cloneNode(true); c.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id')); return c.innerHTML; };
+
+/** 极小的 markdown 子集渲染器：标题 / 段 / 列表 / 引用 / 围栏 / 表格 / 行内。 */
+function mdToHtml(md) {
+  const lines = md.split('\n');
+  const out = [];
+  let i = 0, toc = [];
+  const inline = (s) => esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  const slug = (s) => 'sec-' + s.replace(/[`*]/g, '').trim().toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-|-$/g, '');
+  while (i < lines.length) {
+    const L = lines[i];
+    if (/^```/.test(L)) {                                       // 围栏
+      const info = L.slice(3).trim();
+      const lang = info.split(/\s+/)[0] || 'text';
+      const name = (info.match(/title="([^"]+)"/) || [])[1] || '';
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      out.push(codeBlock(buf.join('\n'), lang, name));
+      continue;
+    }
+    if (/^#{1,4}\s/.test(L)) {                                  // 标题
+      const lv = L.match(/^#+/)[0].length;
+      const text = L.replace(/^#+\s*/, '');
+      if (lv === 1) { out.push('__TITLE__'); i++; continue; }
+      const id = slug(text);
+      toc.push({ lv, text, id });
+      out.push(`<h${lv} id="${id}"><a class="anch" href="#${id}" data-anchor="${id}" aria-label="锚点">#</a>${inline(text)}</h${lv}>`);
+      i++; continue;
+    }
+    if (/^\|/.test(L)) {                                        // 表格
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      const head = cells(rows[0]);
+      const body = rows.slice(2).map(cells);
+      out.push(`<div class="tb"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${
+        body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^>\s?/.test(L)) {                                      // 引用（可多行）
+      const buf = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) buf.push(lines[i++].replace(/^>\s?/, ''));
+      out.push(`<blockquote>${inline(buf.join(' '))}</blockquote>`);
+      continue;
+    }
+    if (/^[-*]\s/.test(L) || /^\d+\.\s/.test(L)) {               // 列表
+      const ordered = /^\d+\./.test(L);
+      const items = [];
+      while (i < lines.length && (/^[-*]\s/.test(lines[i]) || /^\d+\.\s/.test(lines[i]))) {
+        items.push(lines[i++].replace(/^([-*]|\d+\.)\s/, ''));
+      }
+      const tag = ordered ? 'ol' : 'ul';
+      out.push(`<${tag}>${items.map((t) => `<li>${inline(t)}</li>`).join('')}</${tag}>`);
+      continue;
+    }
+    if (L.trim() === '') { i++; continue; }
+    const buf = [];                                             // 段落
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,4}\s|```|\||>\s?|[-*]\s|\d+\.\s)/.test(lines[i])) buf.push(lines[i++]);
+    out.push(`<p>${inline(buf.join(' '))}</p>`);
+  }
+  return { html: out.join('\n'), toc };
+}
+
+/** 极小的语法着色：够让 token 颜色看得出来（真站是构建期 tree-sitter）。 */
+function highlight(code, lang) {
+  const KEYS = { moonbit:['pub','fn','let','mut','match','if','else','while','for','return','type','enum','struct','impl','async','import','guard'],
+                 bash:['npm','node','bash','cd','export','if','then','fi'], json:[], text:[] }[lang] || [];
+  const kwRe = KEYS.length ? new RegExp('\\b(' + KEYS.join('|') + ')\\b', 'g') : null;
+  let s = esc(code);
+  s = s.replace(/(\/\/[^\n]*|#[^\n]*)/g, (m) => `\u0001cm\u0001${m}\u0002`);
+  s = s.replace(/("(?:[^"\\]|\\.)*")/g, '\u0001st\u0001$1\u0002');
+  if (kwRe) s = s.replace(kwRe, '\u0001kw\u0001$1\u0002');
+  s = s.replace(/\b([A-Z][A-Za-z0-9_]*)\b/g, '\u0001ty\u0001$1\u0002');
+  s = s.replace(/\b(\d+(?:\.\d+)?)\b/g, '\u0001num\u0001$1\u0002');
+  s = s.replace(/\b([a-z_][a-z0-9_]*)(?=\()/g, '\u0001fn\u0001$1\u0002');
+  return s.replace(/\u0001(\w+)\u0001([\s\S]*?)\u0002/g, (_, k, v) => `<span class="t-${k}">${v}</span>`);
+}
+const TOKCOLOR = { cm:'var(--tok-cm)', st:'var(--tok-st)', kw:'var(--tok-kw)', ty:'var(--tok-ty)', num:'var(--tok-num)', fn:'var(--tok-fn)' };
+const tokCss = Object.entries(TOKCOLOR).map(([k, v]) => `.t-${k}{color:${v}}`).join('');
+document.head.insertAdjacentHTML('beforeend', `<style>${tokCss}</style>`);
+
+function codeBlock(code, lang, name) {
+  return `<div class="code"><div class="head"><span class="name">${esc(name || lang)}</span><span>${esc(lang)}</span>
+    <span class="grow"></span><button data-copy-code>复制</button></div>
+    <pre><code>${highlight(code, lang)}</code></pre></div>`;
+}
+
+function copy(text, btn, done = '已复制') {
+  const back = () => { const o = btn.dataset.label || btn.textContent; btn.dataset.label = o; btn.dataset.done = '1'; btn.textContent = done;
+    setTimeout(() => { btn.textContent = o; btn.dataset.done = '0'; }, 1400); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(back, () => {});
+  else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); back(); } catch (e) {} document.body.removeChild(ta); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2. 路由（hash：#/ … ；标题锚点用 ?s=<id>，所以链接能分享到"某一节"）
+   ══════════════════════════════════════════════════════════════════════════ */
+const flat = [];                       // 全站页序（给上下页 + 搜索索引用）
+SKILLS.forEach((s) => {
+  flat.push({ path:`/s/${s.slug}/`, kind:'skill', title:s.title, slug:s.slug, desc:s.desc, src:`skills/${s.slug}/SKILL.md`, md:PAGES[`${s.slug}/SKILL.md`] });
+  s.kids.forEach((k) => flat.push({ path:`/s/${s.slug}/${k.name}/`, kind:'kid', title:k.title, slug:s.slug, name:k.name,
+    desc:k.desc, parent:s, src:`skills/${s.slug}/references/${k.name}.md`, md:PAGES[`${s.slug}/references/${k.name}.md`] }));
+});
+
+function parseHash() {
+  let h = location.hash.replace(/^#/, '') || '/';
+  let sec = '';
+  const q = h.indexOf('?s=');
+  if (q >= 0) { sec = h.slice(q + 3); h = h.slice(0, q); }
+  return { path: h, sec };
+}
+const findPage = (p) => flat.find((x) => x.path === p);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3. 渲染
+   ══════════════════════════════════════════════════════════════════════════ */
+const elSidebar = $('#sidebar'), elMain = $('#main'), elTocRail = $('#toc'), elArt = $('#article');
+
+/* ⚠️ 曾经的 bug（体检抓出来的）：这里吐的是**裸 <li>**，没有 <ul class="tree"> 外壳，
+   于是 `.tree a / .txt / .nm / .mj / [aria-current]` 五条规则一条都没命中 ——
+   侧栏渲染成"项目符号 + 蓝色 15.5px 链接 + slug 挤在同一行"，当前项连高亮都没有。
+   现在：结构由上到下 <ul class="tree"> → <li class="snode"> → <div class="srow">。 */
+const expanded = new Map();                       // slug → 手动的展开/收起（没记过就按"当前那份展开"）
+function isOpen(s, cur) {
+  return expanded.has(s.slug) ? expanded.get(s.slug) : !!(cur && cur.slug === s.slug);
+}
+
+/* ── 本页目录的三副样子，共用同一份锚点 ──────────────────────────────────
+   rail 3：右栏那条"轨"（.tocbox 里的 <nav>）
+   rail 2/1：**挂在"正在读的那个文件"节点下面**（.stoc，树的第三级）—— 不是塞在侧栏底部
+   sheet：窄屏那个"目录"按钮弹出来的浮层（.tocbox 里、不带分组标题）
+   没节点的页面（首页 / 书架 / llms / 404）按兜底规则挂在树末（.stocwrap）。 */
+let TOC_MOUNT = 'rail', rendered = false, lastCur = null;
+const tocState = { list: [], page: null, path: '/', none: '这一页没有分节。' };
+const pagePath = () => (location.hash.replace(/^#/, '').split('?')[0] || '/');
+const anchors = (list, path, li) => list.map((t) => {
+  const a = `<a href="#${path}?s=${t.id}" data-sec="${t.id}" class="lv${t.lv}" title="${esc(t.text)}">${esc(t.text)}</a>`;
+  return li ? `<li>${a}</li>` : a;
+}).join('');
+const stocMount = (inner = '') => `<ul class="stoc" id="side-toc" data-toc data-in="side">${inner}</ul>`;   // id 只为体检好找
+const tocRailHTML = () => (tocState.list.length
+  ? `<p class="grp">本页目录</p><nav>${anchors(tocState.list, tocState.path)}</nav>
+     ${tocState.page && tocState.page.src ? `<div class="tocpage"><span>源文件</span><code>${esc(tocState.page.src)}</code></div>` : ''}`
+  : `<p class="grp">本页目录</p><p class="tocnone">${tocState.none}</p>`);
+const tocSideHTML = () => (tocState.list.length
+  ? anchors(tocState.list, tocState.path, true)
+  : `<li class="tocnone">${tocState.none}</li>`);
+function tocEl() { return TOC_MOUNT === 'rail' ? elTocRail : ($('#side-toc') || elTocRail); }
+function setToc(list, page, none) {
+  tocState.list = list || []; tocState.page = page || null; tocState.path = pagePath();
+  if (none) tocState.none = none;
+  elTocRail.innerHTML = TOC_MOUNT === 'rail' ? tocRailHTML() : '';
+  const side = $('#side-toc');
+  if (side) side.innerHTML = TOC_MOUNT === 'side' ? tocSideHTML() : '';
+}
+
+function renderSidebar(cur) {
+  lastCur = cur; rendered = true;
+  const side = TOC_MOUNT === 'side';
+  let hung = false;                               // 目录有没有挂到"当前那个文件"下面
+  const hang = () => { hung = true; return stocMount(); };
+  const tree = SKILLS.map((s) => {
+    const here = !!(cur && cur.slug === s.slug);
+    const open = isOpen(s, cur);
+    const isSelf = here && cur.kind === 'skill';
+    const kids = `<ul class="ssub" ${open ? '' : 'hidden'}>${s.kids.map((k) => {
+      const self = here && cur.kind === 'kid' && cur.name === k.name;
+      return `<li><div class="srow" ${self ? 'data-current="1"' : ''}>
+        <a class="slnk" href="#/s/${s.slug}/${k.name}/" title="${esc(k.title)}" ${self ? 'aria-current="page"' : ''}>${esc(k.title)}</a>
+      </div>${self && side ? hang() : ''}</li>`;                  // 子页 ⇒ 紧跟在这一行下面
+    }).join('')}</ul>`;
+    return `<li class="snode">
+      <div class="srow" ${isSelf ? 'data-current="1"' : ''}>
+        <button class="schev" data-toggle="${esc(s.slug)}" aria-expanded="${open}" aria-label="展开／收起 ${esc(s.title)}" ${s.kids.length ? '' : 'data-leaf="1"'}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <a class="slnk" href="#/s/${s.slug}/" title="${esc(s.title)}" ${isSelf ? 'aria-current="page"' : ''}>${esc(s.title)}</a>
+      </div>${s.kids.length ? kids : ''}${isSelf && side ? hang() : ''}</li>`;   // 主题页 ⇒ 挂在自己那棵树的最下面
+  }).join('');
+  elSidebar.innerHTML =
+    `<p class="grp">Skill 书架 · ${SKILLS.length} 份</p>
+     <ul class="tree">${tree}${side && !hung ? `<li class="stocwrap">${stocMount()}</li>` : ''}</ul>
+     <nav class="sb-foot">
+       <a href="#/shelf/">全部 ${SKILLS.length} 份 →</a>
+       <a href="#/llms">llms.txt（给 Agent 的索引）</a>
+       <span class="fp">内容根指纹 ${SITE.fingerprint}</span>
+     </nav>`;
+  // 雪佛龙只展开/收起，不跳页（点它却跳走 = 假控件）
+  $$('.schev[data-toggle]', elSidebar).forEach((b) => b.addEventListener('click', () => {
+    const slug = b.dataset.toggle, s = SKILLS.find((x) => x.slug === slug);
+    if (!s || !s.kids.length) return;
+    const next = !(b.getAttribute('aria-expanded') === 'true');
+    b.setAttribute('aria-expanded', String(next));
+    const ul = b.closest('.snode').querySelector('.ssub');
+    if (ul) ul.hidden = !next;
+    expanded.set(slug, next);                     // 记住用户的选择（本次会话内）
+  }));
+}
+
+function renderToc(toc, page) { setToc(toc, page, '这一页没有分节。'); }
+
+function agentPanel(page) {
+  if (!page || !page.src) return '';
+  return `<div class="agent">
+    <div class="h"><span class="dot"></span>这一页也是给 Agent 读的 —— 与你看到的是同一份文件</div>
+    <div class="row"><span class="grow">${esc(page.src)}</span>
+      <button class="copy" data-copy="${esc(page.src)}">复制路径</button>
+      <button class="copy" data-copy-raw>复制原文</button></div>
+    <div class="row"><span class="grow">整站索引 llms.txt · 每页原文的 URL 就是本页地址 + <code>.md</code></span>
+      <a href="#/llms">打开 llms.txt</a></div>
+  </div>`;
+}
+
+function renderPage(page, sec) {
+  const cur = page;
+  if (!page) return render404();
+  const md = page.md || '';
+  const { html, toc } = mdToHtml(md);
+  const title = page.title;
+  const layer = page.kind === 'kid' ? page.parent : null;
+
+  elArt.innerHTML = `
+    <nav class="crumb" aria-label="面包屑">
+      <a href="#/">首页</a><span class="sep">/</span>
+      <a href="#/shelf/">书架</a><span class="sep">/</span>
+      ${layer ? `<a href="#/s/${layer.slug}/">${esc(layer.title)}</a><span class="sep">/</span>` : ''}
+      <span>${esc(title)}</span><span class="sep">·</span><span class="here">${esc(page.src.split('/').slice(1).join('/'))}</span>
+    </nav>
+    <h1>${esc(title)}</h1>
+    <p class="lede">${esc(page.desc || '')}</p>
+    <div class="viewbar">
+      <div class="seg" role="group" aria-label="读法">
+        <button id="v-render" aria-pressed="true">渲染</button>
+        <button id="v-raw" aria-pressed="false">原文 .md</button>
+      </div>
+      <span class="hint" id="viewhint">人看这一份</span>
+      <span class="grow"></span>
+      <button class="copy" id="copyUrl" style="font-size:11.5px;padding:3px 8px;border:1px solid var(--line-1);border-radius:4px;background:var(--surface);color:var(--fg-2);cursor:pointer">复制本页链接</button>
+    </div>
+    ${agentPanel(page)}
+    <div id="body">${html.replace('__TITLE__', '')}</div>
+    <div id="rawwrap" hidden>
+      <div class="rawbar"><span>这是 Agent 读到的东西（未渲染的原文，逐字节）：</span><button class="copy" id="copyRaw2" style="font-size:11.5px;padding:3px 8px;border:1px solid var(--line-1);border-radius:4px;background:var(--surface);color:var(--fg-2);cursor:pointer">复制</button></div>
+      <pre class="raw">${esc(md)}</pre>
+    </div>
+    ${pager(page)}
+    <footer class="doc">
+      <div class="row"><span>源文件 <code>${esc(page.src)}</code></span><span>·</span><span>许可 ${SITE.license}</span><span>·</span><span>生成于 ${SITE.generated}</span></div>
+      <div class="row"><span>内容根指纹 <code>${SITE.fingerprint}</code></span><span>·</span><span>本页由 <code>skillpress press</code> 从内容源投影而来，未改动内容源</span></div>
+    </footer>`;
+
+  renderSidebar(cur);
+  renderToc(toc, page);
+  $$('#topnav a').forEach((a) => a.removeAttribute('aria-current'));
+  wirePage(page, toc);
+  document.title = `${title} · ${SITE.title}`;
+  const meta = document.querySelector('meta[name="description"]');
+  if (meta) meta.setAttribute('content', (page.desc || title) + ' — ' + SITE.title);
+
+  if (sec) {
+    const t = document.getElementById(sec);
+    if (t) {
+      // ⚠️ 不能用 offsetTop：`.col` 没有定位 ⇒ offsetParent 不是滚动容器，算出来是错的值
+      const top = t.getBoundingClientRect().top - elMain.getBoundingClientRect().top + elMain.scrollTop;
+      elMain.scrollTo({ top: Math.max(0, top - 16), behavior: 'auto' });
+    }
+  } else {
+    elMain.scrollTo({ top: 0 });
+  }
+}
+
+function pager(page) {
+  const i = flat.indexOf(page);
+  if (i < 0) return '';                       // 系统页不在页序里，别硬凑上下页
+  const prev = flat[i - 1], next = flat[i + 1];
+  return `<nav class="pager" aria-label="上下页">
+    ${prev ? `<a href="#${prev.path}"><div class="k">上一页</div><div class="t">← ${esc(prev.title)}</div></a>` : '<span></span>'}
+    ${next ? `<a class="next" href="#${next.path}"><div class="k">下一页</div><div class="t">${esc(next.title)} →</div></a>` : '<span></span>'}
+  </nav>`;
+}
+
+function systemPage(path) {
+  const s = SYS[path];
+  if (!s) return null;
+  if (s.kind === 'doc') return { path, kind:'sys', title:s.title, desc:s.lede, src:'skills/skillpress/WEBSITE.md', md:s.md };
+  return { path, kind:s.kind, title:'', src:'' };
+}
+
+function renderShelf() {
+  elArt.innerHTML = `<nav class="crumb"><a href="#/">首页</a><span class="sep">/</span><span>书架</span></nav>
+    <h1>书架</h1><p class="lede">${SKILLS.length} 份 skill、${flat.filter((p) => p.kind === 'kid').length} 个子页 —— 一个目录一个主题。</p>
+    ${SKILLS.map((s) => `<div class="agent" style="background:var(--surface)">
+      <div class="h"><span class="dot"></span><a href="#/s/${s.slug}/">${esc(s.title)}</a>
+        <span class="grow"></span><span class="mono" style="font-size:11.5px;color:var(--fg-3)">${s.kids.length} 个子页</span></div>
+      <p style="margin:0;font-size:13.5px;color:var(--fg-2)">${esc(s.desc)}</p>
+      <div class="row" style="margin-top:8px">${s.kids.map((k) => `<a href="#/s/${s.slug}/${k.name}/" style="font-size:12.5px">${esc(k.title)}</a>`).join('')}</div>
+    </div>`).join('')}
+    <footer class="doc"><div class="row"><span>内容根指纹 <code>${SITE.fingerprint}</code></span><span>·</span><span>生成于 ${SITE.generated}</span></div></footer>`;
+  elMain.scrollTo({ top: 0 });
+  renderSidebar(null);
+  setToc([], null, '书架是总览页。');
+  document.title = `书架 · ${SITE.title}`;
+}
+
+function renderHome() {
+  elArt.innerHTML = `
+    <h1>把 skills 目录印成一个站点</h1>
+    <p class="lede">同一份内容，人和 Agent 一起读：你看到的是渲染，它读到的是原文。</p>
+    <div class="agent">
+      <div class="h"><span class="dot"></span>这就是全部主张 —— 内容只有一份</div>
+      <div class="row"><span class="grow">skills/**/SKILL.md</span><button class="copy" data-copy="skills/">复制内容根</button><a href="#/llms">llms.txt</a></div>
+    </div>
+    <h2 id="sec-start">从哪开始</h2>
+    <div class="tb"><table><thead><tr><th>入口</th><th>给你</th><th>给 Agent</th></tr></thead><tbody>
+      <tr><td>书架</td><td><a href="#/shelf/">全部 ${SKILLS.length} 份 skill</a></td><td><code>llms.txt</code></td></tr>
+      <tr><td>应用开发</td><td><a href="#/s/moobile-app-development/">写界面层的入口</a></td><td><code>skills/moobile-app-development/SKILL.md</code></td></tr>
+      <tr><td>踩坑记录</td><td><a href="#/s/moobile-pitfalls/">静默失效与平台差异</a></td><td><code>skills/moobile-pitfalls/SKILL.md</code></td></tr>
+    </tbody></table></div>
+    <h2 id="sec-what">这里有什么</h2>
+    <p>${SKILLS.length} 份 skill、${flat.filter((p) => p.kind === 'kid').length} 个子页；代码块在**构建期**上色；门守内容源的体量与路径。</p>
+    <footer class="doc">
+      <div class="row"><span>内容根指纹 <code>${SITE.fingerprint}</code></span><span>·</span><span>许可 ${SITE.license}</span><span>·</span><span>生成于 ${SITE.generated}</span></div>
+    </footer>`;
+  elMain.scrollTo({ top: 0 });
+  renderSidebar(null);
+  renderToc([{ lv:2, text:'从哪开始', id:'sec-start' }, { lv:2, text:'这里有什么', id:'sec-what' }], { src:'skills/skillpress/WEBSITE.md' });
+  document.title = `${SITE.title} · 人机共读的文档站`;
+}
+
+function renderLLms() {
+  const lines = ['# llms.txt', '', '> 给 Agent 的索引：每一页一行，原文就是它的路径。', ''];
+  SKILLS.forEach((s) => {
+    lines.push(`## ${s.title} (${s.slug})`, `- ${s.desc}`, `- 原文: skills/${s.slug}/SKILL.md`);
+    s.kids.forEach((k) => lines.push(`- ${k.title}: skills/${s.slug}/references/${k.name}.md`));
+    lines.push('');
+  });
+  elArt.innerHTML = `<nav class="crumb"><a href="#/">首页</a><span class="sep">/</span><span>llms.txt</span></nav>
+    <h1>llms.txt</h1><p class="lede">给 Agent 的整站索引 —— 它读这个就知道有哪些内容、原文在哪。</p>
+    <div class="rawbar"><span class="mono">/llms.txt</span><button class="copy" id="copyLlms" style="font-size:11.5px;padding:3px 8px;border:1px solid var(--line-1);border-radius:4px;background:var(--surface);color:var(--fg-2);cursor:pointer">复制</button></div>
+    <pre class="raw" id="llmstext">${esc(lines.join('\n'))}</pre>`;
+  $('#copyLlms').addEventListener('click', (e) => copy($('#llmstext').textContent, e.currentTarget));
+  elMain.scrollTo({ top: 0 });
+  renderSidebar(null);
+  setToc([], null, '索引页。');
+  document.title = `llms.txt · ${SITE.title}`;
+}
+
+function render404() {
+  elArt.innerHTML = `<h1>没找到这一页</h1>
+    <p class="lede">它可能被改名了，或者从来没存在过。</p>
+    <div class="agent"><div class="h"><span class="dot"></span>给 Agent</div>
+      <div class="row"><span class="grow">整站索引在 llms.txt —— 404 的原文请求同样返回 404，不会返回首页内容</span><a href="#/llms">打开</a></div></div>
+    <p><a href="#/">回首页</a> · <a href="#/shelf/">去书架</a></p>`;
+  renderSidebar(null);
+  setToc([], null, '这一页没有目录。');
+  document.title = `404 · ${SITE.title}`;
+}
+
+/* ═══ 4. 页面内接线：读法切换 / 复制 / 锚点 / 目录高亮 ═══════════════════ */
+function wirePage(page, toc) {
+  const btnR = $('#v-render'), btnM = $('#v-raw'), hint = $('#viewhint');
+  const body = $('#body'), raw = $('#rawwrap');
+  const setView = (v) => {
+    btnR.setAttribute('aria-pressed', String(v === 'render'));
+    btnM.setAttribute('aria-pressed', String(v === 'raw'));
+    body.hidden = v === 'raw'; raw.hidden = v !== 'raw';
+    hint.textContent = v === 'raw' ? '这是 Agent 看到的那一份（原文）' : '人看这一份；右侧"原文"能看 Agent 读到的字节';
+  };
+  btnR.addEventListener('click', () => setView('render'));
+  btnM.addEventListener('click', () => setView('raw'));
+  setView(new URLSearchParams(location.hash.split('?')[1] || '').get('v') === 'raw' ? 'raw' : 'render');
+
+  $$('.copy', elArt).forEach((b) => {
+    if (b.dataset.copy) b.addEventListener('click', () => copy(b.dataset.copy, b));
+    if (b.hasAttribute('data-copy-raw')) b.addEventListener('click', () => copy(page.md || '', b));
+  });
+  const c2 = $('#copyRaw2'); if (c2) c2.addEventListener('click', (e) => copy(page.md || '', e.currentTarget));
+  const cu = $('#copyUrl'); if (cu) cu.addEventListener('click', (e) => copy(location.href, e.currentTarget, '已复制链接'));
+  $$('[data-copy-code]', elArt).forEach((b) => b.addEventListener('click', () => copy(b.closest('.code').querySelector('code').innerText, b)));
+  $$('[data-anchor]', elArt).forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault();
+    const id = a.dataset.anchor;
+    location.hash = location.hash.split('?')[0] + '?s=' + id;
+    document.getElementById(id)?.scrollIntoView({ block:'start' });
+  }));
+
+  // 目录跟随滚动（每次回调现查"当前落点"的链接：换阶梯时目录会搬家，缓存的 NodeList 会失联）
+  const targets = toc.map((t) => document.getElementById(t.id)).filter(Boolean);
+  if ('IntersectionObserver' in window && targets.length) {
+    const io = new IntersectionObserver((es) => {
+      es.forEach((en) => { if (en.isIntersecting) {
+        $$('a[data-sec]', tocEl()).forEach((a) => a.setAttribute('aria-current', String(a.dataset.sec === en.target.id)));
+      } });
+    }, { root: elMain, rootMargin: '-56px 0px -70% 0px', threshold: [0, .5, 1] });
+    targets.forEach((t) => io.observe(t));
+  }
+}
+
+/* ═══ 5. 移动端：贴边按钮 + 两级浮出 + sheet ════════════════════════════ */
+const scrim = $('#scrim');
+function closeSheets() {
+  $$('.sheet').forEach((s) => (s.dataset.open = '0'));
+  $$('.fab').forEach((f) => { f.dataset.open = '0'; f.dataset.peek = '0'; f.setAttribute('aria-expanded', 'false'); });
+  scrim.dataset.open = '0';
+}
+function openSheet(name) {
+  closeSheets();
+  const sh = $('#sheet-' + name); if (!sh) return;
+  // 侧栏里现在带着目录（rail 2/1），搬进 sheet 时把 id 摘掉：id 全站唯一
+  if (name === 'shelf') sh.innerHTML = `<div class="grab"></div><h4>书架</h4>${snapshot(elSidebar)}`;
+  if (name === 'toc') sh.innerHTML = `<div class="grab"></div><h4>本页目录</h4>
+     <div class="tocbox">${tocState.list.length ? `<nav>${anchors(tocState.list, tocState.path)}</nav>` : `<p class="tocnone">${tocState.none}</p>`}</div>`;
+  if (name === 'nav') sh.innerHTML = `<div class="grab"></div><h4>导航</h4>
+     <div class="sheetnav">${SITE.nav.map((n) => `<a href="${n.href}">${esc(n.label)}</a>`).join('')}
+     <p class="grp">栏目</p>
+     ${SKILLS.map((s) => `<a class="flat" href="#/s/${s.slug}/">${esc(s.title)}</a>`).join('')}
+     <a class="flat" href="#/llms">llms.txt</a></div>`;
+  sh.dataset.open = '1';
+  scrim.dataset.open = '1';
+  const fab = $('.fab[data-sheet="' + name + '"]');
+  if (fab) { fab.dataset.open = '1'; fab.setAttribute('aria-expanded', 'true'); }
+}
+$$('.fab').forEach((fab) => fab.addEventListener('click', () => {
+  // 第一次点：浮出；第二次点：弹 sheet
+  if (fab.dataset.peek !== '1') { fab.dataset.peek = '1'; return; }
+  if (fab.dataset.open === '1') closeSheets(); else openSheet(fab.dataset.sheet);
+}));
+scrim.addEventListener('click', closeSheets);
+$$('.sheet').forEach((sh) => {
+  sh.addEventListener('click', (e) => { if (e.target.closest('a')) closeSheets(); });
+  // 下滑关闭
+  let y0 = null;
+  sh.addEventListener('touchstart', (e) => (y0 = e.touches[0].clientY), { passive: true });
+  sh.addEventListener('touchmove', (e) => { if (y0 !== null && e.touches[0].clientY - y0 > 60) { closeSheets(); y0 = null; } }, { passive: true });
+});
+
+/* ═══ 6. 主题（三态，真源是 <html data-theme>） ═════════════════════════ */
+const mq = matchMedia('(prefers-color-scheme: dark)');
+const resolve = (p) => (p === 'dark' ? 'dark' : p === 'light' ? 'light' : (mq.matches ? 'dark' : 'light'));
+function setPref(p) {
+  const r = document.documentElement;
+  r.dataset.themePref = p; r.dataset.theme = resolve(p);
+  try { localStorage.setItem('sp-theme', p); } catch (e) {}
+}
+mq.addEventListener && mq.addEventListener('change', () => {
+  if (document.documentElement.dataset.themePref === 'auto') setPref('auto');
+});
+$('#themeBtn').addEventListener('click', () => {
+  const order = ['auto', 'light', 'dark'];
+  const i = order.indexOf(document.documentElement.dataset.themePref || 'auto');
+  setPref(order[(i + 1) % order.length]);
+});
+
+/* ═══ 7. 搜索（索引在"构建期"生成；这里从数据算） ═════════════════════ */
+const INDEX = [];
+flat.forEach((p) => {
+  INDEX.push({ t:p.title, w:(p.kind === 'kid' ? p.parent.title + ' · 子页' : 'skill'), href:'#' + p.path });
+  const { toc } = mdToHtml(p.md || '');
+  toc.forEach((h) => INDEX.push({ t:h.text, w:p.title + ' · 本节', href:'#' + p.path + '?s=' + h.id }));
+});
+INDEX.push({ t:'llms.txt', w:'给 Agent 的索引', href:'#/llms' });
+
+const overlay = $('#overlay'), q = $('#q'), hits = $('#hits');
+let sel = 0, shown = [];
+function renderHits() {
+  const s = q.value.trim().toLowerCase();
+  shown = !s ? INDEX.slice(0, 8)
+    : INDEX.filter((it) => (it.t + ' ' + it.w).toLowerCase().includes(s)).slice(0, 40);
+  if (sel >= shown.length) sel = 0;
+  hits.innerHTML = shown.length
+    ? shown.map((it, i) => `<button class="hit" role="option" aria-selected="${i === sel}"><span class="t">${esc(it.t)}</span><span class="w">${esc(it.w)}</span></button>`).join('')
+    : '<div class="empty">没有命中</div>';
+}
+function openSearch(open) {
+  overlay.dataset.open = open ? '1' : '0';
+  if (open) { q.value = ''; sel = 0; renderHits(); q.focus(); } else { $('#searchBtn').focus(); }
+}
+$('#searchBtn').addEventListener('click', () => openSearch(true));
+overlay.addEventListener('click', (e) => { if (e.target === overlay) openSearch(false); });
+q.addEventListener('input', () => { sel = 0; renderHits(); });
+q.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, shown.length - 1); renderHits(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); renderHits(); }
+  else if (e.key === 'Enter' && shown[sel]) { location.hash = shown[sel].href.slice(1); openSearch(false); }
+});
+hits.addEventListener('click', (e) => { if (e.target.closest('.hit')) openSearch(false); });
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && k === 'k') { e.preventDefault(); openSearch(overlay.dataset.open !== '1'); }
+  if (k === 'escape') { if (overlay.dataset.open === '1') openSearch(false); else closeSheets(); }
+});
+
+/* ═══ 9. 阶梯：视口宽度写进 <html data-rail>（不是 CSS 媒体查询 —— moobile 里没有媒体查询，
+   真站是"视口进 Model、on_resize 改 Model、渲染读 Model"，这里用 data-rail 表达同一件事） ═══ */
+function ladderOf(w) { return w >= 1280 ? '3' : w >= 1024 ? '2' : '1'; }
+function applyLadder() {
+  const r = document.documentElement;
+  const rail = ladderOf(innerWidth);
+  const mount = rail === '3' ? 'rail' : 'side';          // 目录：rail=3 在右栏那条轨里；2/1 挂进树的当前节点下
+  r.dataset.rail = rail;
+  r.dataset.top = innerWidth < 700 ? 'narrow' : 'wide';
+  if (mount === TOC_MOUNT) return;
+  const act = ($('a[data-sec][aria-current="true"]', tocEl()) || {}).dataset;   // 换落点不丢"当前节"
+  TOC_MOUNT = mount;
+  if (rendered) renderSidebar(lastCur);                  // 落点进树 / 出树 ⇒ 侧栏结构要按新落点重建
+  setToc(tocState.list, tocState.page);
+  if (act && act.sec) $$('a[data-sec]', tocEl()).forEach((a) => a.setAttribute('aria-current', String(a.dataset.sec === act.sec)));
+}
+['(min-width:1280px)', '(min-width:1024px)', '(min-width:700px)'].forEach((q) => {
+  const m = matchMedia(q);
+  m.addEventListener && m.addEventListener('change', applyLadder);
+});
+
+/* ═══ 10. 顶栏导航 + 路由分发 ══════════════════════════════════════════ */
+$('#topnav').innerHTML = SITE.nav.map((n) => `<a href="${n.href}">${esc(n.label)}</a>`).join('');
+
+function route() {
+  const { path, sec } = parseHash();
+  closeSheets();
+  const page = findPage(path);
+  if (page) { renderPage(page, sec); return; }
+  if (path === '/' ) return renderHome();
+  if (path === '/shelf/') return renderShelf();
+  if (path === '/llms') return renderLLms();
+  const sys = systemPage(path);
+  if (sys && sys.kind === 'doc') return renderPage(sys, sec);
+  if (sys) return renderHome();
+  render404();
+}
+addEventListener('hashchange', route);
+setPref(document.documentElement.dataset.themePref || 'auto');
+applyLadder();          // 先把阶梯定下来（目录才知道自己该挂哪），再渲染第一页
+route();
+</script>
+</body>
+</html>

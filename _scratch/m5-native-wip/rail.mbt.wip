@@ -1,0 +1,108 @@
+// engine/site/rail.mbt —— 判据组①：**阶梯**（DESIGN-site.md §4.2）。
+//
+// 三档，判据是"目录往哪让"：
+//
+//     1200+ → 三栏（侧栏 272 / 正文 / 目录轨 220）
+//     1024+ → 两栏（侧栏 + 正文），**目录轨不在**
+//     <1024 → 一栏（侧栏整栏不画）
+//
+// ⚠️ 宽度用 CDP 的 `Emulation.setDeviceMetricsOverride` 给（**真的 CSS 视口宽**）。
+//    拖窗口不行：无头 Chrome 的窗口有最小宽（内环实测"请求 420 拿到 512"）。
+// ⚠️ 量完**必须还原视口**（`clear_width`）—— 否则后面每一组判据都在一个非默认宽度下跑，
+//    而"为什么这条红"会指到一个跟它无关的地方。
+
+///|
+/// 一档的读数（从快照里抠出来；抠不到给 `None`，判据自己判"没量到"）。
+priv struct Rung {
+  vw : Int
+  cols : Int
+  first_w : Int
+  last_w : Int
+  all_scroll : Bool
+  why : String
+}
+
+///|
+async fn rung_at(cdp : Cdp, w : Int) -> Rung raise {
+  set_width(cdp, w, 900)
+  let j = snapshot(cdp)
+  let vw = match num_of(j, ["vw"]) {
+    Some(v) => v
+    None => 0
+  }
+  let why = match str_of(j, ["why"]) {
+    Some(s) => s
+    None => ""
+  }
+  let cols = match j_get(j, "cols") {
+    Some(Json::Array(a)) => a
+    _ => ([] : Array[Json])
+  }
+  let mut first_w = 0
+  let mut last_w = 0
+  let mut all_scroll = true
+  if cols.length() > 0 {
+    first_w = match num_of(cols[0], ["w"]) {
+      Some(v) => v
+      None => 0
+    }
+    last_w = match num_of(cols[cols.length() - 1], ["w"]) {
+      Some(v) => v
+      None => 0
+    }
+  }
+  for c in cols {
+    let oy = match str_of(c, ["oy"]) {
+      Some(s) => s
+      None => ""
+    }
+    if oy != "auto" && oy != "scroll" {
+      all_scroll = false
+    }
+  }
+  { vw, cols: cols.length(), first_w, last_w, all_scroll, why }
+}
+
+///|
+pub async fn run_rail(ctx : Ctx) -> Unit raise {
+  let cdp = ctx.cdp
+  let r = ctx.results
+  let three = rung_at(cdp, 1440)
+  let two = rung_at(cdp, 1100)
+  let one = rung_at(cdp, 768)
+  clear_width(cdp)
+
+  let say = fn(name : String, k : Rung) -> String {
+    if k.why != "" {
+      name + "：量不到（" + k.why + "）"
+    } else {
+      name + "：视口 " + k.vw.to_string() + "px → " + k.cols.to_string() + " 栏"
+    }
+  }
+
+  // ① rail 3：三栏，侧栏 272、目录轨 220
+  r.check(
+    three.cols == 3 && three.first_w == 272 && three.last_w == 220,
+    "阶梯 rail 3（1440px）：三栏 = 侧栏 272 / 正文 / 目录轨 220",
+    say("实测", three),
+  )
+  // ② rail 2：两栏，**目录轨不在**（"目录先塞进侧栏"那一步）
+  r.check(
+    two.cols == 2 && two.first_w == 272,
+    "阶梯 rail 2（1100px）：两栏（侧栏 272 + 正文），目录轨不在",
+    say("实测", two),
+  )
+  // ③ rail 1：一栏，**侧栏整栏不画**（不是"藏起来"）
+  r.check(
+    one.cols == 1,
+    "阶梯 rail 1（768px）：一栏（侧栏整栏不画）",
+    say("实测", one),
+  )
+  // ④ 每一档里，栏都**自己滚**（DESIGN §4.1：三个独立滚动容器，不是 sticky）
+  r.check(
+    three.all_scroll && two.all_scroll && one.all_scroll,
+    "每一档里每一栏都自己滚（overflow-y = auto/scroll）",
+    "rail3 " + three.all_scroll.to_string() + " ｜ rail2 " + two.all_scroll.to_string() +
+    " ｜ rail1 " + one.all_scroll.to_string(),
+  )
+}

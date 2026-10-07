@@ -1,0 +1,111 @@
+// engine/site/shell.mbt —— 判据组⑦：**结构**（三栏各自滚 / 页面本身不滚 / 无溢出 / 无报错）。
+//
+// 这一组守的是 `PLAN-ui §10.2` 那个根问题："实际滚的是整个 document ⇒ 顶栏跟着滚出去"。
+// 新结构（根定高 + 三栏各自 `overflow`）正是为它做的，所以这条**升格**成一条硬判据。
+//
+// ⚠️ **探针不许把自己算进被量的页面**：内环第一版把读数用的 `<pre>` 在量之前 append 进 `body`，
+//    "页面本身不滚"于是**恒红**（自己的输出把页面撑高了）。这里的快照**只读**、不加节点 ⇒
+//    不需要 `display:none` 那一步；谁要加节点，就得同时把它从版面里摘掉。
+// ⚠️ **控制台报错**这一条：`Log.enable` 省不得（省了它永远绿），favicon 的 404 **显式**过滤
+//    （写在调用方，不在这儿悄悄吞掉 —— "要么永远红、要么把真错误一起吞掉"两种都糟）。
+
+///|
+/// 全页文字（等挂载用）。
+async fn body_len(cdp : Cdp) -> Int raise {
+  cdp.eval_int("document.body.innerText.trim().length")
+}
+
+///|
+/// 等 React 挂载。
+///
+/// ⚠️ 旧版等的是"正文里出现「文档 / SKILL」"——**那是旧 IA 的一条标签**，新 IA 里不存在。
+///    现在的就绪信号是"页面上真有字了"（与内环同一个信号）。
+pub async fn wait_mounted(cdp : Cdp) -> Bool raise {
+  let mut waited = 0
+  while waited < 30000 {
+    let n = body_len(cdp) catch { _ => 0 }
+    if n > 20 {
+      @async.sleep(400)
+      return true
+    }
+    @async.sleep(250)
+    waited = waited + 250
+  }
+  false
+}
+
+///|
+pub async fn run_shell(ctx : Ctx) -> Unit raise {
+  let cdp = ctx.cdp
+  let r = ctx.results
+  let j = snapshot(cdp)
+  let why = match str_of(j, ["why"]) {
+    Some(s) => s
+    None => ""
+  }
+  if why != "" {
+    r.check(false, "页面结构能读出来（壳 = 顶栏 + 三栏行）", "量不到：" + why)
+    return
+  }
+
+  // ① 三栏各自滚
+  let mut scrolls = 0
+  let mut total = 0
+  match j_get(j, "cols") {
+    Some(Json::Array(a)) =>
+      for c in a {
+        total = total + 1
+        let oy = match str_of(c, ["oy"]) {
+          Some(s) => s
+          None => ""
+        }
+        if oy == "auto" || oy == "scroll" {
+          scrolls = scrolls + 1
+        }
+      }
+    _ => ()
+  }
+  r.check(
+    total >= 1 && scrolls == total,
+    "每一栏自己滚（三个独立的滚动容器，不是 sticky）",
+    scrolls.to_string() + "/" + total.to_string() + " 栏是滚的",
+  )
+
+  // ② 页面本身不滚（顶栏不动）—— 坏法是静默的：宿主 `#root` 不是 flex 容器就会这样
+  let page_scrolls = match bool_of(j, ["pageScrolls"]) {
+    Some(b) => b
+    None => true
+  }
+  r.check(
+    !page_scrolls,
+    "页面本身不滚（长内容下滚的是栏，顶栏不动）",
+    if page_scrolls { "html 滚动高 > 视口高 ⇒ 滚的是整个 document" } else { "" },
+  )
+
+  // ③ 横向溢出
+  let ox = match num_of(j, ["overflowX"]) {
+    Some(v) => v
+    None => 999
+  }
+  r.check(ox <= 1, "没有横向溢出", ox.to_string() + "px")
+}
+
+///|
+/// 判据组⑦的最后一条：**控制台没有 error**（排在最后，因为它是"整场没报错"的快照）。
+pub fn run_console(ctx : Ctx) -> Unit {
+  let r = ctx.results
+  let errors = console_errors(ctx.cdp)
+  let real : Array[String] = []
+  for t in errors {
+    if !lower_ascii(t).contains("favicon") {
+      real.push(t)
+    }
+  }
+  let head : Array[String] = []
+  let mut k = 0
+  while k < real.length() && k < 3 {
+    head.push(real[k])
+    k = k + 1
+  }
+  r.check(real.length() == 0, "控制台没有 error", join_with(head, "  ｜ "))
+}

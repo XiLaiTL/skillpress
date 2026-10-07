@@ -44,8 +44,9 @@ pub(all) struct Kid {
 
 ///| 一页 = 一个 skill。
 pub(all) struct Doc {
-  slug : String        // 目录名（= skill 名）
-  desc : String        // 侧栏用的一行摘要
+  slug : String        // 目录名（= skill 名）；**只在 kicker / 面包屑末位 / Agent 面板 / URL 出现**
+  title : String       // **中文人话的名字**（frontmatter `title` → 正文 H1 → 回退 slug）—— 界面上一律用它
+  desc : String        // 一行摘要（给 Agent 读的，不是侧栏标签）
   full_desc : String   // frontmatter 的完整 description
   when : String        // frontmatter 的 whenToUse
   blocks : Array[Block]
@@ -74,7 +75,7 @@ pub(all) struct Home {
 }
 
 ///|
-/// 内容侧交给界面的三样东西。
+/// 内容侧交给界面的四样东西（首页 / 全部 skill / 页面键换算 / 页脚出处）。
 ///
 /// ⚠️ 为什么是**参数**而不是 import：包不该知道内容从哪来（实例里是生成物 `content` 包，
 /// 将来也可能来自别处）。这三样是界面**唯一**需要的"外面的事"。
@@ -83,4 +84,25 @@ pub(all) struct Ctx {
   docs : Array[Doc]
   /// 页面键 → `(kind, skill 下标, 子页下标)`；认不出给 `(0, -1, -1)`。
   find_page : (String) -> (Int, Int, Int)
+  /// 页脚要交代的出处（许可 / 生成时间 / 内容根指纹）—— 见下面的 `Footer`。
+  footer : Footer
+}
+
+// ── 页脚（DESIGN-site.md §5 页脚那一行） ──────────────────────────────────────
+
+///|
+/// 页脚要交代的**出处**：许可 / 生成时间 / 内容根指纹。
+///
+/// ⚠️ 三个字段都可能**是空串**，而且**空就是空**：渲染时那一项**直接不画**，
+///    不写「许可 —」这种占位（§1 反面验收：不画假东西）。空的原因各不相同，写在这儿免得下次又猜：
+///
+/// | 字段 | 真源 | 今天为什么可能是空 |
+/// |---|---|---|
+/// | `license` | **站点配置**的 `footer.license`（§7） | 那份配置还不存在；过渡期由 `press` 从**实例自己的 `moon.mod` 声明**里取（真实可读的值，不是编的） |
+/// | `generated_at` | **构建那一刻**（宿主侧） | **不进内容包**：内容包要逐字节可复现（`press --check` 拿同一份内容重跑必须一致），时间戳进去会让它每次都红 ⇒ 由实例的构建脚本注入 `globalThis.__skillpress_build`，运行期读它 |
+/// | `root_fingerprint` | 生成期算的**真值**（复用 G8 那套结构指纹 + sha256 归拢） | 应当总有值；空 = 生成器没算（那是 bug，不是"没数据"） |
+pub(all) struct Footer {
+  license : String
+  generated_at : String
+  root_fingerprint : String
 }

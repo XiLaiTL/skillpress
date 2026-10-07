@@ -1,34 +1,69 @@
-// shell/site.mbt —— 入口：把上面几份拼成一个 moobile 应用。
+// shell/site.mbt —— 入口：把各件拼成一个 moobile 应用。
 //
 // 实例里只需一行 `@shell.site(ctx)`；`ctx` 提供**内容侧**的东西（首页 / 全部 skill / 页面键换算）。
+//
+// 这一版的形状（DESIGN-site.md §4）：
+//
+//     主题（值，跟着 Model 走）
+//        ↓
+//     layout.shell：顶栏 + 三栏行（每栏自己滚）
+//        ↓ 侧栏 / 正文 / 目录轨 —— 放不放由**阶梯**决定（rail_of(vw)）
+//
+// ## 页面种类（不是"两个模式"）
+//
+// `Model.page` 四类（`state.mbt` 的 `page_home` / `page_shelf` / `page_doc` / `page_404`）：
+// 原来只有 `mode`（0 官网 / 1 文档），那个形状装不下"首页与书架是两回事"。
+// ⚠️ **404 是兜底、不是走到的**：今天没有 URL 路由（§2.2），认不出的 `sel` 落在那儿。
 
 ///|
 fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
-  let home = ctx.home
-  let skills = ctx.docs
-  // 官网 / 文档：同一个外壳（顶栏），下面换的是正文那半张脸
-  let body : @html.Html = if model.mode == 0 {
-    site_pane(home, model.sec, emit)
+  let theme = theme_of("indigo", resolve_scheme(model.pref, model.sys_dark))
+  let rail = rail_of(model.vw)
+  // 页面种类：文档页要**先验一页真的在**（不在 ⇒ 404 兜底，而不是画一页空的）
+  let page = if model.page == page_doc && !sel_valid(model.sel, ctx.docs) {
+    page_404
   } else {
-    @html.div(
-      attrs=attrs(
-        @style.Style::new().flex(1.0).flex_direction(@style.FlexDirection::Row),
-      ),
-      [sidebar(skills, model, emit), pane(page_of(model.sel, skills))],
-    )
+    model.page
   }
-  @html.div(
-    attrs=attrs(
-      @style.Style::new()
-      .flex(1.0)
-      .flex_direction(@style.FlexDirection::Column)
-      .background_color(c_bg),
-    ),
-    [topbar(ctx, home, model, emit), body],
-  )
+  let top = topbar(theme, ctx, model, emit)
+  // ⚠️ 这里**不能**写 `match page { page_shelf => … }`：那是**绑定一个新变量**（永远匹配第一条），
+  //    后面几条会被判成 unreachable —— 编译器会警告，但要读懂警告才知道"页面对不上"。
+  //    `let` 常量不是模式，所以用 if/else 比。
+  let main : @html.Html = if page == page_shelf {
+    shelf_page(theme, ctx, emit)
+  } else if page == page_doc {
+    article(theme, ctx, model, emit)
+  } else if page == page_404 {
+    notfound_page(theme, emit)
+  } else {
+    home_page(theme, ctx, emit)
+  }
+  // 本页目录的条目（今天在渲染期从正文块里现算 —— P3 之后由生成期带锚点一起给出，见 toc.mbt）
+  let toc : Array[TocEntry] = if page == page_doc {
+    toc_of(page_view(model.sel, ctx.docs).blocks)
+  } else if page == page_home {
+    toc_of(ctx.home.lede)
+  } else {
+    []
+  }
+  // 侧栏：rail ≥ 2 才有（rail 1 时整个进 sheet —— 那是"根本不画"，不是"藏起来"）
+  // 目录挂在**正在读的那个文件**节点下面（用户拍定的 IA），rail 3 才交给右栏那条轨
+  let side : @html.Html? = if rail >= 2 {
+    Some(sidebar(theme, ctx, model, emit, toc, rail < 3))
+  } else {
+    None
+  }
+  let toc_side : @html.Html? = if rail >= 3 { Some(toc_rail(theme, toc)) } else { None }
+  // 窄屏那一层：rail 1 才画（贴边按钮 + 两级交互 + sheet）。
+  // ⚠️ 它必须挂在**根**里（`shell` 的最后一个孩子）：根不滚 ⇒ 绝对定位等价于 fixed。
+  let overlay : Array[@html.Html] = if rail == 1 {
+    mobile_layer(theme, ctx, model, emit, toc)
+  } else {
+    []
+  }
+  shell(theme, top, side, prose_wrap(rail, [main]), toc_side, overlay)
 }
 
-///|
 ///|
 /// 入口：**把这一套界面挂成一个 moobile 应用**。
 ///
@@ -37,5 +72,6 @@ fn view(ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
 pub fn site(ctx : Ctx) -> @moobile.JsValue {
   let upd = fn(model : Model, msg : Msg, emit : @cmd.Emit[Msg]) { update(ctx, model, msg, emit) }
   let vw = fn(model : Model, emit : @cmd.Emit[Msg]) { view(ctx, model, emit) }
-  @moobile.handlers(model=initial(ctx), update=upd, view=vw)
+  let sb = fn(model : Model, emit : @cmd.Emit[Msg]) { subs(model, emit) }
+  @moobile.handlers(model=initial(ctx), update=upd, view=vw, subscriptions=sb)
 }

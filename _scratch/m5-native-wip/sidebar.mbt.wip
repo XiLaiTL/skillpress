@@ -1,0 +1,112 @@
+// engine/site/sidebar.mbt —— 判据组②：**侧栏的行语言**（DESIGN-site.md §4.1.1 那五条）。
+//
+// 这一组守的是"侧栏是树，不是机器名清单"：
+//   ① 行高一致（单行不换行 ⇒ 不参差）
+//   ② **机器名不进侧栏**（`slug` 只在 kicker / 面包屑末位 / Agent 面板 / URL —— §2.3）
+//   ③ 状态只有一条通道：当前项的**左条**，而且**全列只有一条**
+//
+// ⚠️ `PLAN-ui §10.4` 的病根就是这条：真站的侧栏曾经显示 "英文 slug + 一长句 desc"，
+//    而中文 `title` 一次都没用。契约为此补了 `Doc.title`（取法与子页 `Kid.title` 同一套）。
+
+///|
+/// 侧栏读数（从快照里抠）。
+priv struct Side {
+  rows : Int
+  machine : Array[String]
+  bars : Array[String]
+  toc : Int
+  titles : Array[String]
+}
+
+///|
+fn read_side(j : Json) -> Side {
+  let rows = match num_of(j, ["side", "rows"]) {
+    Some(v) => v
+    None => 0
+  }
+  let toc = match num_of(j, ["side", "toc"]) {
+    Some(v) => v
+    None => 0
+  }
+  let strs = fn(key : String) -> Array[String] {
+    match j_get(j, "side") {
+      Some(s) =>
+        match j_get(s, key) {
+          Some(Json::Array(a)) =>
+            a.map(fn(x) {
+              match j_str(x) {
+                Some(t) => t
+                None => ""
+              }
+            })
+          _ => ([] : Array[String])
+        }
+      None => ([] : Array[String])
+    }
+  }
+  { rows, machine: strs("machine"), bars: strs("bars"), toc, titles: strs("titles") }
+}
+
+///|
+/// 有没有中文（判"标签是人话，不是机器名"）。
+fn has_cjk(s : String) -> Bool {
+  for ch in s {
+    if ch.to_int() > 127 {
+      return true
+    }
+  }
+  false
+}
+
+///|
+pub async fn run_sidebar(ctx : Ctx) -> Unit raise {
+  let r = ctx.results
+  let j = snapshot(ctx.cdp)
+  let side = read_side(j)
+
+  // ① 侧栏有树（条目标题按字号 13.5 认）
+  let mut cjk = 0
+  for t in side.titles {
+    if has_cjk(t) {
+      cjk = cjk + 1
+    }
+  }
+  r.check(
+    side.rows >= 2,
+    "侧栏是一棵树：≥2 行条目标题（字号 13.5）",
+    side.rows.to_string() + " 行；前几行：" + join_with(side.titles, " / "),
+  )
+
+  // ② 界面上是中文人话，不是 slug
+  r.check(
+    side.rows > 0 && cjk == side.rows,
+    "侧栏条目标题全是中文人话（`Doc.title`，不是 slug）",
+    cjk.to_string() + "/" + side.rows.to_string() + " 行带中文",
+  )
+
+  // ③ **机器名不许进侧栏**（§2.3："机器名只准出现在 kicker / 面包屑末位 / Agent 面板 / URL"）
+  r.check(
+    side.machine.length() == 0,
+    "侧栏里没有机器名（全小写 ASCII 的 slug 形状）",
+    if side.machine.length() == 0 {
+      "0 个"
+    } else {
+      "混进来 " + side.machine.length().to_string() + " 个：" + join_with(side.machine, "、")
+    },
+  )
+
+  // ④ 状态只有一条通道：当前项的左条，而且**全列只有一条**
+  let brand_bars = Array::new()
+  let mut brand = 0
+  for b in side.bars {
+    brand_bars.push(b)
+    if b.contains("79, 70, 229") || b.contains("165, 180, 252") {
+      brand = brand + 1
+    }
+  }
+  r.check(
+    side.bars.length() == 1 && brand == 1,
+    "当前项有一条品牌色左条，且全列只有一条（状态只有这一条通道）",
+    side.bars.length().to_string() + " 条左条：" + join_with(brand_bars, " / "),
+  )
+}

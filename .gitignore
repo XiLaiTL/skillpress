@@ -1,11 +1,20 @@
 # 依赖（引擎只有高亮这一处依赖，见 package.json 的说明）
 node_modules/
 
-# 站点实例的构建产物（实例在 moobile/skills/skillpress/scripts/.skillpress/，
-# 产物不进这边；这里列出来是为了"在哪儿都不小心生成"时不进仓）
+# 站点实例的构建产物（实例在 skills/skillpress/scripts/.skillpress/，
+# 另一份在 moobile/skills/skillpress/scripts/.skillpress/ —— 两边都不进仓）
 _build/
 dist/
 *.log
+
+# 加工台 `_scratch/`：**只收被文档引用的那几支探针**
+#（route-check / route-flow / theme-firstpaint / ui-ref / m5-native-wip），
+# 一次性补丁脚本与构建缓存不进仓
+_scratch/_build/
+_scratch/*.py
+_scratch/*.mbtx
+# 与 tools/agent-http.mjs 同物：仓里只留 tools/ 那份
+_scratch/agent-http.mjs
 
 # 杂项
 .DS_Store

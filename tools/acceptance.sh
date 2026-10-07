@@ -144,10 +144,10 @@ echo "A3 自家的 skills 能印成站点"
 # ① 两个引擎在**同一份副本**上产物逐字节一致（v3 起；细节见 file-parity.sh 的文件头与 PLAN 的 D29）。
 #    "基线"（旧引擎从当前内容源冻下来的那一份）已退役：R2 之后内容仓有 `WEBSITE.md`，
 #    而冻结的旧实现不认识它 ⇒ 基线必然分叉 —— 那不是 bug，是设计。
-if bash tools/file-parity.sh > /tmp/acc-fileparity.log 2>&1; then
-  ok "整份文件对账通过（副本上旧 vs 新逐字节一致 + 实例那份 = 新引擎现跑）"
+if bash tools/engine-fixtures.sh > /tmp/acc-fixtures.log 2>&1; then
+  ok "引擎夹具对账通过（四份读数与入库 golden 逐字节一致）"
 else
-  bad "整份文件对账红了"; grep '^✗' /tmp/acc-fileparity.log | head -3 | sed 's/^/      /'
+  bad "引擎夹具对账红了"; grep '^✗' /tmp/acc-fixtures.log | head -3 | sed 's/^/      /'
 fi
 # ② 生成物的**形状**与**内容**各自另有守卫：形状由 file-parity 的 0a/0c 判据看，
 #    内容由副本上的逐字节 diff 看（归一化只抹形状）。
@@ -156,7 +156,7 @@ if [ -f "$INSTANCE/content/content.generated.mbt" ]; then
 else
   bad "实例里没有生成物：$INSTANCE/content/content.generated.mbt"
 fi
-if node bin/skillpress.mjs check > /tmp/acc-check.log 2>&1; then ok "check 全绿（$(tail -1 /tmp/acc-check.log | tr -d '\r')）"; else bad "check 红了"; tail -3 /tmp/acc-check.log | sed 's/^/      /'; fi
+if node tools/run-js.mjs check > /tmp/acc-check.log 2>&1; then ok "check 全绿（$(tail -1 /tmp/acc-check.log | tr -d '\r')）"; else bad "check 红了"; tail -3 /tmp/acc-check.log | sed 's/^/      /'; fi
 if [ "$DO_BUILD" = "--build" ]; then
   if (cd "$INSTANCE" && timeout 900 npm run build > /tmp/acc-build.log 2>&1); then ok "实例 build 通过"; else bad "实例 build 失败"; tail -5 /tmp/acc-build.log | sed 's/^/      /'; fi
 else
@@ -171,7 +171,7 @@ if [ -f "$INSTANCE/dist/bundle.js" ]; then
   if [ -n "$stale" ]; then
     bad "dist/bundle.js 比源还旧 ⇒ verify 会测**旧代码**（先 cd 实例 && npm run build）："
     printf '%s\n' "$stale" | sed 's/^/      /'
-  elif node bin/skillpress.mjs verify > /tmp/acc-verify.log 2>&1; then
+  elif bash tools/verify.sh > /tmp/acc-verify.log 2>&1; then
     ok "verify 判据全过（$(grep -oE '全部通过（[0-9]+ 条）' /tmp/acc-verify.log | tail -1)）"
   elif grep -q '等不到：Chrome 的调试端口' /tmp/acc-verify.log; then
     # ⚠️ **真浏览器判据天生会抖**（实测：同一份代码，一次"等不到 Chrome 的调试端口"、紧接着单独重跑
@@ -179,7 +179,7 @@ if [ -f "$INSTANCE/dist/bundle.js" ]; then
     #    也会训练人忽略它）。所以三条同时成立才重试：① 只认**这一种**错误（断言失败一律不重试）；
     #    ② 重试**打出来**给人看；③ **断言一条都不放宽**（重试后仍要 22 条全过）。
     echo "      ·  Chrome 调试端口第一次没起来（环境抖动，不是断言失败）⇒ 明着重试一次"
-    if node bin/skillpress.mjs verify > /tmp/acc-verify.log 2>&1; then
+    if bash tools/verify.sh > /tmp/acc-verify.log 2>&1; then
       ok "verify 判据全过（重试一次后：$(grep -oE '全部通过（[0-9]+ 条）' /tmp/acc-verify.log | tail -1)）"
     else
       bad "verify 重试后仍有红的（两次红 ≈ 真问题）"; tail -3 /tmp/acc-verify.log | sed 's/^/      /'
@@ -189,6 +189,15 @@ if [ -f "$INSTANCE/dist/bundle.js" ]; then
   fi
 else
   bad "实例还没 build 过（没有 dist/bundle.js）⇒ verify 跑不了"
+fi
+
+echo "A5 主题：颜色只有一处源、两套调色板的对比度、色号全覆盖（PLAN-ui §6.5）"
+# 这一条是**新界面**带来的：主题从"13 个模块级常量"变成"跟着 Model 走的**值**"之后，
+# 三种坏法都不会报错（写死色号 / 深色掉对比 / 漏一个色号）⇒ 只能靠判据。
+if bash tools/theme-check.sh > /tmp/acc-theme.log 2>&1; then
+  ok "theme-check 全过（$(grep -c '✓' /tmp/acc-theme.log) 条）"
+else
+  bad "theme-check 有红的"; grep -E '✗|不达标|没有映射' /tmp/acc-theme.log | head -4 | sed 's/^/      /'
 fi
 
 echo

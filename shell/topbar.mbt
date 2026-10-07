@@ -1,329 +1,249 @@
-// shell/topbar.mbt —— 顶栏：一排分段控件 + 下拉菜单。
+// shell/topbar.mbt —— 顶栏（DESIGN-site.md §4.1 顶栏那段 / §5 顶栏那一行）。
 //
-// ⚠️ 顶栏是**一行**（左边站名、右边一排），排不下时走横向滚动 —— 换行会让"顶栏"这个形态散架。
-// `top_msg` 是"点这一条该发什么消息"的唯一判断处（纯链接节直接跳页、有菜单的先展开）。
+// 形状：白底 + 1px 底线、**高 56**（`h_top`），左中右三段：
+//
+//     [s skillpress]   首页  书架  …            [◐]
+//      ↑ 站名=回首页   ↑ nav（见 nav_items）      ↑ 主题三态开关
+//
+// ## 三段各自的来源（§13.1b 那张表）
+//
+//   左（站名）  `Home.title` —— 站点配置 `title` 到了就换成那一条（§7，【实现依赖】）
+//   中（nav）   **`nav_items()` 是唯一的接缝**：今天从首页源的 `##` 推，配置到位只改这一个函数
+//   右（工具）  **今天只有主题开关**。搜索与 llms.txt **不画** —— 见下面那段"缺什么"。
+//
+// ## 缺什么、为什么宁可不画
+//
+//   · **搜索**：要**构建期索引** + 一层浮层（portal / 遮罩）。moobile 今天没有 portal 与遮罩
+//     （`PLAN-ui §4.3` 的实现依赖）⇒ 画出来只能是"点了没反应"。
+//   · **llms.txt 入口**：要生成期多产一份 `/llms.txt`。今天没有那个产物，
+//     链接会指向一个不存在的地址 —— 那比不画更糟（读者点了才知道我们在吹）。
+//   ⇒ **DESIGN §1 反面验收**："点了没反应的元素"出现即红。**宁缺一个按钮，不画一个假按钮。**
+//
+// ## 站名**不用等宽**
+//
+// §3.4 明写"等宽只给代码、机器名、kicker"，并点名"现状把它用在站名与页标题上，是气质损失的来源"。
+// 所以站名是正文那套字体，靠字重 + 左边那个品牌色小方块立住身份。
+//
+// ## 旧件去哪了
+//
+// 原来这份文件里是"分段控件 + 下拉菜单 + `top_msg` 两步语义"（那套是给**吃正文 `##` 的导航**用的）：
+// 新 IA 里 nav 每一条都**直接到某一页**，不存在"先展开再进去" ⇒ 整段随 D3 一起退休。
 
 ///|
-/// 顶栏里的一条**分段控件项**（D2）。
+/// 顶栏中段那几条 nav —— **这是"导航从哪来"的唯一接缝**。
 ///
-/// 与旧版（一块圆角实心底）的区别：常态**没有底色**，选中只靠
-/// **下划线指示条**（`c_accent`，贴在这一项的底边）＋更亮的字色。
-/// 于是整排读起来是"一支分段控件"，而不是"一堆按钮"。
+/// 【实现依赖】设计里这段来自**站点配置**（`.skillpress/` 的 `nav.N.label` / `nav.N.href`，DESIGN §7）：
+/// 那份配置今天**不存在** ⇒ 先按下面两条自我约束从首页源推。配置做出来之后，
+/// **只改这一个函数**（渲染、当前项、点击语义一行都不用动）。
 ///
-/// ⚠️ 下划线是**子 View + `position(Absolute)` + `bottom(0)`** ——
-/// 不用 `border_bottom_width`，因为那会把内容往上顶、且按下态不好接。
-/// 关于 press()：`Render` 里按下态的键会被拆成 `pressStyle`，而**库侧没有消费点**
-/// （见 `moobile-pitfalls`）—— 所以这里**不写按下的视觉**，只留可点性与 `on_click`。
-fn nav_tab(
-  home : Home,
-  i : Int,
-  msg : Msg,
-  on : Bool,
-  emit : @cmd.Emit[Msg],
-) -> @html.Html {
-  // ⚠️ 负号不止一个：`-1` 是「首页」，**`-2` 是换模式那条**（`seg_bar` 里建的）。
-  // 曾经写成 `if i < 0 { "首页" }` ⇒ 换模式那条的标签也成了「首页」，
-  // 于是顶栏上有两条长得一样的「首页」，而「文档 / SKILL」在页面里**一次都没出现**。
-  // 代价：判据点「首页」点到的其实是它（进了文档区，回不了首页），
-  // 而 ① 那条判据用整页子串匹配、被首页中部的 CTA「文档 / SKILL →」蒙绿 —— 假绿 + 真 bug 并存。
-  let label = if i == -1 {
-    "首页"
-  } else if i == -2 {
-    "文档 / SKILL"
-  } else {
-    plain(home.sections[i].title)
+/// 两条自我约束（都是"别把过渡期弄成违规"）：
+/// ① **只放点了真的会到某处**的条目 —— "首页 / 书架"是结构性的（任何站点都有），
+///    其余只收首页源里**有 link 的节**（`find_page` 认得出目标的那种）；
+///    没有目标的那几节**不进 nav**：它们在新 IA 里是首页门户的正文，不是导航。
+/// ② **剥掉正文 `##` 的序号**（"一、两份 skill" → "两份 skill"）：§2.3 规定 nav 标签
+///    **≤6 字、无序号、无标点**，而过渡期的来源正是带序号的正文标题 ⇒
+///    不剥就等于把 D3 那个耦合（正文标题直接当导航）原样端到读者面前。
+fn nav_items(ctx : Ctx) -> Array[(String, Msg)] {
+  let out : Array[(String, Msg)] = []
+  out.push(("首页", Home))
+  out.push(("书架", Shelf))
+  for i = 0; i < ctx.home.sections.length(); i = i + 1 {
+    let s = ctx.home.sections[i]
+    if s.link != "" {
+      let (kind, si, ki) = (ctx.find_page)(s.link)
+      if kind > 0 {
+        out.push((strip_ordinal(plain(s.title)), Go(kind, si, ki)))
+      }
+    }
   }
-  let inner : Array[@html.Html] = [
-    @html.span(
-      attrs=attrs(
-        @style.Style::new()
-        .font_size(12.5)
-        .color(if on { c_head_ink } else { c_head_ink2 })
-        .font_weight(if on { @style.FontWeight::W600 } else { @style.FontWeight::W400 }),
-      ),
-      label,
-    ),
-  ]
-  if on {
-    inner.push(
-      @html.div(
-        attrs=attrs(
-          @style.Style::new()
-          .position(@style.Position::Absolute)
-          .left(@style.px(7.0))
-          .right_(@style.px(7.0))
-          .bottom(@style.px(0.0))
-          .height(@style.px(2.0))
-          .border_radius(1.0)
-          .background_color(c_accent),
-        ),
-        ([] : Array[@html.Html]),
-      ),
-    )
-  }
-  @html.button(
-    attrs=@html.Attrs::build()
-      .styles(
-        @style.Style::new()
-        .padding_horizontal(@style.px(9.0))
-        .padding_vertical(@style.px(9.0))
-        // ⚠️ 用 padding（不是 margin）留出间距：`on_mouseenter` 挂在按钮自己身上，
-        // 用 margin 的话"两条之间的缝"是死区 —— 鼠标划过会连续触发 leave/enter，
-        // 菜单在缝上闪。padding 让它整块都是可悬停面积。
-        .padding_left(@style.px(11.0))
-        .padding_right(@style.px(11.0))
-        .background_color("transparent"),
-      )
-      .on_mouseenter(_ => emit(Hover(i)))
-      .on_mouseleave(_ => emit(Hover(-1))),
-    // ⚠️ 用**传进来的** msg，别在这里自己再算一遍 —— 曾经这里写着 `emit(top_msg(ctx, home, i, model))`，
-    // 而那正好把调用点给的消息丢掉：`i = -1`（首页）与 `-2`（文档）都是负数，
-    // `top_msg` 算不出它们的语义 ⇒ 「首页」那条点了没反应（实测踩过，判据逮到的）。
-    on_click=emit(msg),
-    [@html.div(attrs=attrs(@style.Style::new().align_items(@style.Align::Center)), inner)],
-  )
+  out
 }
 
 ///|
-/// 那一排分段控件（含最右那条**换模式**的「文档」）。
+/// 剥掉中文小标题开头的序号（"一、" / "（一）" / "1."）。
 ///
-/// D2：**「文档」就在同一排的最右一栏，不给独立样式** —— 它和别的项只差一条竖细线
-/// （那是"这一条是换模式，不是换内容"的提示，不是"实心按钮"）。旧版把它做成实心按钮，
-/// 于是整排读起来是"内容项 + 一个动作按钮"两类东西 —— 那正是要拆掉的。
+/// §2.3：nav 标签**无序号**。只剥**开头**那一个，不动正文里别的字样。
+fn strip_ordinal(s : String) -> String {
+  let marks : Array[String] = [
+    "（一）", "（二）", "（三）", "（四）", "（五）", "（六）", "（七）", "（八）", "（九）", "（十）",
+    "一、", "二、", "三、", "四、", "五、", "六、", "七、", "八、", "九、", "十、",
+    "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10.", "1、", "2、", "3、",
+  ]
+  for m in marks {
+    if s.has_prefix(m) {
+      return s[m.length():].to_owned()
+    }
+  }
+  s
+}
 
 ///|
-/// 那一排分段控件（含最右那条**换模式**的「文档」）。
+/// 一条 nav 是不是**当前项**（顶栏那条要标出来）。
 ///
-/// D2：**「文档」就在同一排的最右一栏，不给独立样式** —— 它和别的项只差一条竖细线
-/// （那是"这一条是换模式，不是换内容"的提示，不是"实心按钮"）。旧版把它做成实心按钮，
-/// 于是整排读起来是"内容项 + 一个动作按钮"两类东西 —— 那正是要拆掉的。
-fn seg_bar(ctx : Ctx, home : Home, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
-  let items : Array[@html.Html] = [
-    nav_tab(home, -1, Top(-1), model.mode == 0 && model.sec < 0, emit),
-  ]
-  for i = 0; i < home.sections.length(); i = i + 1 {
-    items.push(nav_tab(home, i, top_msg(ctx, home, i, model), model.mode == 0 && model.sec == i, emit))
+/// 判据是"**当前页与它指向的页是同一页**"，不是"上次点了谁" —— 换页之后顶栏要跟着对。
+fn nav_current(model : Model, m : Msg) -> Bool {
+  match m {
+    Home => model.page == page_home
+    Shelf => model.page == page_shelf
+    Go(kind, i, k) =>
+      model.page == page_doc && model.sel.kind == kind && model.sel.i == i && model.sel.k == k
+    _ => false
   }
-  items.push(
-    @html.div(
-      attrs=attrs(
-        @style.Style::new()
-        .width(@style.px(1.0))
-        .height(@style.px(16.0))
-        .margin_horizontal(@style.px(8.0))
-        .background_color(c_head_on),
-      ),
-      ([] : Array[@html.Html]),
+}
+
+///|
+/// 主题开关上那个记号：跟随系统 `◐` / 亮 `☀` / 暗 `☾`。
+///
+/// 用字符而不是图标：**今天没有图标通道**（moobile 那边要先有矢量/图标那条路），
+/// 而这三个字符本来就表达"半明半暗 / 太阳 / 月亮"三态。
+fn pref_glyph(pref : Pref) -> String {
+  match pref {
+    Auto => "◐"
+    Light => "☀"
+    Dark => "☾"
+  }
+}
+
+///| 可点的图标钮（34×34，圆角 6）—— 顶栏右端那一排共用。
+fn icon_btn(theme : Theme, label : String, hint : String, msg : Msg, emit : @cmd.Emit[Msg]) -> @html.Html {
+  let p = theme.palette
+  @html.button(
+    attrs=attrs(
+      @style.Style::new()
+      .width(@style.px(34.0))
+      .height(@style.px(34.0))
+      .align_items(@style.Align::Center)
+      .justify_content(@style.Justify::Center)
+      .border_radius(r2)
+      .border_width(1.0)
+      .border_color(p.line1)
+      .background_color(p.canvas),
     ),
-  )
-  items.push(nav_tab(home, -2, Docs, model.mode == 1, emit))
-  // ⚠️ 这一排必须**能横向滚**：分栏条数由内容源决定（加一节就多一条），
-  // 而窗口可能比整排窄 —— 排不下时**最左边几条会跑到屏幕外**，点它们等于点空气
-  // （实测：第 9 条分栏进来之后，「首页」落到 x=1883、视口只有 1378 ⇒ `elementFromPoint` 返回 null）。
-  // 换行会破坏"顶栏是一行"的形态，所以走**横向滚动**这条路。
-  //
-  // `horizontal` 是 RN `ScrollView` 的 **prop**（不是样式键），而伪标签 `scroll` 只映射组件类型、
-  // 不带任何 prop ⇒ 得用 `prop_bool` 显式递（它走类型化那张表，React 收到的就是布尔 `true`；
-  // 若用 `prop_str` 会变成字符串 "true"，RNW 不一定认）。
-  @html.div(
-    attrs=attrs(@style.Style::new().flex(1.0)),
+    on_click=emit(msg),
     [
-      @html.node(
-        "scroll",
-        @html.Attrs::build()
-          .styles(@style.Style::new().flex(1.0))
-          .prop_bool("horizontal", true),
-        [
-          @html.div(
-            attrs=attrs(
-              @style.Style::new()
-              .flex_direction(@style.FlexDirection::Row)
-              .align_items(@style.Align::Center),
-            ),
-            items,
-          ),
-        ],
+      // `hint` 走可见文字之外：文本通道今天只有"看得见"这一种，所以记号 + 说明都用同一格
+      // （记号是主，说明挂在 `accessibilityLabel` 那条路上——今天没有可用的标注通道，留待补）
+      @html.span(
+        attrs=attrs(@style.Style::new().font_size(fs_sm).color(p.fg2).text_align(@style.TextAlign::Center)),
+        label,
       ),
     ],
   )
 }
 
 ///|
-/// **下拉菜单**（悬停出，或触摸时点一下展开）。
-///
-/// 挂在顶栏容器里、`position(Absolute)` 贴着那一排的下沿（`top: 100%`）——
-/// 于是它浮在正文上面而不是把正文顶下去（`render.mbt` 的 `styles_to_js` 认这个写法，
-/// 实测 `offsetParent` 就是那层 relative 的顶栏容器）。
-///
-/// 菜单项来自**内容源**：那一节里第一个"整项就是一个链接"的列表（见 `gen-content.mjs`）。
-/// 于是"给某条 tab 加个子菜单"= **在那一节里写个链接列表**，站点代码一个字不用改。
-
-///|
-/// **下拉菜单**（悬停出，或触摸时点一下展开）。
-///
-/// 挂在顶栏容器里、`position(Absolute)` 贴着那一排的下沿（`top: 100%`）——
-/// 于是它浮在正文上面而不是把正文顶下去（`render.mbt` 的 `styles_to_js` 认这个写法，
-/// 实测 `offsetParent` 就是那层 relative 的顶栏容器）。
-///
-/// 菜单项来自**内容源**：那一节里第一个"整项就是一个链接"的列表（见 `gen-content.mjs`）。
-/// 于是"给某条 tab 加个子菜单"= **在那一节里写个链接列表**，站点代码一个字不用改。
-fn seg_drop(home : Home, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
-  let i = if model.hover >= 0 { model.hover } else { model.drop }
-  let rows : Array[@html.Html] = []
-  if i >= 0 && i < home.sections.length() {
-    let sec = home.sections[i]
-    if sec.nav.length() > 0 {
-      for k = 0; k < sec.nav.length(); k = k + 1 {
-        rows.push(
-          @html.button(
+/// 一整条顶栏。
+fn topbar(theme : Theme, ctx : Ctx, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
+  let p = theme.palette
+  let compact = top_compact(model.vw)
+  // ── 左：站名（= 回首页的入口）
+  let brand = @html.button(
+    attrs=attrs(
+      @style.Style::new()
+      .flex_direction(@style.FlexDirection::Row)
+      .align_items(@style.Align::Center)
+      .gap(sp2)
+      .border_width(0.0)
+      .background_color(p.canvas),
+    ),
+    on_click=emit(Home),
+    [
+      @html.div(
+        attrs=attrs(
+          @style.Style::new()
+          .width(@style.px(20.0))
+          .height(@style.px(20.0))
+          .border_radius(r2)
+          .background_color(p.brand)
+          .align_items(@style.Align::Center)
+          .justify_content(@style.Justify::Center),
+        ),
+        [
+          @html.span(
             attrs=attrs(
-              @style.Style::new()
-              .padding_horizontal(@style.px(13.0))
-              .padding_vertical(@style.px(9.0))
-              .background_color("transparent"),
+              @style.Style::new().font_size(fs_aux).color(p.on_brand).font_weight(@style.FontWeight::W700),
             ),
-            on_click=emit(Nav(i, k)),
-            [
-              @html.span(
-                attrs=attrs(
-                  @style.Style::new().font_size(12.5).color(c_head_ink2),
-                ),
-                sec.nav[k].label,
-              ),
-            ],
+            "s",
           ),
-        )
-      }
-    } else if sec.link != "" {
-      // 没有菜单、但这一节是个"纯链接节"：给一句说明，
-      // 免得点下去"怎么跳到别处了"没有解释
-      rows.push(
-        @html.div(
+        ],
+      ),
+      @html.span(
+        attrs=attrs(@style.Style::new().font_size(15.0).color(p.fg1).font_weight(@style.FontWeight::W700)),
+        ctx.home.title,
+      ),
+    ],
+  )
+  // ── 中：nav（窄屏整排收起 —— 那是"这一排排不下"，不是版面换档；见 layout.mbt 的 top_compact）
+  let mid : Array[@html.Html] = []
+  if !compact {
+    for item in nav_items(ctx) {
+      let (label, m) = item
+      let cur = nav_current(model, m)
+      mid.push(
+        @html.button(
           attrs=attrs(
             @style.Style::new()
-            .padding_horizontal(@style.px(13.0))
-            .padding_vertical(@style.px(9.0)),
+            .padding_horizontal(@style.px(sp3))
+            .padding_vertical(@style.px(6.0))
+            .border_radius(r2)
+            .border_width(0.0)
+            .background_color(if cur { p.brand_soft } else { p.canvas }),
           ),
+          on_click=emit(m),
           [
             @html.span(
-              attrs=attrs(@style.Style::new().font_size(12.0).color(c_head_ink2)),
-              "点这一栏直接打开它指的那一页",
+              attrs=attrs(
+                @style.Style::new()
+                .font_size(fs_sm)
+                .color(if cur { p.brand } else { p.fg2 })
+                .font_weight(if cur { @style.FontWeight::W600 } else { @style.FontWeight::W400 }),
+              ),
+              label,
             ),
           ],
         ),
       )
     }
   }
-  @html.div(
-    attrs=attrs(
-      @style.Style::new()
-      .position(@style.Position::Absolute)
-      .top(@style.pct(100.0))
-      .left(@style.px(0.0))
-      .min_width(@style.px(220.0))
-      .padding_vertical(@style.px(5.0))
-      .border_top_width(1.0)
-      .border_top_color(c_head_on)
-      .background_color(c_head)
-      .z_index(20.0),
-    ),
-    [@html.div(attrs=attrs(@style.Style::new().align_items(@style.Align::FlexStart)), rows)],
-  )
-}
-
-///|
-/// 首屏上的按钮（官网那种"下一步去哪"）。
-
-///|
-/// 点顶栏的一条分栏时该发哪条消息（D3：**纯链接节**直接跳到它指的那一页；有菜单的先展开）。
-///
-/// 数据侧已经把这个节的目标认成了**页面键**（`content.generated.mbt` 的 `Section.link`），
-/// 这里只把键换算成"文档模式里的第几页"。认不出来（`kind < 0`）就退回普通分栏。
-fn top_msg(ctx : Ctx, home : Home, i : Int, model : Model) -> Msg {
-  if i < home.sections.length() {
-    if home.sections[i].nav.length() > 0 && model.drop != i {
-      return Top(i)
-    }
-    let key = home.sections[i].link
-    if key != "" {
-      let (kind, si, ki) = (ctx.find_page)(key)
-      if kind > 0 {
-        return Go(kind, si, ki)
-      }
-    }
-  }
-  Top(i)
-}
-
-///|
-/// 顶栏：**一行** —— 左边站名，右边一排分段控件（D2）；下面挂着可选的**下拉菜单**。
-///
-/// 为什么合成一行：旧版是两行（"站名 + 换模式按钮" / "分栏"），于是页面顶部有一行
-/// 只放一个按钮、很空。合起来之后「文档」成了同一排的最右一栏，和分栏同形（只有一条竖线分隔）。
-///
-/// ⚠️ 顶栏在**滚动容器外面**（`view` 里 topbar 与正文是兄弟）—— 这是"吸顶"在 RN 上
-/// 唯一可靠的表达（样式层里没有 `sticky`）。⚠️ **但目前还不成立**：正文那个 `scroll`
-/// 容器被撑成内容那么高 ⇒ 实际滚的是整个 document、顶栏会跟着走。
-/// 实测与三条候选见 `PLAN.md` 的 P2 未决项 —— 别把这条注释读成"已经吸顶了"。
-///
-/// 外层容器带 `position: relative`：下拉菜单靠它定位（`top: 100%` 贴着这一排的下沿）。
-
-///|
-/// 顶栏：**一行** —— 左边站名，右边一排分段控件（D2）；下面挂着可选的**下拉菜单**。
-///
-/// 为什么合成一行：旧版是两行（"站名 + 换模式按钮" / "分栏"），于是页面顶部有一行
-/// 只放一个按钮、很空。合起来之后「文档」成了同一排的最右一栏，和分栏同形（只有一条竖线分隔）。
-///
-/// ⚠️ 顶栏在**滚动容器外面**（`view` 里 topbar 与正文是兄弟）—— 这是"吸顶"在 RN 上
-/// 唯一可靠的表达（样式层里没有 `sticky`）。⚠️ **但目前还不成立**：正文那个 `scroll`
-/// 容器被撑成内容那么高 ⇒ 实际滚的是整个 document、顶栏会跟着走。
-/// 实测与三条候选见 `PLAN.md` 的 P2 未决项 —— 别把这条注释读成"已经吸顶了"。
-///
-/// 外层容器带 `position: relative`：下拉菜单靠它定位（`top: 100%` 贴着这一排的下沿）。
-fn topbar(ctx : Ctx, home : Home, model : Model, emit : @cmd.Emit[Msg]) -> @html.Html {
-  let show_drop = (model.hover >= 0 || model.drop >= 0) && model.mode == 0
-  let wrap : Array[@html.Html] = [
-    @html.div(
-      attrs=attrs(
-        @style.Style::new()
-        .padding_horizontal(@style.px(20.0))
-        .padding_vertical(@style.px(9.0))
-        .flex_direction(@style.FlexDirection::Row)
-        .align_items(@style.Align::Center),
-      ),
-      [
-        @html.span(
-          attrs=attrs(
-            @style.Style::new()
-            .font_family(mono)
-            .font_size(16.0)
-            .color(c_head_ink)
-            .font_weight(@style.FontWeight::W700),
-          ),
-          home.title,
-        ),
-        // ⚠️ 这里**不能**用 `flex(1.0)`：那一排是 [品牌, 空隙, 分段控件] 三个弹性项，
-        // 空隙与分段控件会**平分**剩余宽度（实测 1478 的排里各得 580），
-        // 于是分段控件只拿到 580 —— 而它要 961 才排得下 9 条分栏 ⇒ 只能看见一条。
-        // 固定间距 + 让分段控件**长到自己需要的宽度**（它内部再横向滚）。
-        @html.div(attrs=attrs(@style.Style::new().width(@style.px(14.0))), ([] : Array[@html.Html])),
-        seg_bar(ctx, home, model, emit),
-      ],
-    ),
+  // ── 右：主题三态开关（**今天右端只有它** —— 搜索与 llms 的理由见文件头）
+  let right : Array[@html.Html] = [
+    icon_btn(theme, pref_glyph(model.pref), pref_key(model.pref), SetTheme(next_pref(model.pref)), emit),
   ]
-  if show_drop {
-    wrap.push(seg_drop(home, model, emit))
-  }
   @html.div(
     attrs=attrs(
       @style.Style::new()
-      .position(@style.Position::Relative)
-      .background_color(c_head)
-      .z_index(10.0),
+      .height(@style.px(h_top))
+      .flex_shrink(0.0)
+      .flex_direction(@style.FlexDirection::Row)
+      .align_items(@style.Align::Center)
+      .gap(sp3)
+      .padding_horizontal(@style.px(sp5))
+      .background_color(p.canvas)
+      .border_bottom_width(1.0)
+      .border_bottom_color(p.line1)
+      .z_index(30.0),
     ),
-    wrap,
+    [
+      brand,
+      @html.div(
+        attrs=attrs(
+          @style.Style::new()
+          .flex_direction(@style.FlexDirection::Row)
+          .align_items(@style.Align::Center)
+          .gap(sp1),
+        ),
+        mid,
+      ),
+      @html.div(attrs=attrs(@style.Style::new().flex(1.0)), ([] : Array[@html.Html])),
+      @html.div(
+        attrs=attrs(
+          @style.Style::new()
+          .flex_direction(@style.FlexDirection::Row)
+          .align_items(@style.Align::Center)
+          .gap(sp2),
+        ),
+        right,
+      ),
+    ],
   )
 }
-
-///|
-/// 首屏 = H1 + 引言（`home.lede`）+ 两个"下一步"。

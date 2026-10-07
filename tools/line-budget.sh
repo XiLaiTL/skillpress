@@ -21,6 +21,11 @@
 #   · `lib/`            —— 冻结的旧 Node 版（D15：不回改，所以不管辖）
 #   · `tools/spike/`    —— P8.0 的一次性探针（不进包、也不进账）
 #   · `tools/baseline/` —— **生成物的基线**（244 KB 的 `content.generated.mbt` 是"内容"，不是源码）
+#   · `*.generated.mbt` —— **实例的内容包**（`press` 的产物，同样"是内容不是源码"）
+#     ⚠️ 为什么这条非加不可（2026-10-07 实测的分叉）：那份文件**没进 git**（生成物 + 忽略），
+#     所以"干净克隆里没有它 ⇒ 判据绿"、"本机 build 过实例 ⇒ 判据红"——
+#     同一条判据在两个环境下读数不同，而红的那个是**产物**，不是谁写坏了源码。
+#     一条判据的读数要是取决于"你本机跑没跑过构建"，它就会训练人忽略它。
 set -u
 cd "$(dirname "$0")/.."
 
@@ -31,9 +36,13 @@ list_files() {
   find . \( -name "*.mbt" -o -name "moon.pkg" \) \
     -not -path "*/node_modules/*" -not -path "*/.mooncakes/*" -not -path "*/_build/*" \
     -not -path "./lib/*" -not -path "./tools/spike/*" -not -path "./tools/baseline/*" \
+    -not -name "*.generated.mbt" \
     2>/dev/null
   # 入口与判据脚本（`tools/` 只查顶层：子目录里的是探针与基线，已在上面豁免）
-  find tools -maxdepth 1 \( -name "*.mjs" -o -name "*.sh" \) 2>/dev/null
+  # ⚠️ `.mbtx` 也算**源文件**（2026-10-07 起 `tools/` 里有它了 —— ② 把两个纯文本变换的工具
+  #    从 `.mjs` 换成了 `.mbtx`）。不列进来的话，这类文件**没有任何行长约束**，
+  #    而"没被任何判据覆盖的源文件"正是这套仓库最不想要的东西。
+  find tools -maxdepth 1 \( -name "*.mjs" -o -name "*.sh" -o -name "*.mbtx" \) 2>/dev/null
 }
 
 count_lines() { # 行数（以换行结尾的文件：wc -l 即可）

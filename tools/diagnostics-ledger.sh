@@ -38,11 +38,22 @@ SELFTEST=0
 # 新实现的源码范围 = **MoonBit 源码 + 薄 Node 胶水层**（`tools/*.mjs`：press / 引导层 / 归一化 / DOM 抓取）。
 # 为什么不含 `tools/*.sh`：那些是**判据自己** —— 里面必然大量引用旧诊断的原文（用来 grep 对账），
 # 扫进来会把 `ow` 行误判成"已经补上了"。`tools/spike/`（探针）与 `tools/baseline/`（基线）也不扫。
-NEW_SRC=$(ls engine/*/*.mbt engine/*/*/*.mbt cmd/*/*.mbt tools/*.mjs 2>/dev/null)
+# ⚠️ 扫描范围要跟着**源码搬家**走：P10 把 CLI 拆成"共享逻辑包 + 两个薄可执行件"之后，
+#    子命令的实现从 `cmd/skillpress/main.mbt` 搬到了 `cmd/skillpress/cli/*.mbt` ⇒ 少了这一层通配，
+#    账本会红着说"新源码里找不到 `--update-lock` 那三句话"，而它们其实**搬了地方、一个字没改**
+#    （实测 2026-10-07：三条 `ok` 全红）。搬家不是欠账，改的应该是这一行。
+# ⚠️ `tools/*.mbtx` 也要扫（2026-10-07，D40）：② 把两个纯文本变换的工具从 `.mjs` 换成了 `.mbtx`，
+#    少了这一项，那两份文件里的话就**不在账本的视野里** —— 与 R9 那次同一个形状的漏。
+NEW_SRC=$(ls engine/*/*.mbt engine/*/*/*.mbt cmd/*/*.mbt cmd/*/*/*.mbt tools/*.mjs tools/*.mbtx 2>/dev/null)
 
 # ── 账本：老位置|老关键句|档|新锚（ok/dev 要钉的句子；ow 留 `-`）|dev 列：PLAN 里的编号|覆盖它的判据
 #
 # `|` 是分隔符，锚点里**不许出现** `|`。老关键句取**够独特的一段**（别取太短，会误命中注释）。
+#
+# ⚠️ **"老位置"那一列是历史坐标，不是活文件**：迁移走完之后旧实现（`lib/*.mjs` / `bin/`）退役，
+#    那一列就只是"当初这句话在哪儿"的出处（判据**从来不**去 grep 它 —— 见下面那行注释）。
+#    留着它是因为**审计的链条要能追**：每一条 `ok` / `ow` 都得能指回"它是从哪句话来的"。
+#    谁要动这一列，先想清楚"追不回出处之后，这条账还凭什么存在"。
 LEDGER=$(cat <<'ROWS'
 lib/gen-content.mjs:199|代码块没闭合|ok|代码块没闭合|-|blocks-fixtures 夹具三
 lib/gen-content.mjs:238|表格缺分隔行|ok|表格缺分隔行|-|blocks-fixtures 夹具三
@@ -61,9 +72,9 @@ lib/gen-content.mjs:676|个代码块没配语法或为空，按原文渲染|ow|-
 lib/gen-content.mjs:800-814|gen-content --check：一致|dev|✓ 一致：|DG-check|tools/press.mjs --check（口径不同：只报"一致/不一致 + 第几行"）
 lib/highlight.mjs:135|见程序根 grammars/PROVENANCE.md 的取法|ow|-|DG-高亮指路|无
 lib/highlight.mjs:199|拼回来与原文不一致|ok|拼回来与原文不一致|-|无（参数格式与旧版不同，见审计）
-lib/highlight.mjs:263|一个代码块都没数到|ow|-|DG-audit|无（audit 闸门整条未移植）
-lib/highlight.mjs:322|召回率|ow|-|DG-audit|highlight-parity（更强，但依赖旧 npm 侧在场）
-lib/highlight.mjs:323|未上色比例|ow|-|DG-audit|同上
+lib/highlight.mjs:263|一个代码块都没数到|ok|一个代码块都没数到|-|cmd/skillpress/cli/audit.mbt（两边读数逐项相同）
+lib/highlight.mjs:322|召回率|ok|召回率|-|同上（夹具语料上：44/44 · 37/578 两边一致）
+lib/highlight.mjs:323|未上色比例|ok|未上色比例|-|同上
 lib/check.mjs:297|G1 frontmatter 缺失或未闭合|ok|G1 frontmatter 缺失或未闭合|-|engine/gates（真语料 76 行逐字节 + 22 条 wbtest）
 lib/check.mjs:300|G1 frontmatter 缺 description|ok|G1 frontmatter 缺 |-|同上
 lib/check.mjs:301|与目录名 "Y" 不一致|ok|与目录名 |-|同上
@@ -89,9 +100,9 @@ lib/check.mjs:631|skills.lock.json 已落锁：|ok|skills.lock.json 已落锁：
 lib/check.mjs:632|⚠️ 落锁 = 你**看过**这次的体量变化|ok|⚠️ 落锁 = 你**看过**这次的体量变化|-|新 CLI 的 check
 lib/check.mjs:627|✗ --update-lock：没有这个 skill：|ok|✗ --update-lock：没有这个 skill：|-|新 CLI 的 check（指名不存在的 skill ⇒ 退 2）
 lib/docfacts.mjs:564|根目录不存在：|ow|-|DG-facts|无（按 D18 搬去内容仓，不在核心里）
-lib/verify-site.mjs:325|没有 site/dist/bundle.js|ow|-|DG-verify|无（P8.3 未做）
-lib/verify-site.mjs:329|这条判据要真浏览器（RNW 的行为在 jsdom 里不可信）|ow|-|DG-verify|无（P8.3 未做）
-lib/verify-site.mjs:769|条不过|ow|-|DG-verify|无（P8.3 未做）
+lib/verify-site.mjs:325|没有 site/dist/bundle.js|ok|没有 site/dist/bundle.js|-|site-parity（22 行逐行一致）+ site-corpus-parity
+lib/verify-site.mjs:329|这条判据要真浏览器（RNW 的行为在 jsdom 里不可信）|ok|这条判据要真浏览器（RNW 在 jsdom 里不可信）|-|site-parity
+lib/verify-site.mjs:769|条不过|ok|条不过|-|site-parity
 bin/skillpress.mjs:67|不认识的子命令：|ow|-|DG-CLI|无（**新实现 rc=0**）
 bin/skillpress.mjs:73|还没做：${spec.todo}|ow|-|DG-CLI|无
 bin/skillpress.mjs:38|公共参数：--repo|ow|-|DG-CLI|无（新用法缺这三条）

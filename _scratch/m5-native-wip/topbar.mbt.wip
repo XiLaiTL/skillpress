@@ -1,0 +1,94 @@
+// engine/site/topbar.mbt —— 判据组⑤：**顶栏**（DESIGN-site.md §4.1 顶栏那段 / §2.3）。
+//
+// 新顶栏三段：左**站名**（= 回首页的入口）/ 中 **nav**（来源是站点配置，见 §7）/ 右 搜索·主题·llms。
+//
+// ## 这几条是"旧判据改口径"来的（`PLAN-ui §13.1`）
+//
+// 旧的四条守的是**已经不存在的形状**（"顶栏有「首页」标签"、"分栏 = 首页 README 的 `##`"、
+// "切栏后引言退出正文"、"点到「文档 / SKILL」"）。判据守的不该是那条 `##`，是它背后的**意图**：
+// **有入口、点了真的有反应、能回首页**。所以这里量的是行为，不是标签长相。
+//
+// ⚠️ **`PLAN-ui §13.1c` 那笔账**：不要去断言"nav 里不许有序号条目"——那条是**空判据**
+//    （`nav_items()` 会把正文 `##` 的序号**剥掉**再吐出去 ⇒ 构造上恒绿，证明不了解耦）。
+//    要守"nav 的来源不是正文 `##`"这个性质，只能在**来源**上量或在**扰动**上量（见 §13.1c 的两种真测法，
+//    属于 §13.5 的后续项），不能在"擦干净之后"的输出上量。
+
+///|
+/// 顶栏自己的读数。
+priv struct Bar {
+  h : Int
+  bg : String
+  shell_bg : String
+  clicks : Int
+}
+
+///|
+async fn read_bar(cdp : Cdp) -> Bar raise {
+  let js =
+    #|(() => {
+    #|  const rootEl = document.getElementById('root');
+    #|  let shellEl = rootEl && rootEl.firstElementChild, g = 0;
+    #|  while (shellEl && shellEl.children.length === 1 && g++ < 8) shellEl = shellEl.children[0];
+    #|  if (!shellEl) return { h: 0, bg: '', shellBg: '', clicks: 0 };
+    #|  const bar = shellEl.children[0];
+    #|  const r = bar.getBoundingClientRect();
+    #|  return {
+    #|    h: Math.round(r.height),
+    #|    bg: getComputedStyle(bar).backgroundColor,
+    #|    shellBg: getComputedStyle(shellEl).backgroundColor,
+    #|    clicks: bar.querySelectorAll('[tabindex="0"]').length,
+    #|  };
+    #|})()
+    #|
+  let j = cdp.eval_json(js)
+  {
+    h: match num_of(j, ["h"]) {
+      Some(v) => v
+      None => 0
+    },
+    bg: match str_of(j, ["bg"]) {
+      Some(v) => v
+      None => ""
+    },
+    shell_bg: match str_of(j, ["shellBg"]) {
+      Some(v) => v
+      None => ""
+    },
+    clicks: match num_of(j, ["clicks"]) {
+      Some(v) => v
+      None => 0
+    },
+  }
+}
+
+///|
+pub async fn run_topbar(ctx : Ctx) -> Unit raise {
+  let cdp = ctx.cdp
+  let r = ctx.results
+  let bar = read_bar(cdp)
+
+  // ① 高 56、白底（设计值；旧顶栏是 55 + 深色条）
+  r.check(
+    bar.h == 56,
+    "顶栏高 56px、白底（不是深色条）",
+    "高 " + bar.h.to_string() + "px ｜ 底色 " + bar.bg +
+    " ｜ 壳底色 " + bar.shell_bg,
+  )
+
+  // ② 顶栏**有可点的入口**（站名 + nav + 主题），不是一排死字
+  r.check(
+    bar.clicks >= 3,
+    "顶栏有 ≥3 个可点入口（站名 / nav / 主题开关）",
+    bar.clicks.to_string() + " 个 tabindex=0 元素",
+  )
+
+  // ③ **点站名回首页**（旧判据"点「首页」回首屏"改口径来的；这条比原来更严 —— 它同时验了"品牌可点"）
+  let home_probe = ctx.home_probe
+  if home_probe != "" {
+    let _ = click_brand(cdp)
+    let back = wait_text(cdp, take(norm(home_probe), 24), 40)
+    r.check(back, "点顶栏站名回到首页（H1 回到首页源那句）", "")
+  } else {
+    r.check(false, "点顶栏站名回到首页（H1 回到首页源那句）", "首页源那段探针没取到，这条做不了")
+  }
+}

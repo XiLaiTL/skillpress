@@ -3,6 +3,9 @@ import {
   "XiLaiTL/moobile/style" @style,
   "XiLaiTL/moobile/vendor/rabbita/html" @html,
   "XiLaiTL/moobile/vendor/rabbita/cmd" @cmd,
+  "XiLaiTL/moobile/sub" @sub,
+  "XiLaiTL/moobile/vendor/rabbita/dom" @dom,
+  "XiLaiTL/moobile/vendor/rabbita/url" @url,
 }
 
 supported_targets = "+js"

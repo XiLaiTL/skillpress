@@ -1,0 +1,244 @@
+<!doctype html>
+<!--
+  配色对照 —— 同一套迷你文档站，三套配色并排。
+
+  A = 现在站点的真实值（`skillpress/shell/theme.mbt` 那 13 个常量，原封不动）
+  B = VitePress 的真实值（本地 `vitepress@1.6.4` 的 `theme-default/styles/vars.css`，原封不动）
+  C = 建议值（中性灰沿用 VitePress 那一档，品牌色换成我们自己的；明暗两套齐全）
+
+  用途：别再拿文字描述配色了，直接看。右上角可切明暗（B/C 有深色，A 没有 —— 这本身就是结论之一）。
+-->
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>配色对照 · 现在的站 / VitePress / 建议</title>
+<style>
+  :root {
+    --page-bg: #f4f4f5; --page-fg: #18181b; --page-line: #e4e4e7; --page-muted: #71717a;
+    --font-sans: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  html[data-theme="dark"] { --page-bg: #101012; --page-fg: #e8e8ea; --page-line: #2a2a2e; --page-muted: #8b8b93; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 24px 64px; background: var(--page-bg); color: var(--page-fg);
+    font-family: var(--font-sans); font-size: 14px; line-height: 1.7;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--page-muted); font-size: 12.5px; margin-bottom: 20px; }
+  .topbar-right { position: fixed; top: 16px; right: 20px; display: flex; gap: 6px; }
+  .topbar-right button {
+    font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--page-line); background: var(--page-bg); color: var(--page-fg);
+  }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+  @media (max-width: 1180px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { border: 1px solid var(--page-line); border-radius: 12px; overflow: hidden; background: var(--page-bg); }
+  .phead { padding: 10px 14px; border-bottom: 1px solid var(--page-line); font-size: 13px; font-weight: 600; }
+  .phead span { display: block; font-weight: 400; font-size: 11.5px; color: var(--page-muted); margin-top: 2px; }
+  .mock { font-size: 13px; }
+
+  /* ── 迷你顶栏 ─────────────────────────────────────────────────────── */
+  .mnav { display: flex; align-items: center; gap: 10px; padding: 0 12px; height: var(--nav-h, 40px); background: var(--head-bg); color: var(--head-fg); border-bottom: 1px solid var(--head-line, transparent); }
+  .mbrand { font-family: var(--font-mono); font-size: var(--brand-size, 12px); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mtabs { display: flex; gap: 2px; margin-left: auto; white-space: nowrap; }
+  .mtabs i, .mtabs b { font-style: normal; font-weight: 400; font-size: 11.5px; padding: 4px 7px; color: var(--head-fg2); border-bottom: 2px solid transparent; }
+  .mtabs b { color: var(--head-fg); font-weight: 600; border-bottom-color: var(--brand); }
+
+  /* ── 迷你正文区 ───────────────────────────────────────────────────── */
+  .mrow { display: grid; grid-template-columns: var(--side-w, 120px) minmax(0, 1fr); min-height: 250px; }
+  .mside { background: var(--side-bg); border-right: 1px solid var(--line); padding: 10px 8px; }
+  .mgroup { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); padding: 4px 6px 6px; }
+  .mitem { padding: 5px 6px; border-radius: 6px; margin-bottom: 2px; }
+  .mitem.on { background: var(--brand-soft); }
+  .mlabel { display: block; font-size: 12px; color: var(--text-1); }
+  .mitem.on .mlabel { color: var(--brand); font-weight: 600; }
+  .mdesc { display: block; font-size: 10px; line-height: 1.4; color: var(--text-3); margin-top: 1px;
+           overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .mmain { padding: 14px 16px; background: var(--bg); }
+  .mkicker { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+  .mmain h3 { font-size: var(--h1-size, 18px); margin: 4px 0 8px; color: var(--text-1); letter-spacing: -.01em; }
+  .mmain p { font-size: var(--body-size, 13px); line-height: var(--body-lh, 1.7); color: var(--text-2); margin: 0 0 10px; max-width: var(--content-w, 100%); }
+  .mmain a { color: var(--brand); text-decoration: none; }
+  code { font-family: var(--font-mono); font-size: .88em; background: var(--code-inline-bg); color: var(--code-inline-fg); padding: 1px 4px; border-radius: 4px; }
+  .mcode { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.65; background: var(--code-bg); color: var(--code-fg);
+           border: 1px solid var(--code-line); border-radius: 8px; padding: 9px 11px; margin-bottom: 10px; overflow-x: auto; white-space: pre; }
+  .t-kw { color: var(--tok-kw); } .t-ty { color: var(--tok-ty); } .t-st { color: var(--tok-st); } .t-cm { color: var(--tok-cm); }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); color: var(--text-2); }
+  th { color: var(--text-3); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; background: var(--thead-bg); }
+  .pfoot { border-top: 1px solid var(--page-line); padding: 9px 14px; font-family: var(--font-mono); font-size: 10.5px; line-height: 1.65; color: var(--page-muted); }
+
+  /* ══ A：现在的站（暖纸）—— `skillpress/shell/theme.mbt` 原值 ══════════ */
+  .p-a {
+    --bg: #fffdf8; --side-bg: #eae3d5; --head-bg: #211a13; --head-fg: #fffdf8; --head-fg2: #b3a48c;
+    --text-1: #1a1410; --text-2: #5b4f3f; --text-3: #8b7c66;
+    --line: #ddd3c0; --brand: #8a2518; --brand-soft: #f2e2dd; --code-bg: #f0e9da; --code-fg: #1a1410;
+    --code-line: #ddd3c0; --code-inline-bg: #f0e9da; --code-inline-fg: #1a1410; --thead-bg: transparent;
+    --tok-kw: #8a2518; --tok-ty: #1d4e73; --tok-st: #3f6b47; --tok-cm: #9a8b73;
+    --brand-size: 12px; --nav-h: 40px; --side-w: 128px;
+  }
+  /* ══ B：VitePress 真值 —— `theme-default/styles/vars.css` 原值 ═════════ */
+  .p-b {
+    --bg: #ffffff; --side-bg: #f6f6f7; --head-bg: #ffffff; --head-fg: #3c3c43; --head-fg2: #67676c; --head-line: #e2e2e3;
+    --text-1: #3c3c43; --text-2: #67676c; --text-3: #929295;
+    --line: #e2e2e3; --brand: #3451b2; --brand-soft: rgba(100,108,255,.14);
+    --code-bg: #f6f6f7; --code-fg: #67676c; --code-line: #e2e2e3; --code-inline-bg: rgba(142,150,170,.14); --code-inline-fg: #3451b2;
+    --thead-bg: #f6f6f7; --tok-kw: #3451b2; --tok-ty: #18794e; --tok-st: #b8272c; --tok-cm: #929295;
+    --brand-size: 15px; --nav-h: 64px; --side-w: 150px; --body-size: 13px; --body-lh: 1.75; --h1-size: 18px;
+  }
+  html[data-theme="dark"] .p-b {
+    --bg: #1b1b1f; --side-bg: #161618; --head-bg: #1b1b1f; --head-fg: #dfdfd6; --head-fg2: #98989f; --head-line: #2e2e32;
+    --text-1: #dfdfd6; --text-2: #98989f; --text-3: #6a6a71;
+    --line: #2e2e32; --brand: #a8b1ff; --brand-soft: rgba(100,108,255,.16);
+    --code-bg: #161618; --code-fg: #98989f; --code-line: #2e2e32; --code-inline-bg: rgba(101,117,133,.16); --code-inline-fg: #a8b1ff;
+    --thead-bg: #202127; --tok-kw: #a8b1ff; --tok-ty: #3dd68c; --tok-st: #f66f81; --tok-cm: #6a6a71;
+  }
+  /* ══ C：建议 —— 中性灰沿用 VitePress 那一档，品牌色是我们自己的 ════════ */
+  .p-c {
+    --bg: #ffffff; --side-bg: #f7f7f8; --head-bg: #ffffff; --head-fg: #35363b; --head-fg2: #64656c; --head-line: #e5e5e8;
+    --text-1: #35363b; --text-2: #64656c; --text-3: #8f9096;
+    --line: #e5e5e8; --brand: #4f46e5; --brand-soft: rgba(79,70,229,.12);
+    --code-bg: #f7f7f8; --code-fg: #52535a; --code-line: #e5e5e8; --code-inline-bg: rgba(120,124,150,.14); --code-inline-fg: #4f46e5;
+    --thead-bg: #f7f7f8; --tok-kw: #4f46e5; --tok-ty: #0e7490; --tok-st: #15803d; --tok-cm: #8f9096;
+    --brand-size: 15px; --nav-h: 64px; --side-w: 150px; --body-size: 13px; --body-lh: 1.75; --h1-size: 18px;
+  }
+  html[data-theme="dark"] .p-c {
+    --bg: #18181b; --side-bg: #131316; --head-bg: #18181b; --head-fg: #e4e4e7; --head-fg2: #a1a1aa; --head-line: #27272a;
+    --text-1: #e4e4e7; --text-2: #a1a1aa; --text-3: #71717a;
+    --line: #27272a; --brand: #a5b4fc; --brand-soft: rgba(79,70,229,.20);
+    --code-bg: #131316; --code-fg: #a1a1aa; --code-line: #27272a; --code-inline-bg: rgba(113,113,122,.18); --code-inline-fg: #a5b4fc;
+    --thead-bg: #1f1f23; --tok-kw: #a5b4fc; --tok-ty: #67e8f9; --tok-st: #86efac; --tok-cm: #71717a;
+  }
+
+  /* ── 底部的数值对照表 ─────────────────────────────────────────────── */
+  .nums { margin-top: 26px; border: 1px solid var(--page-line); border-radius: 12px; overflow: hidden; }
+  .nums table { font-size: 12.5px; }
+  .nums th, .nums td { padding: 7px 12px; font-size: 12.5px; color: var(--page-fg); background: transparent; text-transform: none; letter-spacing: 0; }
+  .nums th { background: var(--page-bg); color: var(--page-muted); font-size: 11px; }
+  .nums td.n { font-family: var(--font-mono); font-size: 11.5px; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; border: 1px solid rgba(128,128,128,.35); }
+</style>
+</head>
+<body>
+<div class="topbar-right">
+  <button id="tg">切换明暗</button>
+</div>
+
+<h1>配色对照</h1>
+<p class="sub">同一套迷你文档站 · A = 现在的站（真实常量）｜B = VitePress（真实变量值，本地 <code>vitepress@1.6.4</code>）｜C = 建议（中性灰沿用 B，品牌色换成我们的）</p>
+
+<div class="grid">
+  <!-- ═══════════ A ═══════════ -->
+  <div class="panel p-a">
+    <div class="phead">A · 现在的站（暖纸）<span>值来自 <code>shell/theme.mbt</code>，13 个常量；<b>只有一套，没有深色</b></span></div>
+    <div class="mock">
+      <div class="mnav">
+        <span class="mbrand">skillpress —— 把一堆 skill 印成一个站点</span>
+        <span class="mtabs"><b>首页</b><i>一、站点的形状</i><i>二、书架</i></span>
+      </div>
+      <div class="mrow">
+        <div class="mside">
+          <div class="mgroup">Skill 书架</div>
+          <div class="mitem on"><span class="mlabel">moobile-app-development</span><span class="mdesc">用 moobile 写应用侧代码（不改库）的入口：TEA 四件套…</span></div>
+          <div class="mitem"><span class="mlabel">moobile-pitfalls</span><span class="mdesc">反复栽的那些坑与真因…</span></div>
+        </div>
+        <div class="mmain">
+          <div class="mkicker">moobile-app-development · skill</div>
+          <h3>组件与写法</h3>
+          <p>正文段落，用来判断行宽、字色与密度。<a href="#">一个链接</a>与行内 <code>@style</code> 代码混排。</p>
+          <div class="mcode"><span class="t-cm">// 构建期已上色</span>
+<span class="t-kw">pub fn</span> card(title : <span class="t-ty">String</span>) -&gt; <span class="t-ty">Html</span> { … }</div>
+          <table><tr><th>规矩</th><th>为什么</th></tr><tr><td>样式只走 @style</td><td>字符串通道编译期分不开</td></tr></table>
+        </div>
+      </div>
+    </div>
+    <div class="pfoot">bg #f2ede3 ｜ side #eae3d5 ｜ card #fffdf8 ｜ ink #1a1410 ｜ ink2 #5b4f3f ｜ ink3 #8b7c66<br>accent #8a2518 ｜ line #ddd3c0 ｜ code #f0e9da ｜ <b>head #211a13（深色顶栏）</b></div>
+  </div>
+
+  <!-- ═══════════ B ═══════════ -->
+  <div class="panel p-b">
+    <div class="phead">B · VitePress 真实值<span><code>--vp-c-*</code>，浅色在 <code>:root</code>、深色在 <code>.dark</code>，成对</span></div>
+    <div class="mock">
+      <div class="mnav">
+        <span class="mbrand">VitePress</span>
+        <span class="mtabs"><b>Guide</b><i>Reference</i><i>2.0.0</i></span>
+      </div>
+      <div class="mrow">
+        <div class="mside">
+          <div class="mgroup">Introduction</div>
+          <div class="mitem on"><span class="mlabel">What is VitePress?</span></div>
+          <div class="mitem"><span class="mlabel">Getting Started</span></div>
+          <div class="mitem"><span class="mlabel">Routing</span></div>
+        </div>
+        <div class="mmain">
+          <div class="mkicker">Guide</div>
+          <h3>Getting Started</h3>
+          <p>Same paragraph, VitePress colours. Inline <code>code</code> and a <a href="#">link</a>.</p>
+          <div class="mcode"><span class="t-cm"># ESM-only package</span>
+<span class="t-kw">export default</span> { title: <span class="t-st">'VitePress'</span> }</div>
+          <table><tr><th>Item</th><th>Value</th></tr><tr><td>--vp-c-bg</td><td>#ffffff</td></tr></table>
+        </div>
+      </div>
+    </div>
+    <div class="pfoot">bg #ffffff ｜ bg-alt #f6f6f7 ｜ bg-elv #202127(暗) ｜ text-1 #3c3c43 ｜ text-2 #67676c ｜ text-3 #929295<br>border #c2c2c4 ｜ divider #e2e2e3 ｜ brand #3451b2 ｜ soft rgba(100,108,255,.14)</div>
+  </div>
+
+  <!-- ═══════════ C ═══════════ -->
+  <div class="panel p-c">
+    <div class="phead">C · 建议（中性灰 + 我们自己的品牌色）<span>明暗两套齐；<code>#4f46e5</code> / 深色 <code>#a5b4fc</code></span></div>
+    <div class="mock">
+      <div class="mnav">
+        <span class="mbrand">skillpress</span>
+        <span class="mtabs"><b>首页</b><i>文档</i><i>规矩</i></span>
+      </div>
+      <div class="mrow">
+        <div class="mside">
+          <div class="mgroup">Skill 书架 · 6</div>
+          <div class="mitem on"><span class="mlabel">应用开发</span><span class="mdesc">TEA 四件套 · 首帧入口 · @html DSL…</span></div>
+          <div class="mitem"><span class="mlabel">踩坑记录</span><span class="mdesc">反复栽的那些坑与真因…</span></div>
+        </div>
+        <div class="mmain">
+          <div class="mkicker">应用开发 · skill</div>
+          <h3>组件与写法</h3>
+          <p>正文段落：中性灰底、三级文字色、行宽收窄。<a href="#">一个链接</a>与行内 <code>@style</code> 代码。</p>
+          <div class="mcode"><span class="t-cm">// 构建期已上色</span>
+<span class="t-kw">pub fn</span> card(title : <span class="t-ty">String</span>) -&gt; <span class="t-ty">Html</span> { … }</div>
+          <table><tr><th>规矩</th><th>为什么</th></tr><tr><td>样式只走 @style</td><td>字符串通道编译期分不开</td></tr></table>
+        </div>
+      </div>
+    </div>
+    <div class="pfoot">bg #ffffff ｜ side #f7f7f8 ｜ text-1 #35363b ｜ text-2 #64656c ｜ text-3 #8f9096<br>line #e5e5e8 ｜ brand #4f46e5 ｜ soft rgba(79,70,229,.12) ｜ code-bg #f7f7f8（暗色见切换）</div>
+  </div>
+</div>
+
+<div class="nums">
+  <table>
+    <tr><th>项</th><th>A 现在的站</th><th>B VitePress</th><th>C 建议</th></tr>
+    <tr><td>页面底</td><td class="n"><span class="sw" style="background:#f2ede3"></span>#f2ede3 暖纸</td><td class="n"><span class="sw" style="background:#fff"></span>#ffffff</td><td class="n"><span class="sw" style="background:#fff"></span>#ffffff</td></tr>
+    <tr><td>次级面（侧栏）</td><td class="n"><span class="sw" style="background:#eae3d5"></span>#eae3d5（比底更暗）</td><td class="n"><span class="sw" style="background:#f6f6f7"></span>#f6f6f7（比底略暗）</td><td class="n"><span class="sw" style="background:#f7f7f8"></span>#f7f7f8</td></tr>
+    <tr><td>正文色</td><td class="n">#5b4f3f（两级半）</td><td class="n">#3c3c43 / #67676c / #929295（三级）</td><td class="n">#35363b / #64656c / #8f9096</td></tr>
+    <tr><td>分隔线</td><td class="n">#ddd3c0（暖，与底同调）</td><td class="n">#e2e2e3 + border #c2c2c4（两级）</td><td class="n">#e5e5e8 + #c8c9ce</td></tr>
+    <tr><td>品牌色</td><td class="n"><span class="sw" style="background:#8a2518"></span>#8a2518 朱砂</td><td class="n"><span class="sw" style="background:#3451b2"></span>#3451b2 靛</td><td class="n"><span class="sw" style="background:#4f46e5"></span>#4f46e5 靛紫</td></tr>
+    <tr><td>品牌淡底(选中/行内码)</td><td class="n">实色 #f2e2dd（另加一个色）</td><td class="n">rgba(100,108,255,.14)（**半透明，跟着底走**）</td><td class="n">rgba(79,70,229,.12)</td></tr>
+    <tr><td>顶栏</td><td class="n"><span class="sw" style="background:#211a13"></span>#211a13 近黑棕（与正文两套气质）</td><td class="n">白底 + 1px 线（同一套）</td><td class="n">白底 + 1px 线</td></tr>
+    <tr><td>正文</td><td class="n">14px / 行高 1.85</td><td class="n">16px / 行高 28px(1.75)</td><td class="n">15.5px / 1.75</td></tr>
+    <tr><td>正文行宽</td><td class="n">880px</td><td class="n">688px</td><td class="n">720px</td></tr>
+    <tr><td>侧栏宽 / 顶栏高</td><td class="n">292px / ≈40px</td><td class="n">272px / 64px</td><td class="n">272px / 56px</td></tr>
+    <tr><td>阴影</td><td class="n">无（靠 1px 边框撑）</td><td class="n">5 档，全部 4%–16% 透明</td><td class="n">照 B 的 5 档</td></tr>
+    <tr><td>深色</td><td class="n">❌ 没有</td><td class="n">✅ 全套（<code>.dark</code>）</td><td class="n">✅ 全套</td></tr>
+  </table>
+</div>
+
+<script>
+(function () {
+  var r = document.documentElement;
+  document.getElementById('tg').addEventListener('click', function () {
+    r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark';
+  });
+})();
+</script>
+</body>
+</html>
