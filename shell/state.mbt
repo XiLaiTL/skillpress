@@ -75,6 +75,11 @@ priv struct Model {
   sheet : Int
   /// 窄屏贴边按钮的两级：`0` 贴边停着 / `1` 已经浮出（第二次点才弹 sheet）。
   peek : Int
+  /// **跟读高亮**：现在读到第几节（`-1` = 还没量到 / 这一页没有分节）。
+  active : Int
+  /// 每一节的**绝对偏移**（相对内容区的内容坐标系，见 `toc.mbt` 的 `section_offsets`）。
+  /// ⚠️ 它只是一个**缓存**：只在"第一次 / 跨节 / 换了页"时重锚，滚动时用纯算术（不碰 DOM）。
+  offsets : Array[Double]
 } derive(Eq)
 
 
@@ -103,6 +108,9 @@ pub enum Msg {
   /// **点目录某一条**：滚到正文里那一节的锚点（下标 = 目录里的第几条，从 0 数）。
   /// 动作由 `@sub.scroll_to_node` 发 —— 见 `shell/toc.mbt` 的账。
   TocTo(Int)
+  /// **内容区滚了**（`@sub.on_node_scroll("prose", …)`，载荷 = 它当前的 `scrollTop`）。
+  /// 跟读高亮就靠它：滚动时**纯算术**算"现在读的是哪一节"（见 `toc.mbt` 的 `active_of`）。
+  ProseScrolled(Double)
   /// **地址变了**：后退 / 前进 / 手改地址 / 点同文档链接（`on_url_changed` 递过来的是整条 URL）。
   /// 载荷是 hash 那一段（`#/…`）—— 与 `route.mbt` 的解析口径一致。
   UrlChanged(String)
@@ -151,6 +159,10 @@ fn initial(ctx : Ctx) -> Model {
     sys_dark: dark_now(),
     sheet: -1,
     peek: 0,
+    // 跟读高亮：装载后由 `on_node_scroll` **补的那一次**填上（订阅会先推一次当前 scrollTop），
+    // 所以这两格一开始就是空的，不用同步读 DOM（首屏那会儿 DOM 里还没有东西）。
+    active: -1,
+    offsets: [],
   }
 }
 
@@ -166,11 +178,13 @@ fn initial(ctx : Ctx) -> Model {
 fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model, @cmd.Cmd) {
   match msg {
     Home => {
-      let next = { ..model, page: page_home }
+      // ⚠️ 换页必须清掉跟读高亮的缓存（`active` / `offsets`）：它们是**按这一页的小节**量的，
+      //    留着会拿上一页的偏移表算这一页 —— 症状是"高亮停在一个不存在的小节上"。
+      let next = { ..model, page: page_home, active: -1, offsets: [] }
       (next, push_url_cmd(hash_of(next.page, next.sel, ctx.docs)))
     }
     Shelf => {
-      let next = { ..model, page: page_shelf }
+      let next = { ..model, page: page_shelf, active: -1, offsets: [] }
       (next, push_url_cmd(hash_of(next.page, next.sel, ctx.docs)))
     }
     Go(kind, i, k) => {
@@ -180,7 +194,7 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
       for j = 0; j < model.open.length(); j = j + 1 {
         next.push(if j == i { true } else { model.open[j] })
       }
-      let moved = { ..model, page: page_doc, sel: { kind, i, k }, open: next }
+      let moved = { ..model, page: page_doc, sel: { kind, i, k }, open: next, active: -1, offsets: [] }
       (moved, push_url_cmd(hash_of(moved.page, moved.sel, ctx.docs)))
     }
     UrlChanged(h) => {
@@ -196,7 +210,8 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
       } else {
         model.open
       }
-      ({ ..model, page, sel, open: next }, @cmd.none)
+      // 地址变了也可能换了页 ⇒ 同样清掉高亮缓存（见 `Home` 那条注释）
+      ({ ..model, page, sel, open: next, active: -1, offsets: [] }, @cmd.none)
     }
     Toggle(i) => {
       let next : Array[Bool] = []
@@ -208,6 +223,29 @@ fn update(ctx : Ctx, model : Model, msg : Msg, _emit : @cmd.Emit[Msg]) -> (Model
     Resized(w) => ({ ..model, vw: w }, @cmd.none)
     /// 两级：第一次点只让按钮**浮出**，第二次点才弹 sheet；点开着的那一个 = 收起
     /// （DESIGN §4.3："平时贴边停靠 → 第一次点浮出来 → 第二次点弹层"）。
+    ProseScrolled(top) => {
+      let toc = toc_for(ctx, model)
+      if toc.length() == 0 {
+        // 这一页没有分节（书架 / 404）⇒ 不量、不高亮
+        (model, @cmd.none)
+      } else if model.offsets.length() != toc.length() {
+        // 第一次（或换了页/节数变了）：**量一遍**每一节的绝对偏移
+        let offs = section_offsets(prose_node(), toc.length())
+        ({ ..model, offsets: offs, active: active_of(offs, top) }, @cmd.none)
+      } else {
+        let a = active_of(model.offsets, top)
+        if a == model.active {
+          // ⚠️ **值没变就返回同一个 model** —— 滚动事件是高频的（一次拖动能上百个），
+          //    每次都造新 Model 会让整棵树重渲染。与 `hosttheme` 那条轮询同一条纪律。
+          (model, @cmd.none)
+        } else {
+          // 跨节了（或尺寸变了导致偏移过期）：重锚一次 —— 顺带把"字体/主题/窗口变了"
+          // 这类偏移漂移自愈掉。
+          let offs = section_offsets(prose_node(), toc.length())
+          ({ ..model, offsets: offs, active: active_of(offs, top) }, @cmd.none)
+        }
+      }
+    }
     TocTo(i) =>
       // 滚到那一节。⚠️ 节点名由 `heading_anchor(i)` **两边各自算**（目录行与正文标题），
       //    口径是"第 i 个 h2/h3" —— 同一次渲染里两边数出来的顺序必然一致。
@@ -257,6 +295,10 @@ fn subs(_model : Model, emit : @cmd.Emit[Msg]) -> @sub.Sub {
     //    所以"系统换了明暗"用 2 秒轮询顶上。代价照写：**粒度 2 秒** + 一条常驻定时器；
     //    真正的事件通道（`prefers-color-scheme` 的 change）留给 moobile 那侧补。
     @sub.every(2000, emit(SysTick)),
+    // **内容区的滚动**（跟读高亮那条通道）：载荷 = 那个容器当前的 scrollTop。
+    // ⚠️ 它是**订阅**，不是轮询 —— 而且装载后会**先补一次当前值**（moobile 那边特意做的），
+    //    所以首屏就有高亮，不必等用户先滚一下。
+    @sub.on_node_scroll(prose_node(), fn (v) { emit(ProseScrolled(v)) }),
   ])
 }
 

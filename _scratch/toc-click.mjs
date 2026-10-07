@@ -114,6 +114,61 @@ if (rows && rows.length >= 2) {
   say(near2 && near2.id !== near.id, `两次点击落到**不同**的节（${near ? near.id : '?'} vs ${near2 ? near2.id : '?'}）—— 目录是按条目跳的`);
 }
 
+// ── ⑤⑥ **跟读高亮**：目录行要跟着"内容区滚到哪"换 ──────────────────────────────
+//
+// 判定用**生效读数**（计算样式），不是应用自己报的 state：
+// 高亮 = 品牌色（浅色主题 --brand）+ 加重；并且**必须有且只有一条**是高亮的（"全都高亮"也算红）。
+const BRAND = 'rgb(79, 70, 229)';
+const readRows = () =>
+  cdp.eval(
+    '(() => {' +
+      'const w = document.documentElement.clientWidth;' +
+      'return [...document.querySelectorAll("[tabindex]")]' +
+      '.map((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e);' +
+      'return { text: (e.textContent || "").trim(), left: Math.round(b.left), x: b.left + b.width / 2, y: b.top + b.height / 2, color: cs.color, weight: cs.fontWeight }; })' +
+      '.filter(r => r.left > w * 0.7 && r.text.length > 1 && r.text.length < 40);' +
+      '})()',
+  );
+const activeOf = (rows) => rows.map((r, i) => (r.color === BRAND ? i : -1)).filter((i) => i >= 0);
+console.log('');
+console.log('⑤ 跟读高亮（看**计算样式**：品牌色 ' + BRAND + ' + 加重）');
+const rows0 = await readRows();
+{
+  const a0 = activeOf(rows0);
+  say(a0.length === 1, '装载后**有且只有一条**高亮（实测 ' + a0.length + ' 条）');
+  say(a0[0] === 0, '装载后高亮在第 **0** 条（实测第 ' + a0[0] + ' 条）—— 首屏就有高亮，不必等用户先滚');
+  const weights = rows0.map((r) => r.weight).join('/');
+  say(
+    rows0.every((r, i) => (i === a0[0] ? r.weight === '600' : r.weight === '400')),
+    '加重跟着走：高亮那条 600、其余 400（实测 ' + weights + '）',
+  );
+}
+
+console.log('');
+console.log('⑥ 滚动内容区 ⇒ 高亮跟着换（这才是"跟读"）');
+const target = rows0.length >= 5 ? 4 : rows0.length - 1;
+{
+  const scrolled = await cdp.eval(
+    '(() => {' +
+      'const sec = document.getElementById("sec-' + target + '");' +
+      'const pane = (() => { let el = document.getElementById("sec-0");' +
+      'while (el && el !== document.body) { const cs = getComputedStyle(el);' +
+      'if (el.scrollHeight > el.clientHeight + 20 && /(auto|scroll)/.test(cs.overflowY)) return el; el = el.parentElement; } return null; })();' +
+      'if (!sec || !pane) return null;' +
+      'const delta = sec.getBoundingClientRect().top - pane.getBoundingClientRect().top;' +
+      'pane.scrollTop = pane.scrollTop + delta + 30;' +
+      'return Math.round(pane.scrollTop);' +
+      '})()',
+  );
+  await sleep(700);
+  const rows1 = await readRows();
+  const a1 = activeOf(rows1);
+  say(scrolled !== null, '把内容区滚到第 ' + target + ' 节附近（scrollTop=' + scrolled + '）');
+  say(a1.length === 1, '滚动之后仍**有且只有一条**高亮（实测 ' + a1.length + ' 条）');
+  say(a1[0] === target, '高亮**跟着滚**换到第 ' + target + ' 条（实测第 ' + a1[0] + ' 条）');
+}
+
+
 const errs = (cdp.events || []).filter((e) => e.method === 'Runtime.exceptionThrown' || (e.method === 'Log.entryAdded' && e.params?.entry?.level === 'error'));
 console.log(`\n页面 JS 错误：${errs.length} 条`);
 say(errs.length === 0, '页面无 JS 报错');

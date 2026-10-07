@@ -138,7 +138,7 @@ fn sheet_body(
     sidebar(theme, ctx, model, emit, toc, true)
   } else if which == 2 {
     // 目录 = 树里那一段（同一份渲染）
-    toc_tree_mount(theme, toc, emit)
+    toc_tree_mount(theme, toc, emit, model.active)
   } else {
     let rows : Array[@html.Html] = []
     // 一级导航（就是顶栏那排 —— 窄屏时它进了这里）

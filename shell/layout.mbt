@@ -48,6 +48,7 @@ fn column(
   bg : String,
   border_side : Int,
   children : Array[@html.Html],
+  id : String?,
 ) -> @html.Html {
   let mut s = @style.Style::new()
     .flex_direction(@style.FlexDirection::Column)
@@ -64,7 +65,14 @@ fn column(
   if border_side == 2 {
     s = s.border_left_width(1.0).border_left_color(theme.palette.line1)
   }
-  @html.div(attrs=attrs(s), children)
+  // 节点名（`Attrs::id`）：**跟读高亮**要订阅"内容区这个滚动容器"的滚动，
+  // 而订阅与测量都按名字找节点（moobile 的节点寻址，见 `sub/node.mbt`）。
+  // 只给**内容栏**（`border_side == 0` 那一栏）名字：侧栏/目录轨今天没人订阅。
+  let a = match id {
+    Some(n) => attrs(s).id(n)
+    None => attrs(s)
+  }
+  @html.div(attrs=a, children)
 }
 
 ///|
@@ -83,12 +91,12 @@ pub fn shell(
   let p = theme.palette
   let cols : Array[@html.Html] = []
   match side {
-    Some(h) => cols.push(column(theme, Some(w_side), p.surface2, 1, [h]))
+    Some(h) => cols.push(column(theme, Some(w_side), p.surface2, 1, [h], None))
     None => ()
   }
-  cols.push(column(theme, None, p.canvas, 0, [main]))
+  cols.push(column(theme, None, p.canvas, 0, [main], Some(prose_node())))
   match toc {
-    Some(h) => cols.push(column(theme, Some(w_toc), p.canvas, 2, [h]))
+    Some(h) => cols.push(column(theme, Some(w_toc), p.canvas, 2, [h], None))
     None => ()
   }
   let row = @html.div(

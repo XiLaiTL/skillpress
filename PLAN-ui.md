@@ -872,13 +872,13 @@ wc -l shell/*.mbt                           # 每个 ≤400；实例 app.mbt 仍
 
 | # | 件 | 卡在哪 |
 |---|---|---|
-| ⑤ | 目录**可点** + **跟读高亮** | 🟡 **上半已通（2026-10-07）**：moobile 补了节点寻址（`Attrs::id` + `@sub.scroll_to_node` / `node_rect` / `node_scroll_top`），站点目录行改成 `@html.button` ⇒ **可点了**（读数：`_scratch/toc-click.mjs`，点最后一行 sec-7 顶到上沿差 0px、再点第一行回 sec-0）。**下半仍卡**：跟读高亮要的是**容器级滚动订阅**，`@sub` 今天只给了**一次性读**（`on_scroll` 是**文档级**滚动，语义不同）⇒ 下一刀在 moobile |
+| ⑤ | 目录**可点** + **跟读高亮** | ✅ **两半都通了（2026-10-07）**：moobile 补了节点寻址（`Attrs::id` + `@sub.scroll_to_node` / `node_rect` / `node_scroll_top`）与**容器级滚动订阅**（`@sub.on_node_scroll`，捕获阶段监听 + 装载补一次当前值）；站点侧目录行改 `@html.button` + **量一遍偏移 → 纯算术算当前节**。读数（`_scratch/toc-click.mjs`，真 Chrome）：点最后一行 ⇒ sec-7 顶到上沿差 0px、再点第一行回 sec-0；装载后**恰好一条**高亮在第 0 条、滚到第 4 节 ⇒ 高亮换到第 4 条 |
 | ⑥ | 搜索 ⌘K | 要**构建期索引** + **浮层**（portal + 遮罩 + 点击穿透）—— `@style` 里 `pointer` 命中 0、无 portal |
 | ⑦ | `llms.txt` + 每页 `.md` 原文出口 | 要**生成期产物**（`press` 多产一份 + 每页 `.md` 的地址）；与 ② 的 URL 方案共用地址 |
 | ⑧ | 甲级样式 `cursor` / `box_shadow` / `transform` | **跨仓 moobile**（D-UI-4 已拍 B）。观感大头（阴影 / 抽屉位移 / 悬停手感）全在这一格里；做完 ⑤ 的"浮出"与 ⑥ 的浮层也都沾光 |
 
-**moobile 侧要补的能力清单（照 ⑤⑧ 攒着，一起做更省）**：`cursor` ✅ · `box_shadow` ✅ · **滚到节点** ✅ · **元素测量** ✅ ·
-`transform`（⬜ 未动）· **容器级滚动订阅**（⬜ 未动，⑤ 下半的前置）。
+**moobile 侧要补的能力清单（照 ⑤⑧ 攒着，一起做更省）**：`cursor` ✅ · `box_shadow` ✅ · **滚到节点** ✅ ·
+**元素测量** ✅ · **容器级滚动订阅** ✅ · `transform`（⬜ 未动 —— 现在只剩它一个）。
 
 ### 13.6 路由接线（功能排期，2026-10-07 用户定"先齐功能、判据挂起"）
 

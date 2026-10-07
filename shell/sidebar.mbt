@@ -176,7 +176,7 @@ fn sidebar(
         // ★ 目录就挂在**这一条**下面（用户拍定：不是塞到侧栏底部）
         if self && mount_toc {
           hung = true
-          kids.push(toc_tree_mount(theme, toc, emit))
+          kids.push(toc_tree_mount(theme, toc, emit, model.active))
         }
       }
       items.push(
@@ -194,7 +194,7 @@ fn sidebar(
       // 主题页（不是子页）⇒ 目录挂在它那棵子树的最下面
       if is_self && mount_toc {
         hung = true
-        items.push(toc_tree_mount(theme, toc, emit))
+        items.push(toc_tree_mount(theme, toc, emit, model.active))
       }
     }
   }
@@ -210,7 +210,7 @@ fn sidebar(
           .border_top_width(1.0)
           .border_top_color(p.line1),
         ),
-        [toc_tree_mount(theme, toc, emit)],
+        [toc_tree_mount(theme, toc, emit, model.active)],
       ),
     )
   }
